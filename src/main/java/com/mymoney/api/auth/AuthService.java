@@ -51,10 +51,10 @@ public class AuthService {
     @Transactional
     public AuthResponse refresh(HttpServletRequest request, HttpServletResponse response) {
         String rawRefreshToken = refreshTokenService.extractRefreshToken(request)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token ausente."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token is missing."));
 
         RefreshToken refreshToken = refreshTokenService.findValidToken(rawRefreshToken)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token inválido."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token is invalid."));
 
         refreshTokenService.revoke(refreshToken);
         return issueTokens(refreshToken.getMember(), response);
@@ -72,11 +72,11 @@ public class AuthService {
     public AuthUserResponse currentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getName() == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuário não autenticado.");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User is not authenticated.");
         }
 
         FamilyMember member = memberRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuário não encontrado."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User was not found."));
 
         return mapUser(member);
     }
@@ -96,11 +96,11 @@ public class AuthService {
                 member.getName(),
                 member.getEmail(),
                 member.getRole().name(),
-                member.isMesadaEnabled()
+                member.isAllowanceEnabled()
         );
     }
 
     private ResponseStatusException invalidCredentials() {
-        return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email ou senha inválidos.");
+        return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password.");
     }
 }

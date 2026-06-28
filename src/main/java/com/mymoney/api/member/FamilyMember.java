@@ -34,8 +34,8 @@ public class FamilyMember {
     @Column(nullable = false)
     private boolean active;
 
-    @Column(name = "mesada_enabled", nullable = false)
-    private boolean mesadaEnabled;
+    @Column(name = "allowance_enabled", nullable = false)
+    private boolean allowanceEnabled;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -102,11 +102,11 @@ public class FamilyMember {
         this.active = active;
     }
 
-    public boolean isMesadaEnabled() {
-        return mesadaEnabled;
+    public boolean isAllowanceEnabled() {
+        return allowanceEnabled;
     }
 
-    public void setMesadaEnabled(boolean mesadaEnabled) {
-        this.mesadaEnabled = mesadaEnabled;
+    public void setAllowanceEnabled(boolean allowanceEnabled) {
+        this.allowanceEnabled = allowanceEnabled;
     }
 }

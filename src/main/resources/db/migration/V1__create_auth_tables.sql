@@ -5,7 +5,7 @@ create table if not exists family_members (
     password_hash varchar(120) not null,
     role varchar(20) not null,
     active boolean not null default true,
-    mesada_enabled boolean not null default false,
+    allowance_enabled boolean not null default false,
     created_at timestamp with time zone not null,
     updated_at timestamp with time zone not null
 );
