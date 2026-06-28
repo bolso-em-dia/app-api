@@ -16,7 +16,6 @@ public class FamilyMemberMapper {
                 member.isActive(),
                 member.isAllowanceEnabled(),
                 member.getCreatedAt(),
-                member.getUpdatedAt()
-        );
+                member.getUpdatedAt());
     }
 }

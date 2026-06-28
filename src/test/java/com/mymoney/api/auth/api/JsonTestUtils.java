@@ -7,8 +7,7 @@ public final class JsonTestUtils {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    private JsonTestUtils() {
-    }
+    private JsonTestUtils() {}
 
     public static String extractJsonValue(String json, String field) throws Exception {
         JsonNode root = OBJECT_MAPPER.readTree(json);

@@ -16,10 +16,7 @@ public class AdminSeedRunner implements CommandLineRunner {
     private final AdminSeedProperties properties;
 
     public AdminSeedRunner(
-            FamilyMemberRepository memberRepository,
-            PasswordEncoder passwordEncoder,
-            AdminSeedProperties properties
-    ) {
+            FamilyMemberRepository memberRepository, PasswordEncoder passwordEncoder, AdminSeedProperties properties) {
         this.memberRepository = memberRepository;
         this.passwordEncoder = passwordEncoder;
         this.properties = properties;
@@ -27,16 +24,15 @@ public class AdminSeedRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        memberRepository.findByEmailIgnoreCase(properties.email())
-                .orElseGet(() -> {
-                    FamilyMember member = new FamilyMember();
-                    member.setName(properties.name());
-                    member.setEmail(properties.email().toLowerCase());
-                    member.setPasswordHash(passwordEncoder.encode(properties.password()));
-                    member.setRole(FamilyRole.ADMIN);
-                    member.setActive(true);
-                    member.setAllowanceEnabled(false);
-                    return memberRepository.save(member);
-                });
+        memberRepository.findByEmailIgnoreCase(properties.email()).orElseGet(() -> {
+            FamilyMember member = new FamilyMember();
+            member.setName(properties.name());
+            member.setEmail(properties.email().toLowerCase());
+            member.setPasswordHash(passwordEncoder.encode(properties.password()));
+            member.setRole(FamilyRole.ADMIN);
+            member.setActive(true);
+            member.setAllowanceEnabled(false);
+            return memberRepository.save(member);
+        });
     }
 }

@@ -9,6 +9,14 @@ public record AppSecurityProperties(
         long accessTokenMinutes,
         long refreshTokenDays,
         String refreshCookieName,
-        List<String> allowedOrigins
-) {
+        List<String> allowedOrigins) {
+
+    public AppSecurityProperties {
+        allowedOrigins = allowedOrigins == null ? List.of() : List.copyOf(allowedOrigins);
+    }
+
+    @Override
+    public List<String> allowedOrigins() {
+        return List.copyOf(allowedOrigins);
+    }
 }

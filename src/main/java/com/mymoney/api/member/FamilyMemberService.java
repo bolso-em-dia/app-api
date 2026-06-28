@@ -31,7 +31,8 @@ public class FamilyMemberService {
 
     @Transactional(readOnly = true)
     public FamilyMember getById(UUID id) {
-        return familyMemberRepository.findById(id)
+        return familyMemberRepository
+                .findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family member was not found."));
     }
 
@@ -81,7 +82,8 @@ public class FamilyMemberService {
 
     private void assertEmailAvailable(String rawEmail, UUID currentId) {
         String normalizedEmail = normalizeEmail(rawEmail);
-        familyMemberRepository.findByEmailIgnoreCase(normalizedEmail)
+        familyMemberRepository
+                .findByEmailIgnoreCase(normalizedEmail)
                 .filter(existing -> !existing.getId().equals(currentId))
                 .ifPresent(existing -> {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already in use.");

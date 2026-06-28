@@ -35,11 +35,9 @@ public class FamilyMemberController {
 
     @GetMapping
     public ResponseEntity<List<FamilyMemberResponse>> list() {
-        return ResponseEntity.ok(
-                familyMemberService.listAll().stream()
-                        .map(familyMemberMapper::toResponse)
-                        .toList()
-        );
+        return ResponseEntity.ok(familyMemberService.listAll().stream()
+                .map(familyMemberMapper::toResponse)
+                .toList());
     }
 
     @GetMapping("/{id}")
@@ -55,9 +53,7 @@ public class FamilyMemberController {
 
     @PutMapping("/{id}")
     public ResponseEntity<FamilyMemberResponse> update(
-            @PathVariable UUID id,
-            @Valid @RequestBody UpdateFamilyMemberRequest request
-    ) {
+            @PathVariable UUID id, @Valid @RequestBody UpdateFamilyMemberRequest request) {
         return ResponseEntity.ok(familyMemberMapper.toResponse(familyMemberService.update(id, request)));
     }
 

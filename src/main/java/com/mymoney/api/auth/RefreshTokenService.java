@@ -50,7 +50,8 @@ public class RefreshTokenService {
 
     @Transactional(readOnly = true)
     public Optional<RefreshToken> findValidToken(String rawToken) {
-        return refreshTokenRepository.findByTokenHash(hash(rawToken))
+        return refreshTokenRepository
+                .findByTokenHash(hash(rawToken))
                 .filter(token -> !token.isExpired())
                 .filter(token -> !token.isRevoked())
                 .filter(token -> token.getMember().isActive());
@@ -90,7 +91,7 @@ public class RefreshTokenService {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(digest.digest(rawToken.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 indisponível.", exception);
+            throw new IllegalStateException("SHA-256 is unavailable.", exception);
         }
     }
 }

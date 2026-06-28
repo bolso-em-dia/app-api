@@ -10,6 +10,4 @@ public record FamilyMemberResponse(
         boolean active,
         boolean allowanceEnabled,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt
-) {
-}
+        OffsetDateTime updatedAt) {}

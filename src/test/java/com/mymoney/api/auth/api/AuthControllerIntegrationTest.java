@@ -24,9 +24,11 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Test
     void loginAndMeFlowWorks() throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        MvcResult result = mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
                                 {
                                   "email": "admin@my-money.local",
                                   "password": "admin123456"
@@ -40,8 +42,7 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
         String token = JsonTestUtils.extractJsonValue(result.getResponse().getContentAsString(), "accessToken");
 
-        mockMvc.perform(get("/api/auth/me")
-                        .header("Authorization", "Bearer " + token))
+        mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("admin@my-money.local"))
                 .andExpect(jsonPath("$.role").value("ADMIN"));

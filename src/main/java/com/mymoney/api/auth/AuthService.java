@@ -27,8 +27,7 @@ public class AuthService {
             FamilyMemberRepository memberRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            RefreshTokenService refreshTokenService
-    ) {
+            RefreshTokenService refreshTokenService) {
         this.memberRepository = memberRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -37,7 +36,8 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request, HttpServletResponse response) {
-        FamilyMember member = memberRepository.findByEmailIgnoreCase(request.email())
+        FamilyMember member = memberRepository
+                .findByEmailIgnoreCase(request.email())
                 .filter(FamilyMember::isActive)
                 .orElseThrow(this::invalidCredentials);
 
@@ -50,10 +50,12 @@ public class AuthService {
 
     @Transactional
     public AuthResponse refresh(HttpServletRequest request, HttpServletResponse response) {
-        String rawRefreshToken = refreshTokenService.extractRefreshToken(request)
+        String rawRefreshToken = refreshTokenService
+                .extractRefreshToken(request)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token is missing."));
 
-        RefreshToken refreshToken = refreshTokenService.findValidToken(rawRefreshToken)
+        RefreshToken refreshToken = refreshTokenService
+                .findValidToken(rawRefreshToken)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token is invalid."));
 
         refreshTokenService.revoke(refreshToken);
@@ -62,7 +64,8 @@ public class AuthService {
 
     @Transactional
     public void logout(HttpServletRequest request, HttpServletResponse response) {
-        refreshTokenService.extractRefreshToken(request)
+        refreshTokenService
+                .extractRefreshToken(request)
                 .flatMap(refreshTokenService::findValidToken)
                 .ifPresent(refreshTokenService::revoke);
         refreshTokenService.clearRefreshCookie(response);
@@ -75,7 +78,8 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User is not authenticated.");
         }
 
-        FamilyMember member = memberRepository.findByEmailIgnoreCase(authentication.getName())
+        FamilyMember member = memberRepository
+                .findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User was not found."));
 
         return mapUser(member);
@@ -86,8 +90,7 @@ public class AuthService {
         return new AuthResponse(
                 jwtService.generateAccessToken(member),
                 jwtService.accessTokenDuration().toSeconds(),
-                mapUser(member)
-        );
+                mapUser(member));
     }
 
     private AuthUserResponse mapUser(FamilyMember member) {
@@ -96,8 +99,7 @@ public class AuthService {
                 member.getName(),
                 member.getEmail(),
                 member.getRole().name(),
-                member.isAllowanceEnabled()
-        );
+                member.isAllowanceEnabled());
     }
 
     private ResponseStatusException invalidCredentials() {

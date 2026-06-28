@@ -43,7 +43,8 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
 
     @BeforeEach
     void setUp() throws Exception {
-        regularUser = familyMemberRepository.findByEmailIgnoreCase("user@my-money.local")
+        regularUser = familyMemberRepository
+                .findByEmailIgnoreCase("user@my-money.local")
                 .orElseGet(FamilyMember::new);
         regularUser.setName("Regular User");
         regularUser.setEmail("user@my-money.local");
@@ -59,8 +60,7 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
 
     @Test
     void adminCanListFamilyMembers() throws Exception {
-        mockMvc.perform(get("/api/family-members")
-                        .header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(get("/api/family-members").header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].email").exists())
                 .andExpect(jsonPath("$[*].email").isArray());
@@ -68,10 +68,12 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
 
     @Test
     void adminCanCreateFamilyMember() throws Exception {
-        mockMvc.perform(post("/api/family-members")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        mockMvc.perform(
+                        post("/api/family-members")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
                                 {
                                   "name": "Karol",
                                   "email": "karol@my-money.local",
@@ -94,10 +96,12 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("user@my-money.local"));
 
-        mockMvc.perform(put("/api/family-members/" + regularUser.getId())
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        mockMvc.perform(
+                        put("/api/family-members/" + regularUser.getId())
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
                                 {
                                   "name": "Updated User",
                                   "email": "user@my-money.local",
@@ -124,10 +128,12 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
 
     @Test
     void validationErrorsReturnBadRequest() throws Exception {
-        mockMvc.perform(post("/api/family-members")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        mockMvc.perform(
+                        post("/api/family-members")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
                                 {
                                   "name": "",
                                   "email": "invalid-email",
@@ -141,8 +147,7 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
 
     @Test
     void userCannotAccessFamilyMembersApi() throws Exception {
-        mockMvc.perform(get("/api/family-members")
-                        .header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/family-members").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden());
     }
 
@@ -152,9 +157,11 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
                                 {
                                   "email": "user@my-money.local",
                                   "password": "user123456"
@@ -166,12 +173,14 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
     private String login(String email, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(
+                                """
                                 {
                                   "email": "%s",
                                   "password": "%s"
                                 }
-                                """.formatted(email, password)))
+                                """
+                                        .formatted(email, password)))
                 .andExpect(status().isOk())
                 .andReturn();
 
