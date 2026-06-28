@@ -12,4 +12,8 @@
         <Class name="com.mymoney.api.category.Category"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
+    <Match>
+        <Class name="com.mymoney.api.fixedexpense.FixedExpenseTemplate"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>
