@@ -1,19 +1,20 @@
 package com.mymoney.api;
 
+import java.util.Map;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-
-@Testcontainers
 public abstract class PostgresIntegrationTestSupport {
 
-    @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("my_money_test")
             .withUsername("my_money")
-            .withPassword("my_money");
+            .withPassword("my_money")
+            .withTmpFs(Map.of("/var/lib/postgresql/data", "rw"));
+
+    static {
+        POSTGRES.start();
+    }
 
     @DynamicPropertySource
     static void configureDatabase(DynamicPropertyRegistry registry) {

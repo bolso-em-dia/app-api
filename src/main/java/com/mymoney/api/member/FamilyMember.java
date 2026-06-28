@@ -109,4 +109,12 @@ public class FamilyMember {
     public void setAllowanceEnabled(boolean allowanceEnabled) {
         this.allowanceEnabled = allowanceEnabled;
     }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
 }
