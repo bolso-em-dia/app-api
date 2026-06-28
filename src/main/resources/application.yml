@@ -1,0 +1,32 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/my_money}
+    username: ${DB_USERNAME:my_money}
+    password: ${DB_PASSWORD:my_money}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  security:
+    jwt-secret: ${APP_JWT_SECRET:change-this-secret-change-this-secret}
+    access-token-minutes: ${APP_ACCESS_TOKEN_MINUTES:15}
+    refresh-token-days: ${APP_REFRESH_TOKEN_DAYS:7}
+    refresh-cookie-name: ${APP_REFRESH_COOKIE_NAME:my_money_refresh_token}
+    allowed-origins: ${APP_ALLOWED_ORIGINS:http://localhost:4173,http://localhost:5173}
+  admin:
+    name: ${APP_ADMIN_NAME:Admin}
+    email: ${APP_ADMIN_EMAIL:admin@my-money.local}
+    password: ${APP_ADMIN_PASSWORD:admin123456}

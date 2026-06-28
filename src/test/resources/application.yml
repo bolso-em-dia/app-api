@@ -1,0 +1,17 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+app:
+  security:
+    jwt-secret: test-secret-test-secret-test-secret
+    access-token-minutes: 15
+    refresh-token-days: 7
+    refresh-cookie-name: my_money_refresh_token
+    allowed-origins:
+      - http://localhost:4173
+  admin:
+    name: Admin
+    email: admin@my-money.local
+    password: admin123456

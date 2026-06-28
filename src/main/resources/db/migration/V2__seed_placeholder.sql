@@ -1,0 +1,1 @@
+-- Dados iniciais são semeados pela aplicação no bootstrap.
