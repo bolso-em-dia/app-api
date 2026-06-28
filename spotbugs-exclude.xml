@@ -52,4 +52,8 @@
         <Class name="com.mymoney.api.envelope.api.response.EnvelopeResponse"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
+    <Match>
+        <Class name="com.mymoney.api.dashboard.DashboardService"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>
