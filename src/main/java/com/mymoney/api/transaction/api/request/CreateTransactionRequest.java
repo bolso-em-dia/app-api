@@ -1,0 +1,22 @@
+package com.mymoney.api.transaction.api.request;
+
+import com.mymoney.api.transaction.OwnershipType;
+import com.mymoney.api.transaction.TransactionType;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.UUID;
+
+public record CreateTransactionRequest(
+        @NotNull TransactionType type,
+        @NotNull OwnershipType ownershipType,
+        @NotBlank String description,
+        @NotNull @DecimalMin("0.01") BigDecimal amount,
+        @NotNull LocalDate transactionDate,
+        @NotNull LocalDate referenceMonth,
+        @NotNull UUID accountId,
+        @NotNull UUID categoryId,
+        UUID memberId,
+        Integer installmentCount) {}
