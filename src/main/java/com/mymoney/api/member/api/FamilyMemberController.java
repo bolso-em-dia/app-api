@@ -8,6 +8,7 @@ import com.mymoney.api.member.mapper.FamilyMemberMapper;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,15 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/family-members")
 @PreAuthorize("hasRole('ADMIN')")
+@RequiredArgsConstructor
 public class FamilyMemberController {
 
     private final FamilyMemberService familyMemberService;
     private final FamilyMemberMapper familyMemberMapper;
-
-    public FamilyMemberController(FamilyMemberService familyMemberService, FamilyMemberMapper familyMemberMapper) {
-        this.familyMemberService = familyMemberService;
-        this.familyMemberMapper = familyMemberMapper;
-    }
 
     @GetMapping
     public ResponseEntity<List<FamilyMemberResponse>> list() {

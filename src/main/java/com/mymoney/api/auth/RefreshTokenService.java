@@ -13,20 +13,17 @@ import java.time.OffsetDateTime;
 import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final AppSecurityProperties properties;
-
-    public RefreshTokenService(RefreshTokenRepository refreshTokenRepository, AppSecurityProperties properties) {
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.properties = properties;
-    }
 
     @Transactional
     public void rotate(FamilyMember member, HttpServletResponse response) {

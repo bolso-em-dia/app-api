@@ -5,6 +5,7 @@ import com.mymoney.api.auth.api.AuthUserResponse;
 import com.mymoney.api.auth.api.LoginRequest;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,9 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
 
+    @SuppressFBWarnings(
+            value = "EI_EXPOSE_REP2",
+            justification = "Spring injects shared services here. The reference is not exposed back to callers.")
     public AuthService(
             FamilyMemberRepository memberRepository,
             PasswordEncoder passwordEncoder,

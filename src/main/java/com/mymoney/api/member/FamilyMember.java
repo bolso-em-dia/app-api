@@ -10,9 +10,16 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "family_members")
+@Getter
+@Setter
+@NoArgsConstructor
 public class FamilyMember {
 
     @Id
@@ -38,9 +45,11 @@ public class FamilyMember {
     private boolean allowanceEnabled;
 
     @Column(name = "created_at", nullable = false)
+    @Setter(AccessLevel.NONE)
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at", nullable = false)
+    @Setter(AccessLevel.NONE)
     private OffsetDateTime updatedAt;
 
     @PrePersist
@@ -56,65 +65,5 @@ public class FamilyMember {
     @PreUpdate
     void onUpdate() {
         updatedAt = OffsetDateTime.now();
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getPasswordHash() {
-        return passwordHash;
-    }
-
-    public void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
-    }
-
-    public FamilyRole getRole() {
-        return role;
-    }
-
-    public void setRole(FamilyRole role) {
-        this.role = role;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
-    }
-
-    public boolean isAllowanceEnabled() {
-        return allowanceEnabled;
-    }
-
-    public void setAllowanceEnabled(boolean allowanceEnabled) {
-        this.allowanceEnabled = allowanceEnabled;
-    }
-
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
     }
 }

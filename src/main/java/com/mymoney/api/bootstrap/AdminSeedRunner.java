@@ -4,23 +4,18 @@ import com.mymoney.api.config.AdminSeedProperties;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class AdminSeedRunner implements CommandLineRunner {
 
     private final FamilyMemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final AdminSeedProperties properties;
-
-    public AdminSeedRunner(
-            FamilyMemberRepository memberRepository, PasswordEncoder passwordEncoder, AdminSeedProperties properties) {
-        this.memberRepository = memberRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.properties = properties;
-    }
 
     @Override
     public void run(String... args) {
