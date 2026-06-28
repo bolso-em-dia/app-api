@@ -1,7 +1,6 @@
 package com.mymoney.api.auth;
 
 import com.mymoney.api.member.FamilyMember;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -29,8 +28,6 @@ public class RefreshToken {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "member_id", nullable = false)
-    @Getter(AccessLevel.NONE)
-    @Setter(AccessLevel.NONE)
     private FamilyMember member;
 
     @Column(name = "token_hash", nullable = false, unique = true, length = 64)
@@ -52,20 +49,6 @@ public class RefreshToken {
             id = UUID.randomUUID();
         }
         createdAt = OffsetDateTime.now();
-    }
-
-    @SuppressFBWarnings(
-            value = "EI_EXPOSE_REP",
-            justification = "JPA entity associations are intentionally mutable references managed by Hibernate.")
-    public FamilyMember getMember() {
-        return member;
-    }
-
-    @SuppressFBWarnings(
-            value = "EI_EXPOSE_REP2",
-            justification = "JPA entity associations are intentionally mutable references managed by Hibernate.")
-    public void setMember(FamilyMember member) {
-        this.member = member;
     }
 
     public boolean isRevoked() {

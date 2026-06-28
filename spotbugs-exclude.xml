@@ -1,3 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <FindBugsFilter>
+    <Match>
+        <Class name="com.mymoney.api.auth.AuthService"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.auth.RefreshToken"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.category.Category"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>

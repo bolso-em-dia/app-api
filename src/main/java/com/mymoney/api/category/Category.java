@@ -1,6 +1,5 @@
 package com.mymoney.api.category;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -45,8 +44,6 @@ public class Category {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "replacement_category_id")
-    @Getter(AccessLevel.NONE)
-    @Setter(AccessLevel.NONE)
     private Category replacementCategory;
 
     @Column(name = "created_at", nullable = false)
@@ -70,19 +67,5 @@ public class Category {
     @PreUpdate
     void onUpdate() {
         updatedAt = OffsetDateTime.now();
-    }
-
-    @SuppressFBWarnings(
-            value = "EI_EXPOSE_REP",
-            justification = "JPA self-references are intentionally mutable associations managed by Hibernate.")
-    public Category getReplacementCategory() {
-        return replacementCategory;
-    }
-
-    @SuppressFBWarnings(
-            value = "EI_EXPOSE_REP2",
-            justification = "JPA self-references are intentionally mutable associations managed by Hibernate.")
-    public void setReplacementCategory(Category replacementCategory) {
-        this.replacementCategory = replacementCategory;
     }
 }

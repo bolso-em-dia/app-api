@@ -5,9 +5,9 @@ import com.mymoney.api.auth.api.AuthUserResponse;
 import com.mymoney.api.auth.api.LoginRequest;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,26 +17,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
     private final FamilyMemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
-
-    @SuppressFBWarnings(
-            value = "EI_EXPOSE_REP2",
-            justification = "Spring injects shared services here. The reference is not exposed back to callers.")
-    public AuthService(
-            FamilyMemberRepository memberRepository,
-            PasswordEncoder passwordEncoder,
-            JwtService jwtService,
-            RefreshTokenService refreshTokenService) {
-        this.memberRepository = memberRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
-        this.refreshTokenService = refreshTokenService;
-    }
 
     @Transactional
     public AuthResponse login(LoginRequest request, HttpServletResponse response) {
