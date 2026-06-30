@@ -1,6 +1,7 @@
 package com.mymoney.api.fixedexpense.api;
 
 import com.mymoney.api.PageResponse;
+import com.mymoney.api.fixedexpense.FixedExpenseTemplateListStatus;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateService;
 import com.mymoney.api.fixedexpense.api.request.ArchiveFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateRequest;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -35,9 +37,12 @@ public class FixedExpenseTemplateController {
 
     @GetMapping
     public ResponseEntity<PageResponse<FixedExpenseTemplateResponse>> list(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "ALL") FixedExpenseTemplateListStatus status,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(
-                fixedExpenseTemplateService.listAll(pageable).map(fixedExpenseTemplateMapper::toResponse)));
+        return ResponseEntity.ok(PageResponse.from(fixedExpenseTemplateService
+                .listAll(search, status, pageable)
+                .map(fixedExpenseTemplateMapper::toResponse)));
     }
 
     @GetMapping("/{id}")

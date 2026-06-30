@@ -111,6 +111,19 @@ class FixedExpenseTemplateControllerIntegrationTest extends PostgresIntegrationT
                 .andExpect(jsonPath("$.totalItems").value(1))
                 .andExpect(jsonPath("$.totalPages").value(1));
 
+        template.setArchivedFromMonth(LocalDate.of(2026, 7, 1));
+        template.setActive(false);
+        fixedExpenseTemplateRepository.save(template);
+
+        mockMvc.perform(get("/api/fixed-expense-templates")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("search", "rent")
+                        .param("status", "ARCHIVED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].name").value("Rent"))
+                .andExpect(jsonPath("$.totalItems").value(1));
+
         mockMvc.perform(post("/api/fixed-expense-templates")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)

@@ -1,6 +1,7 @@
 package com.mymoney.api.category.api;
 
 import com.mymoney.api.PageResponse;
+import com.mymoney.api.category.CategoryListStatus;
 import com.mymoney.api.category.CategoryService;
 import com.mymoney.api.category.api.request.ArchiveCategoryRequest;
 import com.mymoney.api.category.api.request.CreateCategoryRequest;
@@ -40,9 +41,11 @@ public class CategoryController {
 
     @GetMapping
     public ResponseEntity<PageResponse<CategoryResponse>> list(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "ALL") CategoryListStatus status,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
-        return ResponseEntity.ok(
-                PageResponse.from(categoryService.listAll(pageable).map(categoryMapper::toResponse)));
+        return ResponseEntity.ok(PageResponse.from(
+                categoryService.listAll(search, status, pageable).map(categoryMapper::toResponse)));
     }
 
     @GetMapping("/{id}")

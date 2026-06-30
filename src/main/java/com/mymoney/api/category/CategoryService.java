@@ -22,8 +22,9 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
 
     @Transactional(readOnly = true)
-    public Page<Category> listAll(Pageable pageable) {
-        return categoryRepository.findAll(pageable);
+    public Page<Category> listAll(String search, CategoryListStatus status, Pageable pageable) {
+        String normalizedSearch = normalizeSearch(search);
+        return categoryRepository.findByFilters(normalizedSearch, status.name(), pageable);
     }
 
     @Transactional(readOnly = true)
@@ -87,5 +88,12 @@ public class CategoryService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeSearch(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim();
     }
 }

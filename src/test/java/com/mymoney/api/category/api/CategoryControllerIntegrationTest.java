@@ -89,6 +89,26 @@ class CategoryControllerIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.totalItems").value(2))
                 .andExpect(jsonPath("$.totalPages").value(2));
 
+        categoryA.setArchivedFromMonth(LocalDate.of(2026, 7, 1));
+        categoryA.setReplacementCategory(categoryB);
+        categoryRepository.save(categoryA);
+
+        mockMvc.perform(get("/api/categories")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("search", "trans")
+                        .param("status", "ACTIVE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].name").value("Transport"))
+                .andExpect(jsonPath("$.totalItems").value(1));
+
+        mockMvc.perform(get("/api/categories")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("status", "ARCHIVED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].name").value("Groceries"));
+
         mockMvc.perform(
                         post("/api/categories")
                                 .header("Authorization", "Bearer " + adminToken)

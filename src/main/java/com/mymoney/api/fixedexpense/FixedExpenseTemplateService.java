@@ -27,8 +27,8 @@ public class FixedExpenseTemplateService {
     private final AccountService accountService;
 
     @Transactional(readOnly = true)
-    public Page<FixedExpenseTemplate> listAll(Pageable pageable) {
-        return fixedExpenseTemplateRepository.findAllBy(pageable);
+    public Page<FixedExpenseTemplate> listAll(String search, FixedExpenseTemplateListStatus status, Pageable pageable) {
+        return fixedExpenseTemplateRepository.findByFilters(normalizeSearch(search), status.name(), pageable);
     }
 
     @Transactional(readOnly = true)
@@ -94,5 +94,12 @@ public class FixedExpenseTemplateService {
 
     private LocalDate currentReferenceMonth() {
         return YearMonth.now().atDay(1);
+    }
+
+    private String normalizeSearch(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim();
     }
 }
