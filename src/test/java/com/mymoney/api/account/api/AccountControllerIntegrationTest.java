@@ -84,9 +84,15 @@ class AccountControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Test
     void adminCanListCreateGetAndUpdateAccounts() throws Exception {
-        mockMvc.perform(get("/api/accounts").header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(get("/api/accounts")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].name").isArray());
+                .andExpect(jsonPath("$.items[*].name").isArray())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalItems").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
 
         mockMvc.perform(
                         post("/api/accounts")

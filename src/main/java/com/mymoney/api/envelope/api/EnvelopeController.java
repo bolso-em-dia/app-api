@@ -1,5 +1,6 @@
 package com.mymoney.api.envelope.api;
 
+import com.mymoney.api.PageResponse;
 import com.mymoney.api.envelope.EnvelopeService;
 import com.mymoney.api.envelope.api.request.ArchiveEnvelopeRequest;
 import com.mymoney.api.envelope.api.request.CreateEnvelopeRequest;
@@ -12,6 +13,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,11 +39,12 @@ public class EnvelopeController {
     private final EnvelopeMapper envelopeMapper;
 
     @GetMapping
-    public ResponseEntity<List<EnvelopeResponse>> list(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate referenceMonth) {
-        return ResponseEntity.ok(envelopeService.listForMonth(referenceMonth).stream()
-                .map(view -> envelopeMapper.toResponse(view, List.of()))
-                .toList());
+    public ResponseEntity<PageResponse<EnvelopeResponse>> list(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate referenceMonth,
+            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+        return ResponseEntity.ok(PageResponse.from(envelopeService
+                .listForMonth(referenceMonth, pageable)
+                .map(view -> envelopeMapper.toResponse(view, List.of()))));
     }
 
     @GetMapping("/{id}")

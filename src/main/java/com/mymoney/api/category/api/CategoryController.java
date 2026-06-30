@@ -1,5 +1,6 @@
 package com.mymoney.api.category.api;
 
+import com.mymoney.api.PageResponse;
 import com.mymoney.api.category.CategoryService;
 import com.mymoney.api.category.api.request.ArchiveCategoryRequest;
 import com.mymoney.api.category.api.request.CreateCategoryRequest;
@@ -12,6 +13,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,10 +39,10 @@ public class CategoryController {
     private final CategoryMapper categoryMapper;
 
     @GetMapping
-    public ResponseEntity<List<CategoryResponse>> list() {
-        return ResponseEntity.ok(categoryService.listAll().stream()
-                .map(categoryMapper::toResponse)
-                .toList());
+    public ResponseEntity<PageResponse<CategoryResponse>> list(
+            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+        return ResponseEntity.ok(
+                PageResponse.from(categoryService.listAll(pageable).map(categoryMapper::toResponse)));
     }
 
     @GetMapping("/{id}")

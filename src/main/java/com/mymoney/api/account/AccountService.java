@@ -5,10 +5,11 @@ import com.mymoney.api.account.api.request.CreateAccountRequest;
 import com.mymoney.api.account.api.request.UpdateAccountRequest;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,10 +22,8 @@ public class AccountService {
     private final AccountRepository accountRepository;
 
     @Transactional(readOnly = true)
-    public List<Account> listAll() {
-        return accountRepository.findAll().stream()
-                .sorted(Comparator.comparing(Account::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
+    public Page<Account> listAll(Pageable pageable) {
+        return accountRepository.findAll(pageable);
     }
 
     @Transactional(readOnly = true)

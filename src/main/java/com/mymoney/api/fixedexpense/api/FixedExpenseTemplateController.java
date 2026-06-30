@@ -1,5 +1,6 @@
 package com.mymoney.api.fixedexpense.api;
 
+import com.mymoney.api.PageResponse;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateService;
 import com.mymoney.api.fixedexpense.api.request.ArchiveFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateRequest;
@@ -7,9 +8,10 @@ import com.mymoney.api.fixedexpense.api.request.UpdateFixedExpenseTemplateReques
 import com.mymoney.api.fixedexpense.api.response.FixedExpenseTemplateResponse;
 import com.mymoney.api.fixedexpense.mapper.FixedExpenseTemplateMapper;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,10 +34,10 @@ public class FixedExpenseTemplateController {
     private final FixedExpenseTemplateMapper fixedExpenseTemplateMapper;
 
     @GetMapping
-    public ResponseEntity<List<FixedExpenseTemplateResponse>> list() {
-        return ResponseEntity.ok(fixedExpenseTemplateService.listAll().stream()
-                .map(fixedExpenseTemplateMapper::toResponse)
-                .toList());
+    public ResponseEntity<PageResponse<FixedExpenseTemplateResponse>> list(
+            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+        return ResponseEntity.ok(PageResponse.from(
+                fixedExpenseTemplateService.listAll(pageable).map(fixedExpenseTemplateMapper::toResponse)));
     }
 
     @GetMapping("/{id}")

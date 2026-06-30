@@ -79,9 +79,15 @@ class CategoryControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Test
     void adminCanListCreateGetAndUpdateCategories() throws Exception {
-        mockMvc.perform(get("/api/categories").header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(get("/api/categories")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].name").isArray());
+                .andExpect(jsonPath("$.items[*].name").isArray())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalItems").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
 
         mockMvc.perform(
                         post("/api/categories")

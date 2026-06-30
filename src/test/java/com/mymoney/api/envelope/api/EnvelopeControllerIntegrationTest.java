@@ -163,12 +163,15 @@ class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
     void listDetailTransactionsAndBreakdownWork() throws Exception {
         mockMvc.perform(get("/api/envelopes")
                         .header("Authorization", "Bearer " + adminToken)
-                        .param("referenceMonth", "2026-06-01"))
+                        .param("referenceMonth", "2026-06-01")
+                        .param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.name=='Family Essentials')].consumedAmount")
+                .andExpect(jsonPath("$.items[?(@.name=='Family Essentials')].consumedAmount")
                         .isNotEmpty())
-                .andExpect(jsonPath("$[?(@.name=='Karol Allowance')].consumedAmount")
-                        .isNotEmpty());
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalItems").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
 
         mockMvc.perform(get("/api/envelopes/" + globalEnvelope.getId())
                         .header("Authorization", "Bearer " + adminToken)

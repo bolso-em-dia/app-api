@@ -2,10 +2,10 @@ package com.mymoney.api.member;
 
 import com.mymoney.api.member.api.request.CreateFamilyMemberRequest;
 import com.mymoney.api.member.api.request.UpdateFamilyMemberRequest;
-import java.util.Comparator;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,10 +20,8 @@ public class FamilyMemberService {
     private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
-    public List<FamilyMember> listAll() {
-        return familyMemberRepository.findAll().stream()
-                .sorted(Comparator.comparing(FamilyMember::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
+    public Page<FamilyMember> listAll(Pageable pageable) {
+        return familyMemberRepository.findAllBy(pageable);
     }
 
     @Transactional(readOnly = true)

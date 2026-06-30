@@ -101,9 +101,15 @@ class FixedExpenseTemplateControllerIntegrationTest extends PostgresIntegrationT
 
     @Test
     void adminCanListCreateGetAndUpdateTemplates() throws Exception {
-        mockMvc.perform(get("/api/fixed-expense-templates").header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(get("/api/fixed-expense-templates")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].name").isArray());
+                .andExpect(jsonPath("$.items[*].name").isArray())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
 
         mockMvc.perform(post("/api/fixed-expense-templates")
                         .header("Authorization", "Bearer " + adminToken)

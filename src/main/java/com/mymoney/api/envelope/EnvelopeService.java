@@ -14,12 +14,17 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,10 +40,21 @@ public class EnvelopeService {
     private final TransactionRepository transactionRepository;
 
     @Transactional(readOnly = true)
-    public List<EnvelopeView> listForMonth(LocalDate referenceMonth) {
-        return envelopeModelRepository.findActiveForMonth(referenceMonth).stream()
+    public Page<EnvelopeView> listForMonth(LocalDate referenceMonth, Pageable pageable) {
+        Page<UUID> idPage = envelopeModelRepository.findActiveIdsForMonth(referenceMonth, pageable);
+        List<EnvelopeView> views = loadByIds(idPage.getContent()).stream()
                 .map(envelope -> toView(envelope, referenceMonth))
-                .sorted(Comparator.comparing(view -> view.envelopeModel().getName(), String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        return new PageImpl<>(views, pageable, idPage.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public List<EnvelopeView> listForMonth(LocalDate referenceMonth) {
+        return loadByIds(envelopeModelRepository
+                        .findActiveIdsForMonth(referenceMonth, Pageable.unpaged())
+                        .getContent())
+                .stream()
+                .map(envelope -> toView(envelope, referenceMonth))
                 .toList();
     }
 
@@ -122,6 +138,18 @@ public class EnvelopeService {
                 .sorted(Comparator.comparing(
                         EnvelopeCategoryBreakdownItem::categoryName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
+    }
+
+    private List<EnvelopeModel> loadByIds(List<UUID> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+
+        Map<UUID, EnvelopeModel> envelopesById = envelopeModelRepository.findAllWithAssociationsByIdIn(ids).stream()
+                .collect(Collectors.toMap(
+                        EnvelopeModel::getId, envelope -> envelope, (left, right) -> left, LinkedHashMap::new));
+
+        return ids.stream().map(envelopesById::get).toList();
     }
 
     private EnvelopeView toView(EnvelopeModel envelope, LocalDate referenceMonth) {

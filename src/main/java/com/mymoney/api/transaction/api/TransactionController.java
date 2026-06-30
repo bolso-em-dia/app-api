@@ -1,5 +1,6 @@
 package com.mymoney.api.transaction.api;
 
+import com.mymoney.api.PageResponse;
 import com.mymoney.api.transaction.DeleteScope;
 import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.TransactionService;
@@ -13,6 +14,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.data.web.SortDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,19 +41,20 @@ public class TransactionController {
     private final TransactionMapper transactionMapper;
 
     @GetMapping
-    public ResponseEntity<List<TransactionResponse>> list(
+    public ResponseEntity<PageResponse<TransactionResponse>> list(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate referenceMonth,
             @RequestParam(required = false) TransactionType type,
             @RequestParam(required = false) OwnershipType ownershipType,
             @RequestParam(required = false) UUID accountId,
             @RequestParam(required = false) UUID categoryId,
-            @RequestParam(required = false) UUID memberId) {
-        return ResponseEntity.ok(
-                transactionService
-                        .listByFilters(referenceMonth, type, ownershipType, accountId, categoryId, memberId)
-                        .stream()
-                        .map(transactionMapper::toResponse)
-                        .toList());
+            @RequestParam(required = false) UUID memberId,
+            @PageableDefault(size = 20)
+                    @SortDefault.SortDefaults({@SortDefault(sort = "transactionDate"), @SortDefault(sort = "createdAt")
+                    })
+                    Pageable pageable) {
+        return ResponseEntity.ok(PageResponse.from(transactionService
+                .listByFilters(referenceMonth, type, ownershipType, accountId, categoryId, memberId, pageable)
+                .map(transactionMapper::toResponse)));
     }
 
     @GetMapping("/{id}")

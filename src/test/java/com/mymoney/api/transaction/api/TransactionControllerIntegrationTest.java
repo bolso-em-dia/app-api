@@ -121,9 +121,14 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
     void adminCanListCreateGetAndUpdateTransactions() throws Exception {
         mockMvc.perform(get("/api/transactions")
                         .header("Authorization", "Bearer " + adminToken)
-                        .param("referenceMonth", "2026-06-01"))
+                        .param("referenceMonth", "2026-06-01")
+                        .param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].description").isArray());
+                .andExpect(jsonPath("$.items[*].description").isArray())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
 
         mockMvc.perform(post("/api/transactions")
                         .header("Authorization", "Bearer " + adminToken)

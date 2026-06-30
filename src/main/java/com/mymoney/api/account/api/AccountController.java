@@ -1,5 +1,6 @@
 package com.mymoney.api.account.api;
 
+import com.mymoney.api.PageResponse;
 import com.mymoney.api.account.AccountService;
 import com.mymoney.api.account.api.request.ArchiveAccountRequest;
 import com.mymoney.api.account.api.request.CreateAccountRequest;
@@ -12,6 +13,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,9 +39,10 @@ public class AccountController {
     private final AccountMapper accountMapper;
 
     @GetMapping
-    public ResponseEntity<List<AccountResponse>> list() {
+    public ResponseEntity<PageResponse<AccountResponse>> list(
+            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
         return ResponseEntity.ok(
-                accountService.listAll().stream().map(accountMapper::toResponse).toList());
+                PageResponse.from(accountService.listAll(pageable).map(accountMapper::toResponse)));
     }
 
     @GetMapping("/{id}")

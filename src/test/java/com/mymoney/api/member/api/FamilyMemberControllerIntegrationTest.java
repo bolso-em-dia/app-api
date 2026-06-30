@@ -60,10 +60,16 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
 
     @Test
     void adminCanListFamilyMembers() throws Exception {
-        mockMvc.perform(get("/api/family-members").header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(get("/api/family-members")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].email").exists())
-                .andExpect(jsonPath("$[*].email").isArray());
+                .andExpect(jsonPath("$.items[0].email").exists())
+                .andExpect(jsonPath("$.items[*].email").isArray())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalItems").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
     }
 
     @Test
