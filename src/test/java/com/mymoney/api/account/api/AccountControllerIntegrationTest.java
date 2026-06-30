@@ -86,13 +86,16 @@ class AccountControllerIntegrationTest extends PostgresIntegrationTestSupport {
     void adminCanListCreateGetAndUpdateAccounts() throws Exception {
         mockMvc.perform(get("/api/accounts")
                         .header("Authorization", "Bearer " + adminToken)
+                        .param("search", "visa")
+                        .param("status", "ACTIVE")
+                        .param("type", "CREDIT_CARD")
                         .param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[*].name").isArray())
+                .andExpect(jsonPath("$.items[0].name").value("Visa Platinum"))
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(1))
-                .andExpect(jsonPath("$.totalItems").value(2))
-                .andExpect(jsonPath("$.totalPages").value(2));
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
 
         mockMvc.perform(
                         post("/api/accounts")
@@ -201,6 +204,12 @@ class AccountControllerIntegrationTest extends PostgresIntegrationTestSupport {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.archivedFromMonth").value("2026-07-01"));
+
+        mockMvc.perform(get("/api/accounts")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("status", "ARCHIVED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].name").value("Main Checking"));
 
         mockMvc.perform(get("/api/accounts").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden());

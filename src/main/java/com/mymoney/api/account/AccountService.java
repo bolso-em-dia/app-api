@@ -22,8 +22,8 @@ public class AccountService {
     private final AccountRepository accountRepository;
 
     @Transactional(readOnly = true)
-    public Page<Account> listAll(Pageable pageable) {
-        return accountRepository.findAll(pageable);
+    public Page<Account> listAll(String search, AccountListStatus status, AccountType type, Pageable pageable) {
+        return accountRepository.findByFilters(normalizeSearch(search), status.name(), type, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -136,5 +136,12 @@ public class AccountService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeSearch(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim();
     }
 }

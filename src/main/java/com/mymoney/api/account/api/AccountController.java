@@ -1,7 +1,9 @@
 package com.mymoney.api.account.api;
 
 import com.mymoney.api.PageResponse;
+import com.mymoney.api.account.AccountListStatus;
 import com.mymoney.api.account.AccountService;
+import com.mymoney.api.account.AccountType;
 import com.mymoney.api.account.api.request.ArchiveAccountRequest;
 import com.mymoney.api.account.api.request.CreateAccountRequest;
 import com.mymoney.api.account.api.request.UpdateAccountRequest;
@@ -40,9 +42,12 @@ public class AccountController {
 
     @GetMapping
     public ResponseEntity<PageResponse<AccountResponse>> list(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "ALL") AccountListStatus status,
+            @RequestParam(required = false) AccountType type,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
-        return ResponseEntity.ok(
-                PageResponse.from(accountService.listAll(pageable).map(accountMapper::toResponse)));
+        return ResponseEntity.ok(PageResponse.from(
+                accountService.listAll(search, status, type, pageable).map(accountMapper::toResponse)));
     }
 
     @GetMapping("/{id}")
