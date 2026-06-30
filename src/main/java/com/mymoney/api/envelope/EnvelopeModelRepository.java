@@ -19,16 +19,35 @@ public interface EnvelopeModelRepository extends JpaRepository<EnvelopeModel, UU
                     select e.id
                     from EnvelopeModel e
                     where e.createdInMonth <= :referenceMonth
-                      and (e.archivedFromMonth is null or e.archivedFromMonth > :referenceMonth)
+                      and (:search = '' or lower(e.name) like concat('%', lower(:search), '%'))
+                      and (
+                        :status = 'ALL'
+                        or (:status = 'ACTIVE'
+                            and (e.archivedFromMonth is null or e.archivedFromMonth > :referenceMonth))
+                        or (:status = 'ARCHIVED'
+                            and e.archivedFromMonth is not null
+                            and e.archivedFromMonth <= :referenceMonth)
+                      )
+                      and (:type is null or e.type = :type)
                     """,
             countQuery =
                     """
                     select count(e)
                     from EnvelopeModel e
                     where e.createdInMonth <= :referenceMonth
-                      and (e.archivedFromMonth is null or e.archivedFromMonth > :referenceMonth)
+                      and (:search = '' or lower(e.name) like concat('%', lower(:search), '%'))
+                      and (
+                        :status = 'ALL'
+                        or (:status = 'ACTIVE'
+                            and (e.archivedFromMonth is null or e.archivedFromMonth > :referenceMonth))
+                        or (:status = 'ARCHIVED'
+                            and e.archivedFromMonth is not null
+                            and e.archivedFromMonth <= :referenceMonth)
+                      )
+                      and (:type is null or e.type = :type)
                     """)
-    Page<UUID> findActiveIdsForMonth(LocalDate referenceMonth, Pageable pageable);
+    Page<UUID> findIdsForMonth(
+            LocalDate referenceMonth, String search, String status, EnvelopeType type, Pageable pageable);
 
     @EntityGraph(attributePaths = {"categories", "ownerMember"})
     @Query(

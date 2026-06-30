@@ -1,7 +1,9 @@
 package com.mymoney.api.envelope.api;
 
 import com.mymoney.api.PageResponse;
+import com.mymoney.api.envelope.EnvelopeListStatus;
 import com.mymoney.api.envelope.EnvelopeService;
+import com.mymoney.api.envelope.EnvelopeType;
 import com.mymoney.api.envelope.api.request.ArchiveEnvelopeRequest;
 import com.mymoney.api.envelope.api.request.CreateEnvelopeRequest;
 import com.mymoney.api.envelope.api.request.UpdateEnvelopeRequest;
@@ -41,9 +43,12 @@ public class EnvelopeController {
     @GetMapping
     public ResponseEntity<PageResponse<EnvelopeResponse>> list(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate referenceMonth,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "ACTIVE") EnvelopeListStatus status,
+            @RequestParam(required = false) EnvelopeType type,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
         return ResponseEntity.ok(PageResponse.from(envelopeService
-                .listForMonth(referenceMonth, pageable)
+                .listForMonth(referenceMonth, search, status, type, pageable)
                 .map(view -> envelopeMapper.toResponse(view, List.of()))));
     }
 

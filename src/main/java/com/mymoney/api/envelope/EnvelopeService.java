@@ -40,8 +40,10 @@ public class EnvelopeService {
     private final TransactionRepository transactionRepository;
 
     @Transactional(readOnly = true)
-    public Page<EnvelopeView> listForMonth(LocalDate referenceMonth, Pageable pageable) {
-        Page<UUID> idPage = envelopeModelRepository.findActiveIdsForMonth(referenceMonth, pageable);
+    public Page<EnvelopeView> listForMonth(
+            LocalDate referenceMonth, String search, EnvelopeListStatus status, EnvelopeType type, Pageable pageable) {
+        Page<UUID> idPage = envelopeModelRepository.findIdsForMonth(
+                referenceMonth, normalizeSearch(search), status.name(), type, pageable);
         List<EnvelopeView> views = loadByIds(idPage.getContent()).stream()
                 .map(envelope -> toView(envelope, referenceMonth))
                 .toList();
@@ -51,7 +53,7 @@ public class EnvelopeService {
     @Transactional(readOnly = true)
     public List<EnvelopeView> listForMonth(LocalDate referenceMonth) {
         return loadByIds(envelopeModelRepository
-                        .findActiveIdsForMonth(referenceMonth, Pageable.unpaged())
+                        .findIdsForMonth(referenceMonth, "", EnvelopeListStatus.ACTIVE.name(), null, Pageable.unpaged())
                         .getContent())
                 .stream()
                 .map(envelope -> toView(envelope, referenceMonth))
@@ -233,5 +235,12 @@ public class EnvelopeService {
 
     private LocalDate currentReferenceMonth() {
         return YearMonth.now().atDay(1);
+    }
+
+    private String normalizeSearch(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim();
     }
 }

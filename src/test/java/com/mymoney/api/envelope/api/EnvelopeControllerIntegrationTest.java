@@ -164,14 +164,16 @@ class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
         mockMvc.perform(get("/api/envelopes")
                         .header("Authorization", "Bearer " + adminToken)
                         .param("referenceMonth", "2026-06-01")
+                        .param("search", "allowance")
+                        .param("status", "ACTIVE")
+                        .param("type", "ALLOWANCE")
                         .param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[?(@.name=='Family Essentials')].consumedAmount")
-                        .isNotEmpty())
+                .andExpect(jsonPath("$.items[0].name").value("Karol Allowance"))
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(1))
-                .andExpect(jsonPath("$.totalItems").value(2))
-                .andExpect(jsonPath("$.totalPages").value(2));
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
 
         mockMvc.perform(get("/api/envelopes/" + globalEnvelope.getId())
                         .header("Authorization", "Bearer " + adminToken)
@@ -258,6 +260,14 @@ class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
+
+        mockMvc.perform(get("/api/envelopes")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-07-01")
+                        .param("status", "ARCHIVED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[?(@.name=='Transport Envelope Updated')]")
+                        .isNotEmpty());
 
         mockMvc.perform(get("/api/envelopes")
                         .header("Authorization", "Bearer " + userToken)
