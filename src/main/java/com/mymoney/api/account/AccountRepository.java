@@ -2,6 +2,7 @@ package com.mymoney.api.account;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -9,6 +10,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 public interface AccountRepository extends JpaRepository<Account, UUID> {
+
+    @Query(
+            """
+            select a
+            from Account a
+            where lower(trim(a.name)) = lower(trim(:name))
+            """)
+    Optional<Account> findByNormalizedName(String name);
 
     @Query(
             """
