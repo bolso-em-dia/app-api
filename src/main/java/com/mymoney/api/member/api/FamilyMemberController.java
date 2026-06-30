@@ -1,6 +1,7 @@
 package com.mymoney.api.member.api;
 
 import com.mymoney.api.PageResponse;
+import com.mymoney.api.member.FamilyMemberListStatus;
 import com.mymoney.api.member.FamilyMemberService;
 import com.mymoney.api.member.api.request.CreateFamilyMemberRequest;
 import com.mymoney.api.member.api.request.UpdateFamilyMemberRequest;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -34,9 +36,11 @@ public class FamilyMemberController {
 
     @GetMapping
     public ResponseEntity<PageResponse<FamilyMemberResponse>> list(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "ALL") FamilyMemberListStatus status,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
-        return ResponseEntity.ok(
-                PageResponse.from(familyMemberService.listAll(pageable).map(familyMemberMapper::toResponse)));
+        return ResponseEntity.ok(PageResponse.from(
+                familyMemberService.listAll(search, status, pageable).map(familyMemberMapper::toResponse)));
     }
 
     @GetMapping("/{id}")

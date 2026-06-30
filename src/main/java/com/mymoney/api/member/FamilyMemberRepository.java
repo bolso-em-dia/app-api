@@ -5,10 +5,26 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 public interface FamilyMemberRepository extends JpaRepository<FamilyMember, UUID> {
 
-    Page<FamilyMember> findAllBy(Pageable pageable);
+    @Query(
+            """
+            select m
+            from FamilyMember m
+            where (
+                :search = ''
+                or lower(m.name) like concat('%', lower(:search), '%')
+                or lower(m.email) like concat('%', lower(:search), '%')
+              )
+              and (
+                :status = 'ALL'
+                or (:status = 'ACTIVE' and m.active = true)
+                or (:status = 'ARCHIVED' and m.active = false)
+              )
+            """)
+    Page<FamilyMember> findByFilters(String search, String status, Pageable pageable);
 
     Optional<FamilyMember> findByEmailIgnoreCase(String email);
 

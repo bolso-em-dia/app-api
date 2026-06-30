@@ -20,8 +20,8 @@ public class FamilyMemberService {
     private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
-    public Page<FamilyMember> listAll(Pageable pageable) {
-        return familyMemberRepository.findAllBy(pageable);
+    public Page<FamilyMember> listAll(String search, FamilyMemberListStatus status, Pageable pageable) {
+        return familyMemberRepository.findByFilters(normalizeSearch(search), status.name(), pageable);
     }
 
     @Transactional(readOnly = true)
@@ -87,5 +87,12 @@ public class FamilyMemberService {
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase();
+    }
+
+    private String normalizeSearch(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim();
     }
 }

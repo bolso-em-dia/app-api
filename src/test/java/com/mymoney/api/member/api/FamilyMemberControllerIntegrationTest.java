@@ -62,14 +62,15 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
     void adminCanListFamilyMembers() throws Exception {
         mockMvc.perform(get("/api/family-members")
                         .header("Authorization", "Bearer " + adminToken)
+                        .param("search", "user")
+                        .param("status", "ACTIVE")
                         .param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].email").exists())
-                .andExpect(jsonPath("$.items[*].email").isArray())
+                .andExpect(jsonPath("$.items[0].email").value("user@my-money.local"))
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(1))
-                .andExpect(jsonPath("$.totalItems").value(2))
-                .andExpect(jsonPath("$.totalPages").value(2));
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
     }
 
     @Test
@@ -125,6 +126,12 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false))
                 .andExpect(jsonPath("$.allowanceEnabled").value(false));
+
+        mockMvc.perform(get("/api/family-members")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("status", "ARCHIVED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].email").value("user@my-money.local"));
 
         mockMvc.perform(patch("/api/family-members/" + regularUser.getId() + "/restore")
                         .header("Authorization", "Bearer " + adminToken))
