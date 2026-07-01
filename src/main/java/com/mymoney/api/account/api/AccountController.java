@@ -43,7 +43,7 @@ public class AccountController {
     @GetMapping
     public ResponseEntity<PageResponse<AccountResponse>> list(
             @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "ALL") AccountListStatus status,
+            @RequestParam(defaultValue = "ACTIVE") AccountListStatus status,
             @RequestParam(required = false) AccountType type,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
         return ResponseEntity.ok(PageResponse.from(

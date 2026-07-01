@@ -3,6 +3,7 @@ package com.mymoney.api.category;
 import com.mymoney.api.category.api.request.ArchiveCategoryRequest;
 import com.mymoney.api.category.api.request.CreateCategoryRequest;
 import com.mymoney.api.category.api.request.UpdateCategoryRequest;
+import com.mymoney.api.category.api.response.CategoryResponse;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
@@ -22,39 +23,48 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
 
     @Transactional(readOnly = true)
-    public Page<Category> listAll(String search, CategoryListStatus status, Pageable pageable) {
+    public Page<CategoryResponse> listAllResponses(String search, CategoryListStatus status, Pageable pageable) {
         String normalizedSearch = normalizeSearch(search);
-        return categoryRepository.findByFilters(normalizedSearch, status.name(), pageable);
+        return categoryRepository.findResponseByFilters(normalizedSearch, status.name(), pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public CategoryResponse getResponseById(UUID id) {
+        return categoryRepository
+                .findResponseById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category was not found."));
     }
 
     @Transactional(readOnly = true)
     public Category getById(UUID id) {
         return categoryRepository
-                .findWithAssociationsById(id)
+                .findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category was not found."));
     }
 
     @Transactional
-    public Category create(CreateCategoryRequest request) {
+    public CategoryResponse create(CreateCategoryRequest request) {
         Category category = new Category();
         category.setName(request.name().trim());
         category.setIcon(normalizeNullable(request.icon()));
         category.setColor(normalizeNullable(request.color()));
         category.setCreatedInMonth(currentReferenceMonth());
-        return getById(categoryRepository.save(category).getId());
+        Category saved = categoryRepository.save(category);
+        return getResponseById(saved.getId());
     }
 
     @Transactional
-    public Category update(UUID id, UpdateCategoryRequest request) {
+    public CategoryResponse update(UUID id, UpdateCategoryRequest request) {
         Category category = getById(id);
         category.setName(request.name().trim());
         category.setIcon(normalizeNullable(request.icon()));
         category.setColor(normalizeNullable(request.color()));
-        return getById(categoryRepository.save(category).getId());
+        Category saved = categoryRepository.save(category);
+        return getResponseById(saved.getId());
     }
 
     @Transactional
-    public Category archive(UUID id, ArchiveCategoryRequest request) {
+    public CategoryResponse archive(UUID id, ArchiveCategoryRequest request) {
         Category category = getById(id);
         Category replacementCategory = getById(request.replacementCategoryId());
         LocalDate archivedFromMonth = currentReferenceMonth();
@@ -71,7 +81,8 @@ public class CategoryService {
 
         category.setArchivedFromMonth(archivedFromMonth);
         category.setReplacementCategory(replacementCategory);
-        return getById(categoryRepository.save(category).getId());
+        Category saved = categoryRepository.save(category);
+        return getResponseById(saved.getId());
     }
 
     @Transactional(readOnly = true)

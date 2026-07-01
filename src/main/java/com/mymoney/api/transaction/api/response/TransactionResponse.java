@@ -1,5 +1,8 @@
 package com.mymoney.api.transaction.api.response;
 
+import com.mymoney.api.transaction.OwnershipType;
+import com.mymoney.api.transaction.TransactionSourceType;
+import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -24,4 +27,47 @@ public record TransactionResponse(
         Short installmentNumber,
         Short installmentTotal,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt) {}
+        OffsetDateTime updatedAt) {
+
+    public TransactionResponse(
+            UUID id,
+            TransactionType type,
+            OwnershipType ownershipType,
+            TransactionSourceType sourceType,
+            String description,
+            BigDecimal amount,
+            LocalDate transactionDate,
+            LocalDate referenceMonth,
+            UUID accountId,
+            String accountName,
+            UUID categoryId,
+            String categoryName,
+            UUID memberId,
+            String memberName,
+            UUID installmentGroupId,
+            Short installmentNumber,
+            Short installmentTotal,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt) {
+        this(
+                id.toString(),
+                type.name(),
+                ownershipType.name(),
+                sourceType.name(),
+                description,
+                amount,
+                transactionDate,
+                referenceMonth,
+                accountId.toString(),
+                accountName,
+                categoryId.toString(),
+                categoryName,
+                memberId == null ? null : memberId.toString(),
+                memberName,
+                installmentGroupId,
+                installmentNumber,
+                installmentTotal,
+                createdAt,
+                updatedAt);
+    }
+}

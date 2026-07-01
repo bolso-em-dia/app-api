@@ -37,7 +37,7 @@ public class FamilyMemberController {
     @GetMapping
     public ResponseEntity<PageResponse<FamilyMemberResponse>> list(
             @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "ALL") FamilyMemberListStatus status,
+            @RequestParam(defaultValue = "ACTIVE") FamilyMemberListStatus status,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
         return ResponseEntity.ok(PageResponse.from(
                 familyMemberService.listAll(search, status, pageable).map(familyMemberMapper::toResponse)));

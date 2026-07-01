@@ -7,6 +7,7 @@ import com.mymoney.api.category.CategoryService;
 import com.mymoney.api.fixedexpense.api.request.ArchiveFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.UpdateFixedExpenseTemplateRequest;
+import com.mymoney.api.fixedexpense.api.response.FixedExpenseTemplateResponse;
 import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.Transaction;
 import com.mymoney.api.transaction.TransactionRepository;
@@ -33,38 +34,48 @@ public class FixedExpenseTemplateService {
     private final TransactionRepository transactionRepository;
 
     @Transactional(readOnly = true)
-    public Page<FixedExpenseTemplate> listAll(String search, FixedExpenseTemplateListStatus status, Pageable pageable) {
-        return fixedExpenseTemplateRepository.findByFilters(normalizeSearch(search), status.name(), pageable);
+    public Page<FixedExpenseTemplateResponse> listAllResponses(
+            String search, FixedExpenseTemplateListStatus status, Pageable pageable) {
+        return fixedExpenseTemplateRepository.findResponseByFilters(normalizeSearch(search), status.name(), pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public FixedExpenseTemplateResponse getResponseById(UUID id) {
+        return fixedExpenseTemplateRepository
+                .findResponseById(id)
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Fixed expense template was not found."));
     }
 
     @Transactional(readOnly = true)
     public FixedExpenseTemplate getById(UUID id) {
         return fixedExpenseTemplateRepository
-                .findWithAssociationsById(id)
+                .findById(id)
                 .orElseThrow(() ->
                         new ResponseStatusException(HttpStatus.NOT_FOUND, "Fixed expense template was not found."));
     }
 
     @Transactional
-    public FixedExpenseTemplate create(CreateFixedExpenseTemplateRequest request) {
+    public FixedExpenseTemplateResponse create(CreateFixedExpenseTemplateRequest request) {
         FixedExpenseTemplate template = new FixedExpenseTemplate();
         apply(template, request.name(), request.amount(), request.categoryId(), request.accountId(), request.dueDay());
         template.setCreatedInMonth(currentReferenceMonth());
         template.setActive(true);
         FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
         createCurrentMonthTransactionIfMissing(saved);
-        return getById(saved.getId());
+        return getResponseById(saved.getId());
     }
 
     @Transactional
-    public FixedExpenseTemplate update(UUID id, UpdateFixedExpenseTemplateRequest request) {
+    public FixedExpenseTemplateResponse update(UUID id, UpdateFixedExpenseTemplateRequest request) {
         FixedExpenseTemplate template = getById(id);
         apply(template, request.name(), request.amount(), request.categoryId(), request.accountId(), request.dueDay());
-        return getById(fixedExpenseTemplateRepository.save(template).getId());
+        FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
+        return getResponseById(saved.getId());
     }
 
     @Transactional
-    public FixedExpenseTemplate archive(UUID id, ArchiveFixedExpenseTemplateRequest request) {
+    public FixedExpenseTemplateResponse archive(UUID id, ArchiveFixedExpenseTemplateRequest request) {
         FixedExpenseTemplate template = getById(id);
         LocalDate archivedFromMonth = currentReferenceMonth();
         if (archivedFromMonth.isBefore(template.getCreatedInMonth())) {
@@ -74,7 +85,8 @@ public class FixedExpenseTemplateService {
         }
         template.setArchivedFromMonth(archivedFromMonth);
         template.setActive(false);
-        return getById(fixedExpenseTemplateRepository.save(template).getId());
+        FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
+        return getResponseById(saved.getId());
     }
 
     private void createCurrentMonthTransactionIfMissing(FixedExpenseTemplate template) {

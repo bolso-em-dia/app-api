@@ -8,7 +8,6 @@ import com.mymoney.api.transaction.TransactionType;
 import com.mymoney.api.transaction.api.request.CreateTransactionRequest;
 import com.mymoney.api.transaction.api.request.UpdateTransactionRequest;
 import com.mymoney.api.transaction.api.response.TransactionResponse;
-import com.mymoney.api.transaction.mapper.TransactionMapper;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
@@ -38,7 +37,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class TransactionController {
 
     private final TransactionService transactionService;
-    private final TransactionMapper transactionMapper;
 
     @GetMapping
     public ResponseEntity<PageResponse<TransactionResponse>> list(
@@ -52,28 +50,24 @@ public class TransactionController {
                     @SortDefault.SortDefaults({@SortDefault(sort = "transactionDate"), @SortDefault(sort = "createdAt")
                     })
                     Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(transactionService
-                .listByFilters(referenceMonth, type, ownershipType, accountId, categoryId, memberId, pageable)
-                .map(transactionMapper::toResponse)));
+        return ResponseEntity.ok(PageResponse.from(transactionService.listResponseByFilters(
+                referenceMonth, type, ownershipType, accountId, categoryId, memberId, pageable)));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<TransactionResponse> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(transactionMapper.toResponse(transactionService.getById(id)));
+        return ResponseEntity.ok(transactionService.getResponseById(id));
     }
 
     @PostMapping
     public ResponseEntity<List<TransactionResponse>> create(@Valid @RequestBody CreateTransactionRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(transactionService.create(request).stream()
-                        .map(transactionMapper::toResponse)
-                        .toList());
+        return ResponseEntity.status(HttpStatus.CREATED).body(transactionService.create(request));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<TransactionResponse> update(
             @PathVariable UUID id, @Valid @RequestBody UpdateTransactionRequest request) {
-        return ResponseEntity.ok(transactionMapper.toResponse(transactionService.update(id, request)));
+        return ResponseEntity.ok(transactionService.update(id, request));
     }
 
     @DeleteMapping("/{id}")

@@ -42,33 +42,31 @@ public class CategoryController {
     @GetMapping
     public ResponseEntity<PageResponse<CategoryResponse>> list(
             @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "ALL") CategoryListStatus status,
+            @RequestParam(defaultValue = "ACTIVE") CategoryListStatus status,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(
-                categoryService.listAll(search, status, pageable).map(categoryMapper::toResponse)));
+        return ResponseEntity.ok(PageResponse.from(categoryService.listAllResponses(search, status, pageable)));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<CategoryResponse> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(categoryMapper.toResponse(categoryService.getById(id)));
+        return ResponseEntity.ok(categoryService.getResponseById(id));
     }
 
     @PostMapping
     public ResponseEntity<CategoryResponse> create(@Valid @RequestBody CreateCategoryRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(categoryMapper.toResponse(categoryService.create(request)));
+        return ResponseEntity.status(HttpStatus.CREATED).body(categoryService.create(request));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<CategoryResponse> update(
             @PathVariable UUID id, @Valid @RequestBody UpdateCategoryRequest request) {
-        return ResponseEntity.ok(categoryMapper.toResponse(categoryService.update(id, request)));
+        return ResponseEntity.ok(categoryService.update(id, request));
     }
 
     @PatchMapping("/{id}/archive")
     public ResponseEntity<CategoryResponse> archive(
             @PathVariable UUID id, @Valid @RequestBody ArchiveCategoryRequest request) {
-        return ResponseEntity.ok(categoryMapper.toResponse(categoryService.archive(id, request)));
+        return ResponseEntity.ok(categoryService.archive(id, request));
     }
 
     @GetMapping("/options")

@@ -1,19 +1,16 @@
 package com.mymoney.api.category;
 
+import com.mymoney.api.category.api.response.CategoryResponse;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 public interface CategoryRepository extends JpaRepository<Category, UUID> {
-
-    @EntityGraph(attributePaths = {"replacementCategory"})
-    Optional<Category> findWithAssociationsById(UUID id);
 
     @Query(
             """
@@ -25,8 +22,19 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
 
     @Query(
             """
-            select c
+            select new com.mymoney.api.category.api.response.CategoryResponse(
+                c.id,
+                c.name,
+                c.icon,
+                c.color,
+                c.createdInMonth,
+                c.archivedFromMonth,
+                rc.id,
+                c.createdAt,
+                c.updatedAt
+            )
             from Category c
+            left join c.replacementCategory rc
             where (:search = '' or lower(c.name) like concat('%', lower(:search), '%'))
               and (
                 :status = 'ALL'
@@ -34,7 +42,26 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
                 or (:status = 'ARCHIVED' and c.archivedFromMonth is not null)
               )
             """)
-    Page<Category> findByFilters(String search, String status, Pageable pageable);
+    Page<CategoryResponse> findResponseByFilters(String search, String status, Pageable pageable);
+
+    @Query(
+            """
+            select new com.mymoney.api.category.api.response.CategoryResponse(
+                c.id,
+                c.name,
+                c.icon,
+                c.color,
+                c.createdInMonth,
+                c.archivedFromMonth,
+                rc.id,
+                c.createdAt,
+                c.updatedAt
+            )
+            from Category c
+            left join c.replacementCategory rc
+            where c.id = :id
+            """)
+    Optional<CategoryResponse> findResponseById(UUID id);
 
     @Query(
             """

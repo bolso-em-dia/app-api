@@ -7,7 +7,6 @@ import com.mymoney.api.fixedexpense.api.request.ArchiveFixedExpenseTemplateReque
 import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.UpdateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.response.FixedExpenseTemplateResponse;
-import com.mymoney.api.fixedexpense.mapper.FixedExpenseTemplateMapper;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -33,41 +32,37 @@ import org.springframework.web.bind.annotation.RestController;
 public class FixedExpenseTemplateController {
 
     private final FixedExpenseTemplateService fixedExpenseTemplateService;
-    private final FixedExpenseTemplateMapper fixedExpenseTemplateMapper;
 
     @GetMapping
     public ResponseEntity<PageResponse<FixedExpenseTemplateResponse>> list(
             @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "ALL") FixedExpenseTemplateListStatus status,
+            @RequestParam(defaultValue = "ACTIVE") FixedExpenseTemplateListStatus status,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(fixedExpenseTemplateService
-                .listAll(search, status, pageable)
-                .map(fixedExpenseTemplateMapper::toResponse)));
+        return ResponseEntity.ok(PageResponse.from(
+                fixedExpenseTemplateService.listAllResponses(search, status, pageable)));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<FixedExpenseTemplateResponse> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(fixedExpenseTemplateMapper.toResponse(fixedExpenseTemplateService.getById(id)));
+        return ResponseEntity.ok(fixedExpenseTemplateService.getResponseById(id));
     }
 
     @PostMapping
     public ResponseEntity<FixedExpenseTemplateResponse> create(
             @Valid @RequestBody CreateFixedExpenseTemplateRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(fixedExpenseTemplateMapper.toResponse(fixedExpenseTemplateService.create(request)));
+        return ResponseEntity.status(HttpStatus.CREATED).body(fixedExpenseTemplateService.create(request));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<FixedExpenseTemplateResponse> update(
             @PathVariable UUID id, @Valid @RequestBody UpdateFixedExpenseTemplateRequest request) {
-        return ResponseEntity.ok(
-                fixedExpenseTemplateMapper.toResponse(fixedExpenseTemplateService.update(id, request)));
+        return ResponseEntity.ok(fixedExpenseTemplateService.update(id, request));
     }
 
     @PatchMapping("/{id}/archive")
     public ResponseEntity<FixedExpenseTemplateResponse> archive(
             @PathVariable UUID id, @Valid @RequestBody(required = false) ArchiveFixedExpenseTemplateRequest request) {
-        return ResponseEntity.ok(fixedExpenseTemplateMapper.toResponse(fixedExpenseTemplateService.archive(
-                id, request == null ? new ArchiveFixedExpenseTemplateRequest() : request)));
+        return ResponseEntity.ok(
+                fixedExpenseTemplateService.archive(id, request == null ? new ArchiveFixedExpenseTemplateRequest() : request));
     }
 }

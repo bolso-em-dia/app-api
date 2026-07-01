@@ -8,6 +8,7 @@ import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.transaction.api.request.CreateTransactionRequest;
 import com.mymoney.api.transaction.api.request.UpdateTransactionRequest;
+import com.mymoney.api.transaction.api.response.TransactionResponse;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -29,6 +30,19 @@ public class TransactionService {
     private final CategoryService categoryService;
     private final AccountService accountService;
     private final FamilyMemberRepository familyMemberRepository;
+
+    @Transactional(readOnly = true)
+    public Page<TransactionResponse> listResponseByFilters(
+            LocalDate referenceMonth,
+            TransactionType type,
+            OwnershipType ownershipType,
+            UUID accountId,
+            UUID categoryId,
+            UUID memberId,
+            Pageable pageable) {
+        return transactionRepository.findResponseByFilters(
+                referenceMonth, type, ownershipType, accountId, categoryId, memberId, pageable);
+    }
 
     @Transactional(readOnly = true)
     public Page<Transaction> listByFilters(
@@ -56,14 +70,21 @@ public class TransactionService {
     }
 
     @Transactional(readOnly = true)
+    public TransactionResponse getResponseById(UUID id) {
+        return transactionRepository
+                .findResponseById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction was not found."));
+    }
+
+    @Transactional(readOnly = true)
     public Transaction getById(UUID id) {
         return transactionRepository
-                .findWithAssociationsById(id)
+                .findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction was not found."));
     }
 
     @Transactional
-    public List<Transaction> create(CreateTransactionRequest request) {
+    public List<TransactionResponse> create(CreateTransactionRequest request) {
         validateInstallmentCount(request.installmentCount());
         Category category = categoryService.getById(request.categoryId());
         Account account = accountService.getById(request.accountId());
@@ -72,7 +93,7 @@ public class TransactionService {
         int installmentCount = request.installmentCount() == null ? 1 : request.installmentCount();
         UUID installmentGroupId = installmentCount > 1 ? UUID.randomUUID() : null;
 
-        List<Transaction> created = new ArrayList<>();
+        List<TransactionResponse> created = new ArrayList<>();
         for (int i = 0; i < installmentCount; i++) {
             LocalDate transactionDate = request.transactionDate().plusMonths(i);
             Transaction transaction = new Transaction();
@@ -90,14 +111,14 @@ public class TransactionService {
             transaction.setInstallmentGroupId(installmentGroupId);
             transaction.setInstallmentNumber(installmentCount > 1 ? (short) (i + 1) : null);
             transaction.setInstallmentTotal(installmentCount > 1 ? (short) installmentCount : null);
-            created.add(getById(transactionRepository.save(transaction).getId()));
+            created.add(getResponseById(transactionRepository.save(transaction).getId()));
         }
 
         return created;
     }
 
     @Transactional
-    public Transaction update(UUID id, UpdateTransactionRequest request) {
+    public TransactionResponse update(UUID id, UpdateTransactionRequest request) {
         Transaction transaction = getById(id);
         Category category = categoryService.getById(request.categoryId());
         Account account = accountService.getById(request.accountId());
@@ -113,7 +134,7 @@ public class TransactionService {
         transaction.setAccount(account);
         transaction.setMember(member);
 
-        return getById(transactionRepository.save(transaction).getId());
+        return getResponseById(transactionRepository.save(transaction).getId());
     }
 
     @Transactional
