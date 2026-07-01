@@ -1,13 +1,19 @@
 package com.mymoney.api.fixedexpense;
 
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 public interface FixedExpenseTemplateRepository extends JpaRepository<FixedExpenseTemplate, UUID> {
 
+    @EntityGraph(attributePaths = {"category", "account"})
+    Optional<FixedExpenseTemplate> findWithAssociationsById(UUID id);
+
+    @EntityGraph(attributePaths = {"category", "account"})
     @Query(
             """
             select t

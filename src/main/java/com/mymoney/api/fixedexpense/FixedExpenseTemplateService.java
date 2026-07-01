@@ -7,6 +7,11 @@ import com.mymoney.api.category.CategoryService;
 import com.mymoney.api.fixedexpense.api.request.ArchiveFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.UpdateFixedExpenseTemplateRequest;
+import com.mymoney.api.transaction.OwnershipType;
+import com.mymoney.api.transaction.Transaction;
+import com.mymoney.api.transaction.TransactionRepository;
+import com.mymoney.api.transaction.TransactionSourceType;
+import com.mymoney.api.transaction.TransactionType;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.UUID;
@@ -25,6 +30,7 @@ public class FixedExpenseTemplateService {
     private final FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
     private final CategoryService categoryService;
     private final AccountService accountService;
+    private final TransactionRepository transactionRepository;
 
     @Transactional(readOnly = true)
     public Page<FixedExpenseTemplate> listAll(String search, FixedExpenseTemplateListStatus status, Pageable pageable) {
@@ -34,7 +40,7 @@ public class FixedExpenseTemplateService {
     @Transactional(readOnly = true)
     public FixedExpenseTemplate getById(UUID id) {
         return fixedExpenseTemplateRepository
-                .findById(id)
+                .findWithAssociationsById(id)
                 .orElseThrow(() ->
                         new ResponseStatusException(HttpStatus.NOT_FOUND, "Fixed expense template was not found."));
     }
@@ -45,27 +51,57 @@ public class FixedExpenseTemplateService {
         apply(template, request.name(), request.amount(), request.categoryId(), request.accountId(), request.dueDay());
         template.setCreatedInMonth(currentReferenceMonth());
         template.setActive(true);
-        return fixedExpenseTemplateRepository.save(template);
+        FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
+        createCurrentMonthTransactionIfMissing(saved);
+        return getById(saved.getId());
     }
 
     @Transactional
     public FixedExpenseTemplate update(UUID id, UpdateFixedExpenseTemplateRequest request) {
         FixedExpenseTemplate template = getById(id);
         apply(template, request.name(), request.amount(), request.categoryId(), request.accountId(), request.dueDay());
-        return fixedExpenseTemplateRepository.save(template);
+        return getById(fixedExpenseTemplateRepository.save(template).getId());
     }
 
     @Transactional
     public FixedExpenseTemplate archive(UUID id, ArchiveFixedExpenseTemplateRequest request) {
         FixedExpenseTemplate template = getById(id);
-        if (request.archivedFromMonth().isBefore(template.getCreatedInMonth())) {
+        LocalDate archivedFromMonth = currentReferenceMonth();
+        if (archivedFromMonth.isBefore(template.getCreatedInMonth())) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY,
                     "Archive month cannot be before the fixed expense template creation month.");
         }
-        template.setArchivedFromMonth(request.archivedFromMonth());
+        template.setArchivedFromMonth(archivedFromMonth);
         template.setActive(false);
-        return fixedExpenseTemplateRepository.save(template);
+        return getById(fixedExpenseTemplateRepository.save(template).getId());
+    }
+
+    private void createCurrentMonthTransactionIfMissing(FixedExpenseTemplate template) {
+        LocalDate referenceMonth = currentReferenceMonth();
+        if (transactionRepository.existsByFixedExpenseTemplateIdAndReferenceMonth(template.getId(), referenceMonth)) {
+            return;
+        }
+
+        Transaction transaction = new Transaction();
+        transaction.setType(TransactionType.EXPENSE);
+        transaction.setOwnershipType(OwnershipType.SHARED);
+        transaction.setSourceType(TransactionSourceType.FIXED_EXPENSE);
+        transaction.setDescription(template.getName());
+        transaction.setAmount(template.getAmount());
+        transaction.setTransactionDate(resolveTransactionDate(referenceMonth, template.getDueDay()));
+        transaction.setReferenceMonth(referenceMonth);
+        transaction.setAccount(template.getAccount());
+        transaction.setCategory(template.getCategory());
+        transaction.setMember(null);
+        transaction.setFixedExpenseTemplate(template);
+        transactionRepository.save(transaction);
+    }
+
+    private LocalDate resolveTransactionDate(LocalDate referenceMonth, Short dueDay) {
+        YearMonth yearMonth = YearMonth.from(referenceMonth);
+        int day = Math.min(dueDay.intValue(), yearMonth.lengthOfMonth());
+        return yearMonth.atDay(day);
     }
 
     private void apply(

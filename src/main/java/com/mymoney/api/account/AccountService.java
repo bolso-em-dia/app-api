@@ -65,11 +65,12 @@ public class AccountService {
     @Transactional
     public Account archive(UUID id, ArchiveAccountRequest request) {
         Account account = getById(id);
-        if (request.archivedFromMonth().isBefore(account.getCreatedInMonth())) {
+        LocalDate archivedFromMonth = currentReferenceMonth();
+        if (archivedFromMonth.isBefore(account.getCreatedInMonth())) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "Archive month cannot be before the account creation month.");
         }
-        account.setArchivedFromMonth(request.archivedFromMonth());
+        account.setArchivedFromMonth(archivedFromMonth);
         return accountRepository.save(account);
     }
 

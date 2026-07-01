@@ -2,14 +2,20 @@ package com.mymoney.api.transaction;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
 
+    @EntityGraph(attributePaths = {"account", "category", "member"})
+    Optional<Transaction> findWithAssociationsById(UUID id);
+
+    @EntityGraph(attributePaths = {"account", "category", "member"})
     @Query(
             """
             select t
@@ -30,6 +36,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             UUID memberId,
             Pageable pageable);
 
+    @EntityGraph(attributePaths = {"account", "category", "member"})
     @Query(
             """
             select t
@@ -49,6 +56,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             UUID accountId,
             UUID categoryId,
             UUID memberId);
+
+    boolean existsByFixedExpenseTemplateIdAndReferenceMonth(UUID fixedExpenseTemplateId, LocalDate referenceMonth);
 
     List<Transaction> findByInstallmentGroupIdOrderByInstallmentNumber(UUID installmentGroupId);
 

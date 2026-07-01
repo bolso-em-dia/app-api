@@ -66,8 +66,8 @@ public class FixedExpenseTemplateController {
 
     @PatchMapping("/{id}/archive")
     public ResponseEntity<FixedExpenseTemplateResponse> archive(
-            @PathVariable UUID id, @Valid @RequestBody ArchiveFixedExpenseTemplateRequest request) {
-        return ResponseEntity.ok(
-                fixedExpenseTemplateMapper.toResponse(fixedExpenseTemplateService.archive(id, request)));
+            @PathVariable UUID id, @Valid @RequestBody(required = false) ArchiveFixedExpenseTemplateRequest request) {
+        return ResponseEntity.ok(fixedExpenseTemplateMapper.toResponse(fixedExpenseTemplateService.archive(
+                id, request == null ? new ArchiveFixedExpenseTemplateRequest() : request)));
     }
 }

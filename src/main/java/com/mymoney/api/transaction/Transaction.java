@@ -2,6 +2,7 @@ package com.mymoney.api.transaction;
 
 import com.mymoney.api.account.Account;
 import com.mymoney.api.category.Category;
+import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.member.FamilyMember;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -68,6 +69,10 @@ public class Transaction {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id")
     private FamilyMember member;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fixed_expense_template_id")
+    private FixedExpenseTemplate fixedExpenseTemplate;
 
     @Column(name = "installment_group_id")
     private UUID installmentGroupId;

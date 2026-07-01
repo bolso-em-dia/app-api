@@ -30,7 +30,7 @@ public class CategoryService {
     @Transactional(readOnly = true)
     public Category getById(UUID id) {
         return categoryRepository
-                .findById(id)
+                .findWithAssociationsById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category was not found."));
     }
 
@@ -41,7 +41,7 @@ public class CategoryService {
         category.setIcon(normalizeNullable(request.icon()));
         category.setColor(normalizeNullable(request.color()));
         category.setCreatedInMonth(currentReferenceMonth());
-        return categoryRepository.save(category);
+        return getById(categoryRepository.save(category).getId());
     }
 
     @Transactional
@@ -50,27 +50,28 @@ public class CategoryService {
         category.setName(request.name().trim());
         category.setIcon(normalizeNullable(request.icon()));
         category.setColor(normalizeNullable(request.color()));
-        return categoryRepository.save(category);
+        return getById(categoryRepository.save(category).getId());
     }
 
     @Transactional
     public Category archive(UUID id, ArchiveCategoryRequest request) {
         Category category = getById(id);
         Category replacementCategory = getById(request.replacementCategoryId());
+        LocalDate archivedFromMonth = currentReferenceMonth();
 
         if (category.getId().equals(replacementCategory.getId())) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "Replacement category must be different from the archived one.");
         }
 
-        if (request.archivedFromMonth().isBefore(category.getCreatedInMonth())) {
+        if (archivedFromMonth.isBefore(category.getCreatedInMonth())) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "Archive month cannot be before the category creation month.");
         }
 
-        category.setArchivedFromMonth(request.archivedFromMonth());
+        category.setArchivedFromMonth(archivedFromMonth);
         category.setReplacementCategory(replacementCategory);
-        return categoryRepository.save(category);
+        return getById(categoryRepository.save(category).getId());
     }
 
     @Transactional(readOnly = true)

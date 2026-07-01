@@ -68,8 +68,9 @@ public class AccountController {
 
     @PatchMapping("/{id}/archive")
     public ResponseEntity<AccountResponse> archive(
-            @PathVariable UUID id, @Valid @RequestBody ArchiveAccountRequest request) {
-        return ResponseEntity.ok(accountMapper.toResponse(accountService.archive(id, request)));
+            @PathVariable UUID id, @Valid @RequestBody(required = false) ArchiveAccountRequest request) {
+        return ResponseEntity.ok(accountMapper.toResponse(accountService.archive(
+                id, request == null ? new ArchiveAccountRequest() : request)));
     }
 
     @GetMapping("/options")

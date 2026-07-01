@@ -15,7 +15,6 @@ public record CreateTransactionRequest(
         @NotBlank String description,
         @NotNull @DecimalMin("0.01") BigDecimal amount,
         @NotNull LocalDate transactionDate,
-        @NotNull LocalDate referenceMonth,
         @NotNull UUID accountId,
         @NotNull UUID categoryId,
         UUID memberId,

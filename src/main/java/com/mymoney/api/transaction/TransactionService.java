@@ -9,6 +9,7 @@ import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.transaction.api.request.CreateTransactionRequest;
 import com.mymoney.api.transaction.api.request.UpdateTransactionRequest;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -57,7 +58,7 @@ public class TransactionService {
     @Transactional(readOnly = true)
     public Transaction getById(UUID id) {
         return transactionRepository
-                .findById(id)
+                .findWithAssociationsById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction was not found."));
     }
 
@@ -73,6 +74,7 @@ public class TransactionService {
 
         List<Transaction> created = new ArrayList<>();
         for (int i = 0; i < installmentCount; i++) {
+            LocalDate transactionDate = request.transactionDate().plusMonths(i);
             Transaction transaction = new Transaction();
             transaction.setType(request.type());
             transaction.setOwnershipType(request.ownershipType());
@@ -80,15 +82,15 @@ public class TransactionService {
                     installmentCount > 1 ? TransactionSourceType.INSTALLMENT : TransactionSourceType.MANUAL);
             transaction.setDescription(request.description().trim());
             transaction.setAmount(request.amount());
-            transaction.setTransactionDate(request.transactionDate().plusMonths(i));
-            transaction.setReferenceMonth(request.referenceMonth().plusMonths(i));
+            transaction.setTransactionDate(transactionDate);
+            transaction.setReferenceMonth(referenceMonthFromDate(transactionDate));
             transaction.setAccount(account);
             transaction.setCategory(category);
             transaction.setMember(member);
             transaction.setInstallmentGroupId(installmentGroupId);
             transaction.setInstallmentNumber(installmentCount > 1 ? (short) (i + 1) : null);
             transaction.setInstallmentTotal(installmentCount > 1 ? (short) installmentCount : null);
-            created.add(transactionRepository.save(transaction));
+            created.add(getById(transactionRepository.save(transaction).getId()));
         }
 
         return created;
@@ -106,12 +108,12 @@ public class TransactionService {
         transaction.setDescription(request.description().trim());
         transaction.setAmount(request.amount());
         transaction.setTransactionDate(request.transactionDate());
-        transaction.setReferenceMonth(request.referenceMonth());
+        transaction.setReferenceMonth(referenceMonthFromDate(request.transactionDate()));
         transaction.setCategory(category);
         transaction.setAccount(account);
         transaction.setMember(member);
 
-        return transactionRepository.save(transaction);
+        return getById(transactionRepository.save(transaction).getId());
     }
 
     @Transactional
@@ -164,5 +166,9 @@ public class TransactionService {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "Installment count must be between 1 and 120.");
         }
+    }
+
+    private LocalDate referenceMonthFromDate(LocalDate transactionDate) {
+        return YearMonth.from(transactionDate).atDay(1);
     }
 }

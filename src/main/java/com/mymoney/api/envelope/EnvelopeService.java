@@ -101,13 +101,13 @@ public class EnvelopeService {
     }
 
     @Transactional
-    public EnvelopeModel archive(UUID id, ArchiveEnvelopeRequest request) {
+    public EnvelopeModel archive(UUID id, ArchiveEnvelopeRequest request, LocalDate referenceMonth) {
         EnvelopeModel envelope = getById(id);
-        if (request.archivedFromMonth().isBefore(envelope.getCreatedInMonth())) {
+        if (referenceMonth.isBefore(envelope.getCreatedInMonth())) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "Archive month cannot be before the envelope creation month.");
         }
-        envelope.setArchivedFromMonth(request.archivedFromMonth());
+        envelope.setArchivedFromMonth(referenceMonth);
         envelope.setActive(false);
         return envelopeModelRepository.save(envelope);
     }

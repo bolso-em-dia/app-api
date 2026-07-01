@@ -79,10 +79,13 @@ public class EnvelopeController {
 
     @PatchMapping("/{id}/archive")
     public ResponseEntity<EnvelopeResponse> archive(
-            @PathVariable UUID id, @Valid @RequestBody ArchiveEnvelopeRequest request) {
-        var envelope = envelopeService.archive(id, request);
-        return ResponseEntity.ok(envelopeMapper.toResponse(
-                envelopeService.getViewById(envelope.getId(), envelope.getCreatedInMonth()), List.of()));
+            @PathVariable UUID id,
+            @Valid @RequestBody(required = false) ArchiveEnvelopeRequest request,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate referenceMonth) {
+        var envelope = envelopeService.archive(
+                id, request == null ? new ArchiveEnvelopeRequest() : request, referenceMonth);
+        return ResponseEntity.ok(
+                envelopeMapper.toResponse(envelopeService.getViewById(envelope.getId(), referenceMonth), List.of()));
     }
 
     @GetMapping("/{id}/transactions")
