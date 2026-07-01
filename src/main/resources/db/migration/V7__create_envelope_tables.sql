@@ -1,4 +1,4 @@
-create table if not exists envelope_models (
+create table if not exists budget_models (
     id uuid primary key,
     name varchar(120) not null,
     type varchar(20) not null,
@@ -11,12 +11,12 @@ create table if not exists envelope_models (
     updated_at timestamp with time zone not null
 );
 
-create table if not exists envelope_model_categories (
-    envelope_model_id uuid not null references envelope_models(id),
+create table if not exists budget_model_categories (
+    budget_model_id uuid not null references budget_models(id),
     category_id uuid not null references categories(id),
-    primary key (envelope_model_id, category_id)
+    primary key (budget_model_id, category_id)
 );
 
-create index if not exists idx_envelope_models_owner_member_id on envelope_models(owner_member_id);
-create index if not exists idx_envelope_models_created_in_month on envelope_models(created_in_month);
-create index if not exists idx_envelope_models_archived_from_month on envelope_models(archived_from_month);
+create index if not exists idx_budget_models_owner_member_id on budget_models(owner_member_id);
+create index if not exists idx_budget_models_created_in_month on budget_models(created_in_month);
+create index if not exists idx_budget_models_archived_from_month on budget_models(archived_from_month);

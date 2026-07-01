@@ -22,9 +22,7 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     @Override
     public void commence(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            AuthenticationException authException)
+            HttpServletRequest request, HttpServletResponse response, AuthenticationException authException)
             throws IOException {
         log.warn(
                 "Authentication failure on {} {} message={}",
@@ -36,9 +34,6 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(
                 response.getWriter(),
-                ApiErrorResponse.from(
-                        HttpStatus.UNAUTHORIZED,
-                        "Authentication is required.",
-                        request.getRequestURI()));
+                ApiErrorResponse.from(HttpStatus.UNAUTHORIZED, "Authentication is required.", request.getRequestURI()));
     }
 }

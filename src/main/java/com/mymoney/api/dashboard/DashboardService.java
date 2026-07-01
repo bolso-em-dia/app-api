@@ -1,7 +1,7 @@
 package com.mymoney.api.dashboard;
 
-import com.mymoney.api.envelope.EnvelopeService;
-import com.mymoney.api.envelope.EnvelopeView;
+import com.mymoney.api.budget.BudgetService;
+import com.mymoney.api.budget.BudgetView;
 import com.mymoney.api.transaction.Transaction;
 import com.mymoney.api.transaction.TransactionRepository;
 import com.mymoney.api.transaction.TransactionType;
@@ -19,17 +19,22 @@ import org.springframework.transaction.annotation.Transactional;
 public class DashboardService {
 
     private final TransactionRepository transactionRepository;
-    private final EnvelopeService envelopeService;
+    private final BudgetService budgetService;
 
     @Transactional(readOnly = true)
     public DashboardView getDashboard(LocalDate referenceMonth) {
         List<Transaction> transactions =
                 transactionRepository.findByFilters(referenceMonth, null, null, null, null, null);
-        List<EnvelopeView> envelopes = envelopeService.listForMonth(referenceMonth);
+        List<BudgetView> budgets = budgetService.listForMonth(referenceMonth);
 
         BigDecimal totalIncome = sumByType(transactions, TransactionType.INCOME);
         BigDecimal totalExpense = sumByType(transactions, TransactionType.EXPENSE);
         BigDecimal balance = totalIncome.subtract(totalExpense);
+        BigDecimal reservedBudgetAmount = budgets.stream()
+                .map(BudgetView::remainingAmount)
+                .filter(remaining -> remaining.compareTo(BigDecimal.ZERO) > 0)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal availableBalance = balance.subtract(reservedBudgetAmount);
 
         List<Transaction> recentTransactions = transactions.stream()
                 .sorted(Comparator.comparing(Transaction::getTransactionDate)
@@ -61,7 +66,15 @@ public class DashboardService {
                 .toList();
 
         return new DashboardView(
-                referenceMonth, totalIncome, totalExpense, balance, envelopes, recentTransactions, categoryBreakdown);
+                referenceMonth,
+                totalIncome,
+                totalExpense,
+                balance,
+                availableBalance,
+                reservedBudgetAmount,
+                budgets,
+                recentTransactions,
+                categoryBreakdown);
     }
 
     private BigDecimal sumByType(List<Transaction> transactions, TransactionType type) {

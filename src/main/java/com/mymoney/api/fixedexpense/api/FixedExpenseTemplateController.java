@@ -38,8 +38,8 @@ public class FixedExpenseTemplateController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "ACTIVE") FixedExpenseTemplateListStatus status,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(
-                fixedExpenseTemplateService.listAllResponses(search, status, pageable)));
+        return ResponseEntity.ok(
+                PageResponse.from(fixedExpenseTemplateService.listAllResponses(search, status, pageable)));
     }
 
     @GetMapping("/{id}")
@@ -62,7 +62,7 @@ public class FixedExpenseTemplateController {
     @PatchMapping("/{id}/archive")
     public ResponseEntity<FixedExpenseTemplateResponse> archive(
             @PathVariable UUID id, @Valid @RequestBody(required = false) ArchiveFixedExpenseTemplateRequest request) {
-        return ResponseEntity.ok(
-                fixedExpenseTemplateService.archive(id, request == null ? new ArchiveFixedExpenseTemplateRequest() : request));
+        return ResponseEntity.ok(fixedExpenseTemplateService.archive(
+                id, request == null ? new ArchiveFixedExpenseTemplateRequest() : request));
     }
 }

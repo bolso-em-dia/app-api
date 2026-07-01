@@ -10,11 +10,11 @@ import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
 import com.mymoney.api.auth.api.JsonTestUtils;
+import com.mymoney.api.budget.BudgetModel;
+import com.mymoney.api.budget.BudgetModelRepository;
+import com.mymoney.api.budget.BudgetType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
-import com.mymoney.api.envelope.EnvelopeModel;
-import com.mymoney.api.envelope.EnvelopeModelRepository;
-import com.mymoney.api.envelope.EnvelopeType;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
@@ -61,7 +61,7 @@ class DashboardControllerIntegrationTest extends PostgresIntegrationTestSupport 
     private TransactionRepository transactionRepository;
 
     @Autowired
-    private EnvelopeModelRepository envelopeModelRepository;
+    private BudgetModelRepository budgetModelRepository;
 
     private String adminToken;
     private String userToken;
@@ -109,23 +109,23 @@ class DashboardControllerIntegrationTest extends PostgresIntegrationTestSupport 
         account.setCreatedInMonth(LocalDate.of(2026, 6, 1));
         account = accountRepository.save(account);
 
-        EnvelopeModel familyEnvelope = new EnvelopeModel();
-        familyEnvelope.setName("Family Essentials");
-        familyEnvelope.setType(EnvelopeType.GLOBAL);
-        familyEnvelope.setMonthlyLimit(new BigDecimal("1000.00"));
-        familyEnvelope.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        familyEnvelope.setActive(true);
-        familyEnvelope.setCategories(new LinkedHashSet<>(java.util.List.of(groceries, transport)));
-        envelopeModelRepository.save(familyEnvelope);
+        BudgetModel familyBudget = new BudgetModel();
+        familyBudget.setName("Family Essentials");
+        familyBudget.setType(BudgetType.GLOBAL);
+        familyBudget.setMonthlyLimit(new BigDecimal("1000.00"));
+        familyBudget.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        familyBudget.setActive(true);
+        familyBudget.setCategories(new LinkedHashSet<>(java.util.List.of(groceries, transport)));
+        budgetModelRepository.save(familyBudget);
 
-        EnvelopeModel allowanceEnvelope = new EnvelopeModel();
-        allowanceEnvelope.setName("Karol Allowance");
-        allowanceEnvelope.setType(EnvelopeType.ALLOWANCE);
-        allowanceEnvelope.setOwnerMember(allowanceMember);
-        allowanceEnvelope.setMonthlyLimit(new BigDecimal("400.00"));
-        allowanceEnvelope.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        allowanceEnvelope.setActive(true);
-        envelopeModelRepository.save(allowanceEnvelope);
+        BudgetModel allowanceBudget = new BudgetModel();
+        allowanceBudget.setName("Karol Allowance");
+        allowanceBudget.setType(BudgetType.ALLOWANCE);
+        allowanceBudget.setOwnerMember(allowanceMember);
+        allowanceBudget.setMonthlyLimit(new BigDecimal("400.00"));
+        allowanceBudget.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        allowanceBudget.setActive(true);
+        budgetModelRepository.save(allowanceBudget);
 
         transactionRepository.save(createTransaction(
                 TransactionType.INCOME,
@@ -171,7 +171,9 @@ class DashboardControllerIntegrationTest extends PostgresIntegrationTestSupport 
                 .andExpect(jsonPath("$.summary.totalIncome").value(5000.0))
                 .andExpect(jsonPath("$.summary.totalExpense").value(195.0))
                 .andExpect(jsonPath("$.summary.balance").value(4805.0))
-                .andExpect(jsonPath("$.envelopes.length()").value(2))
+                .andExpect(jsonPath("$.summary.availableBalance").value(3600.0))
+                .andExpect(jsonPath("$.summary.reservedBudgetAmount").value(1205.0))
+                .andExpect(jsonPath("$.budgets.length()").value(2))
                 .andExpect(jsonPath("$.recentTransactions[0].description").value("Ride app"))
                 .andExpect(jsonPath("$.categoryBreakdown[0].categoryName").value("Groceries"));
 

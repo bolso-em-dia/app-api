@@ -1,10 +1,10 @@
-package com.mymoney.api.envelope;
+package com.mymoney.api.budget;
 
+import com.mymoney.api.budget.api.request.ArchiveBudgetRequest;
+import com.mymoney.api.budget.api.request.CreateBudgetRequest;
+import com.mymoney.api.budget.api.request.UpdateBudgetRequest;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryService;
-import com.mymoney.api.envelope.api.request.ArchiveEnvelopeRequest;
-import com.mymoney.api.envelope.api.request.CreateEnvelopeRequest;
-import com.mymoney.api.envelope.api.request.UpdateEnvelopeRequest;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.transaction.OwnershipType;
@@ -32,84 +32,84 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
-public class EnvelopeService {
+public class BudgetService {
 
-    private final EnvelopeModelRepository envelopeModelRepository;
+    private final BudgetModelRepository budgetModelRepository;
     private final CategoryService categoryService;
     private final FamilyMemberRepository familyMemberRepository;
     private final TransactionRepository transactionRepository;
 
     @Transactional(readOnly = true)
-    public Page<EnvelopeView> listForMonth(
-            LocalDate referenceMonth, String search, EnvelopeListStatus status, EnvelopeType type, Pageable pageable) {
-        Page<UUID> idPage = envelopeModelRepository.findIdsForMonth(
+    public Page<BudgetView> listForMonth(
+            LocalDate referenceMonth, String search, BudgetListStatus status, BudgetType type, Pageable pageable) {
+        Page<UUID> idPage = budgetModelRepository.findIdsForMonth(
                 referenceMonth, normalizeSearch(search), status.name(), type, pageable);
-        List<EnvelopeView> views = loadByIds(idPage.getContent()).stream()
-                .map(envelope -> toView(envelope, referenceMonth))
+        List<BudgetView> views = loadByIds(idPage.getContent()).stream()
+                .map(budget -> toView(budget, referenceMonth))
                 .toList();
         return new PageImpl<>(views, pageable, idPage.getTotalElements());
     }
 
     @Transactional(readOnly = true)
-    public List<EnvelopeView> listForMonth(LocalDate referenceMonth) {
-        return loadByIds(envelopeModelRepository
-                        .findIdsForMonth(referenceMonth, "", EnvelopeListStatus.ACTIVE.name(), null, Pageable.unpaged())
+    public List<BudgetView> listForMonth(LocalDate referenceMonth) {
+        return loadByIds(budgetModelRepository
+                        .findIdsForMonth(referenceMonth, "", BudgetListStatus.ACTIVE.name(), null, Pageable.unpaged())
                         .getContent())
                 .stream()
-                .map(envelope -> toView(envelope, referenceMonth))
+                .map(budget -> toView(budget, referenceMonth))
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public EnvelopeView getViewById(UUID id, LocalDate referenceMonth) {
+    public BudgetView getViewById(UUID id, LocalDate referenceMonth) {
         return toView(getById(id), referenceMonth);
     }
 
     @Transactional(readOnly = true)
-    public EnvelopeModel getById(UUID id) {
-        return envelopeModelRepository
+    public BudgetModel getById(UUID id) {
+        return budgetModelRepository
                 .findWithAssociationsById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Envelope was not found."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Budget was not found."));
     }
 
     @Transactional
-    public EnvelopeModel create(CreateEnvelopeRequest request) {
-        EnvelopeModel envelope = new EnvelopeModel();
+    public BudgetModel create(CreateBudgetRequest request) {
+        BudgetModel budget = new BudgetModel();
         apply(
-                envelope,
+                budget,
                 request.name(),
                 request.type(),
                 request.ownerMemberId(),
                 request.categoryIds(),
                 request.monthlyLimit());
-        envelope.setCreatedInMonth(currentReferenceMonth());
-        envelope.setActive(true);
-        return envelopeModelRepository.save(envelope);
+        budget.setCreatedInMonth(currentReferenceMonth());
+        budget.setActive(true);
+        return budgetModelRepository.save(budget);
     }
 
     @Transactional
-    public EnvelopeModel update(UUID id, UpdateEnvelopeRequest request) {
-        EnvelopeModel envelope = getById(id);
+    public BudgetModel update(UUID id, UpdateBudgetRequest request) {
+        BudgetModel budget = getById(id);
         apply(
-                envelope,
+                budget,
                 request.name(),
                 request.type(),
                 request.ownerMemberId(),
                 request.categoryIds(),
                 request.monthlyLimit());
-        return envelopeModelRepository.save(envelope);
+        return budgetModelRepository.save(budget);
     }
 
     @Transactional
-    public EnvelopeModel archive(UUID id, ArchiveEnvelopeRequest request, LocalDate referenceMonth) {
-        EnvelopeModel envelope = getById(id);
-        if (referenceMonth.isBefore(envelope.getCreatedInMonth())) {
+    public BudgetModel archive(UUID id, ArchiveBudgetRequest request, LocalDate referenceMonth) {
+        BudgetModel budget = getById(id);
+        if (referenceMonth.isBefore(budget.getCreatedInMonth())) {
             throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "Archive month cannot be before the envelope creation month.");
+                    HttpStatus.UNPROCESSABLE_ENTITY, "Archive month cannot be before the budget creation month.");
         }
-        envelope.setArchivedFromMonth(referenceMonth);
-        envelope.setActive(false);
-        return envelopeModelRepository.save(envelope);
+        budget.setArchivedFromMonth(referenceMonth);
+        budget.setActive(false);
+        return budgetModelRepository.save(budget);
     }
 
     @Transactional(readOnly = true)
@@ -118,7 +118,7 @@ public class EnvelopeService {
     }
 
     @Transactional(readOnly = true)
-    public List<EnvelopeCategoryBreakdownItem> categoryBreakdown(UUID id, LocalDate referenceMonth) {
+    public List<BudgetCategoryBreakdownItem> categoryBreakdown(UUID id, LocalDate referenceMonth) {
         List<Transaction> transactions = filterTransactions(getById(id), referenceMonth);
         return transactions.stream()
                 .collect(Collectors.groupingBy(
@@ -132,44 +132,42 @@ public class EnvelopeService {
                                     transaction.getCategory().getId().equals(entry.getKey()))
                             .findFirst()
                             .orElseThrow();
-                    return new EnvelopeCategoryBreakdownItem(
+                    return new BudgetCategoryBreakdownItem(
                             firstMatch.getCategory().getId().toString(),
                             firstMatch.getCategory().getName(),
                             entry.getValue());
                 })
-                .sorted(Comparator.comparing(
-                        EnvelopeCategoryBreakdownItem::categoryName, String.CASE_INSENSITIVE_ORDER))
+                .sorted(Comparator.comparing(BudgetCategoryBreakdownItem::categoryName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
-    private List<EnvelopeModel> loadByIds(List<UUID> ids) {
+    private List<BudgetModel> loadByIds(List<UUID> ids) {
         if (ids.isEmpty()) {
             return List.of();
         }
 
-        Map<UUID, EnvelopeModel> envelopesById = envelopeModelRepository.findAllWithAssociationsByIdIn(ids).stream()
+        Map<UUID, BudgetModel> budgetsById = budgetModelRepository.findAllWithAssociationsByIdIn(ids).stream()
                 .collect(Collectors.toMap(
-                        EnvelopeModel::getId, envelope -> envelope, (left, right) -> left, LinkedHashMap::new));
+                        BudgetModel::getId, budget -> budget, (left, right) -> left, LinkedHashMap::new));
 
-        return ids.stream().map(envelopesById::get).toList();
+        return ids.stream().map(budgetsById::get).toList();
     }
 
-    private EnvelopeView toView(EnvelopeModel envelope, LocalDate referenceMonth) {
-        BigDecimal consumedAmount = filterTransactions(envelope, referenceMonth).stream()
+    private BudgetView toView(BudgetModel budget, LocalDate referenceMonth) {
+        BigDecimal consumedAmount = filterTransactions(budget, referenceMonth).stream()
                 .map(Transaction::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new EnvelopeView(
-                envelope, consumedAmount, envelope.getMonthlyLimit().subtract(consumedAmount));
+        return new BudgetView(budget, consumedAmount, budget.getMonthlyLimit().subtract(consumedAmount));
     }
 
-    private List<Transaction> filterTransactions(EnvelopeModel envelope, LocalDate referenceMonth) {
+    private List<Transaction> filterTransactions(BudgetModel budget, LocalDate referenceMonth) {
         List<Transaction> monthlyTransactions =
                 transactionRepository.findByFilters(referenceMonth, null, null, null, null, null);
 
-        if (envelope.getType() == EnvelopeType.ALLOWANCE) {
-            UUID ownerId = envelope.getOwnerMember() == null
+        if (budget.getType() == BudgetType.ALLOWANCE) {
+            UUID ownerId = budget.getOwnerMember() == null
                     ? null
-                    : envelope.getOwnerMember().getId();
+                    : budget.getOwnerMember().getId();
             return monthlyTransactions.stream()
                     .filter(transaction -> transaction.getOwnershipType() == OwnershipType.INDIVIDUAL)
                     .filter(transaction -> transaction.getMember() != null)
@@ -178,7 +176,7 @@ public class EnvelopeService {
         }
 
         Set<UUID> categoryIds =
-                envelope.getCategories().stream().map(Category::getId).collect(Collectors.toSet());
+                budget.getCategories().stream().map(Category::getId).collect(Collectors.toSet());
         return monthlyTransactions.stream()
                 .filter(transaction -> transaction.getOwnershipType() == OwnershipType.SHARED)
                 .filter(transaction ->
@@ -187,20 +185,20 @@ public class EnvelopeService {
     }
 
     private void apply(
-            EnvelopeModel envelope,
+            BudgetModel budget,
             String name,
-            EnvelopeType type,
+            BudgetType type,
             UUID ownerMemberId,
             List<UUID> categoryIds,
             BigDecimal monthlyLimit) {
-        envelope.setName(name.trim());
-        envelope.setType(type);
-        envelope.setMonthlyLimit(monthlyLimit);
+        budget.setName(name.trim());
+        budget.setType(type);
+        budget.setMonthlyLimit(monthlyLimit);
 
-        if (type == EnvelopeType.ALLOWANCE) {
+        if (type == BudgetType.ALLOWANCE) {
             if (ownerMemberId == null) {
                 throw new ResponseStatusException(
-                        HttpStatus.UNPROCESSABLE_ENTITY, "Allowance envelopes require an owner member.");
+                        HttpStatus.UNPROCESSABLE_ENTITY, "Allowance budgets require an owner member.");
             }
             FamilyMember owner = familyMemberRepository
                     .findById(ownerMemberId)
@@ -209,26 +207,25 @@ public class EnvelopeService {
                             () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family member was not found."));
             if (!owner.isAllowanceEnabled()) {
                 throw new ResponseStatusException(
-                        HttpStatus.UNPROCESSABLE_ENTITY,
-                        "Allowance envelopes require a member with allowance enabled.");
+                        HttpStatus.UNPROCESSABLE_ENTITY, "Allowance budgets require a member with allowance enabled.");
             }
-            if (envelope.getId() == null
-                    && envelopeModelRepository.existsByOwnerMemberIdAndType(owner.getId(), EnvelopeType.ALLOWANCE)) {
+            if (budget.getId() == null
+                    && budgetModelRepository.existsByOwnerMemberIdAndType(owner.getId(), BudgetType.ALLOWANCE)) {
                 throw new ResponseStatusException(
-                        HttpStatus.CONFLICT, "An allowance envelope already exists for this member.");
+                        HttpStatus.CONFLICT, "An allowance budget already exists for this member.");
             }
-            envelope.setOwnerMember(owner);
-            envelope.setCategories(new LinkedHashSet<>());
+            budget.setOwnerMember(owner);
+            budget.setCategories(new LinkedHashSet<>());
             return;
         }
 
         if (categoryIds == null || categoryIds.isEmpty()) {
             throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "Global envelopes require at least one category.");
+                    HttpStatus.UNPROCESSABLE_ENTITY, "Global budgets require at least one category.");
         }
 
-        envelope.setOwnerMember(null);
-        envelope.setCategories(categoryIds.stream()
+        budget.setOwnerMember(null);
+        budget.setCategories(categoryIds.stream()
                 .map(categoryService::getById)
                 .collect(Collectors.toCollection(LinkedHashSet::new)));
     }

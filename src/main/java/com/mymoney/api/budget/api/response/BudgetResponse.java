@@ -1,11 +1,11 @@
-package com.mymoney.api.envelope.api.response;
+package com.mymoney.api.budget.api.response;
 
 import com.mymoney.api.transaction.api.response.TransactionResponse;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-public record EnvelopeResponse(
+public record BudgetResponse(
         String id,
         String name,
         String type,
@@ -17,5 +17,5 @@ public record EnvelopeResponse(
         LocalDate createdInMonth,
         LocalDate archivedFromMonth,
         boolean active,
-        List<EnvelopeCategoryResponse> categories,
+        List<BudgetCategoryResponse> categories,
         List<TransactionResponse> transactions) {}

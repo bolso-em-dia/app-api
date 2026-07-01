@@ -1,6 +1,6 @@
 package com.mymoney.api.dashboard;
 
-import com.mymoney.api.envelope.EnvelopeView;
+import com.mymoney.api.budget.BudgetView;
 import com.mymoney.api.transaction.Transaction;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -11,12 +11,14 @@ public record DashboardView(
         BigDecimal totalIncome,
         BigDecimal totalExpense,
         BigDecimal balance,
-        List<EnvelopeView> envelopes,
+        BigDecimal availableBalance,
+        BigDecimal reservedBudgetAmount,
+        List<BudgetView> budgets,
         List<Transaction> recentTransactions,
         List<DashboardCategoryBreakdownItem> categoryBreakdown) {
 
     public DashboardView {
-        envelopes = List.copyOf(envelopes);
+        budgets = List.copyOf(budgets);
         recentTransactions = List.copyOf(recentTransactions);
         categoryBreakdown = List.copyOf(categoryBreakdown);
     }

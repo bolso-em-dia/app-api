@@ -1,4 +1,4 @@
-package com.mymoney.api.envelope;
+package com.mymoney.api.budget;
 
 import java.time.LocalDate;
 import java.util.Collection;
@@ -11,13 +11,13 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
-public interface EnvelopeModelRepository extends JpaRepository<EnvelopeModel, UUID> {
+public interface BudgetModelRepository extends JpaRepository<BudgetModel, UUID> {
 
     @Query(
             value =
                     """
                     select e.id
-                    from EnvelopeModel e
+                    from BudgetModel e
                     where e.createdInMonth <= :referenceMonth
                       and (:search = '' or lower(e.name) like concat('%', lower(:search), '%'))
                       and (
@@ -33,7 +33,7 @@ public interface EnvelopeModelRepository extends JpaRepository<EnvelopeModel, UU
             countQuery =
                     """
                     select count(e)
-                    from EnvelopeModel e
+                    from BudgetModel e
                     where e.createdInMonth <= :referenceMonth
                       and (:search = '' or lower(e.name) like concat('%', lower(:search), '%'))
                       and (
@@ -47,26 +47,26 @@ public interface EnvelopeModelRepository extends JpaRepository<EnvelopeModel, UU
                       and (:type is null or e.type = :type)
                     """)
     Page<UUID> findIdsForMonth(
-            LocalDate referenceMonth, String search, String status, EnvelopeType type, Pageable pageable);
+            LocalDate referenceMonth, String search, String status, BudgetType type, Pageable pageable);
 
     @EntityGraph(attributePaths = {"categories", "ownerMember"})
     @Query(
             """
             select distinct e
-            from EnvelopeModel e
+            from BudgetModel e
             where e.id in :ids
             """)
-    List<EnvelopeModel> findAllWithAssociationsByIdIn(Collection<UUID> ids);
+    List<BudgetModel> findAllWithAssociationsByIdIn(Collection<UUID> ids);
 
     @Query(
             """
             select distinct e
-            from EnvelopeModel e
+            from BudgetModel e
             left join fetch e.categories
             left join fetch e.ownerMember
             where e.id = :id
             """)
-    Optional<EnvelopeModel> findWithAssociationsById(UUID id);
+    Optional<BudgetModel> findWithAssociationsById(UUID id);
 
-    boolean existsByOwnerMemberIdAndType(UUID ownerMemberId, EnvelopeType type);
+    boolean existsByOwnerMemberIdAndType(UUID ownerMemberId, BudgetType type);
 }

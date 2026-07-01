@@ -54,6 +54,13 @@ public class TransactionController {
                 referenceMonth, type, ownershipType, accountId, categoryId, memberId, pageable)));
     }
 
+    @GetMapping("/descriptions")
+    public ResponseEntity<List<String>> listDescriptionSuggestions(
+            @RequestParam(required = false, defaultValue = "") String query,
+            @RequestParam(required = false) Integer limit) {
+        return ResponseEntity.ok(transactionService.listDescriptionSuggestions(query, limit));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<TransactionResponse> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(transactionService.getResponseById(id));

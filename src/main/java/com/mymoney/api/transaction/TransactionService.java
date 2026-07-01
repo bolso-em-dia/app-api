@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,9 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @RequiredArgsConstructor
 public class TransactionService {
+
+    private static final int DEFAULT_DESCRIPTION_SUGGESTION_LIMIT = 8;
+    private static final int MAX_DESCRIPTION_SUGGESTION_LIMIT = 12;
 
     private final TransactionRepository transactionRepository;
     private final CategoryService categoryService;
@@ -42,6 +46,18 @@ public class TransactionService {
             Pageable pageable) {
         return transactionRepository.findResponseByFilters(
                 referenceMonth, type, ownershipType, accountId, categoryId, memberId, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> listDescriptionSuggestions(String query, Integer limit) {
+        String normalizedQuery = query == null ? "" : query.trim();
+        int normalizedLimit;
+        if (limit == null) {
+            normalizedLimit = DEFAULT_DESCRIPTION_SUGGESTION_LIMIT;
+        } else {
+            normalizedLimit = Math.max(1, Math.min(limit, MAX_DESCRIPTION_SUGGESTION_LIMIT));
+        }
+        return transactionRepository.findDescriptionSuggestions(normalizedQuery, PageRequest.of(0, normalizedLimit));
     }
 
     @Transactional(readOnly = true)

@@ -1,4 +1,4 @@
-package com.mymoney.api.envelope;
+package com.mymoney.api.budget;
 
 import com.mymoney.api.category.Category;
 import com.mymoney.api.member.FamilyMember;
@@ -27,11 +27,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "envelope_models")
+@Table(name = "budget_models")
 @Getter
 @Setter
 @NoArgsConstructor
-public class EnvelopeModel {
+public class BudgetModel {
 
     @Id
     private UUID id;
@@ -41,7 +41,7 @@ public class EnvelopeModel {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private EnvelopeType type;
+    private BudgetType type;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_member_id")
@@ -49,8 +49,8 @@ public class EnvelopeModel {
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-            name = "envelope_model_categories",
-            joinColumns = @JoinColumn(name = "envelope_model_id"),
+            name = "budget_model_categories",
+            joinColumns = @JoinColumn(name = "budget_model_id"),
             inverseJoinColumns = @JoinColumn(name = "category_id"))
     private Set<Category> categories = new LinkedHashSet<>();
 

@@ -29,31 +29,43 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
     <Match>
-        <Class name="com.mymoney.api.envelope.EnvelopeModel"/>
+        <Class name="com.mymoney.api.budget.BudgetModel"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
     <Match>
-        <Class name="com.mymoney.api.envelope.EnvelopeService"/>
+        <Class name="com.mymoney.api.budget.BudgetService"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
     <Match>
-        <Class name="com.mymoney.api.envelope.EnvelopeView"/>
+        <Class name="com.mymoney.api.budget.BudgetView"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
     <Match>
-        <Class name="com.mymoney.api.envelope.api.request.CreateEnvelopeRequest"/>
+        <Class name="com.mymoney.api.budget.api.request.CreateBudgetRequest"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
     <Match>
-        <Class name="com.mymoney.api.envelope.api.request.UpdateEnvelopeRequest"/>
+        <Class name="com.mymoney.api.budget.api.request.UpdateBudgetRequest"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
     <Match>
-        <Class name="com.mymoney.api.envelope.api.response.EnvelopeResponse"/>
+        <Class name="com.mymoney.api.budget.api.response.BudgetResponse"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
     <Match>
         <Class name="com.mymoney.api.dashboard.DashboardService"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.fixedexpense.FixedExpenseTemplateService"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.security.ApiAuthenticationEntryPoint"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.security.ApiAccessDeniedHandler"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
 </FindBugsFilter>

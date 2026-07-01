@@ -1,4 +1,4 @@
-package com.mymoney.api.envelope.api;
+package com.mymoney.api.budget.api;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -12,11 +12,11 @@ import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
 import com.mymoney.api.auth.api.JsonTestUtils;
+import com.mymoney.api.budget.BudgetModel;
+import com.mymoney.api.budget.BudgetModelRepository;
+import com.mymoney.api.budget.BudgetType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
-import com.mymoney.api.envelope.EnvelopeModel;
-import com.mymoney.api.envelope.EnvelopeModelRepository;
-import com.mymoney.api.envelope.EnvelopeType;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
@@ -42,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
+class BudgetControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     private MockMvc mockMvc;
@@ -63,7 +63,7 @@ class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
     private TransactionRepository transactionRepository;
 
     @Autowired
-    private EnvelopeModelRepository envelopeModelRepository;
+    private BudgetModelRepository budgetModelRepository;
 
     private String adminToken;
     private String userToken;
@@ -71,8 +71,8 @@ class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
     private Category groceries;
     private Category transport;
     private Account account;
-    private EnvelopeModel globalEnvelope;
-    private EnvelopeModel allowanceEnvelope;
+    private BudgetModel globalBudget;
+    private BudgetModel allowanceBudget;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -89,7 +89,7 @@ class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
         allowanceMember = new FamilyMember();
         allowanceMember.setName("Karol");
-        allowanceMember.setEmail("karol-envelope@my-money.local");
+        allowanceMember.setEmail("karol-budget@my-money.local");
         allowanceMember.setPasswordHash(passwordEncoder.encode("karol123456"));
         allowanceMember.setRole(FamilyRole.USER);
         allowanceMember.setActive(true);
@@ -112,23 +112,23 @@ class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
         account.setCreatedInMonth(LocalDate.of(2026, 6, 1));
         account = accountRepository.save(account);
 
-        globalEnvelope = new EnvelopeModel();
-        globalEnvelope.setName("Family Essentials");
-        globalEnvelope.setType(EnvelopeType.GLOBAL);
-        globalEnvelope.setMonthlyLimit(new BigDecimal("1000.00"));
-        globalEnvelope.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        globalEnvelope.setActive(true);
-        globalEnvelope.setCategories(new LinkedHashSet<>(java.util.List.of(groceries, transport)));
-        globalEnvelope = envelopeModelRepository.save(globalEnvelope);
+        globalBudget = new BudgetModel();
+        globalBudget.setName("Family Essentials");
+        globalBudget.setType(BudgetType.GLOBAL);
+        globalBudget.setMonthlyLimit(new BigDecimal("1000.00"));
+        globalBudget.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        globalBudget.setActive(true);
+        globalBudget.setCategories(new LinkedHashSet<>(java.util.List.of(groceries, transport)));
+        globalBudget = budgetModelRepository.save(globalBudget);
 
-        allowanceEnvelope = new EnvelopeModel();
-        allowanceEnvelope.setName("Karol Allowance");
-        allowanceEnvelope.setType(EnvelopeType.ALLOWANCE);
-        allowanceEnvelope.setOwnerMember(allowanceMember);
-        allowanceEnvelope.setMonthlyLimit(new BigDecimal("400.00"));
-        allowanceEnvelope.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        allowanceEnvelope.setActive(true);
-        allowanceEnvelope = envelopeModelRepository.save(allowanceEnvelope);
+        allowanceBudget = new BudgetModel();
+        allowanceBudget.setName("Karol Allowance");
+        allowanceBudget.setType(BudgetType.ALLOWANCE);
+        allowanceBudget.setOwnerMember(allowanceMember);
+        allowanceBudget.setMonthlyLimit(new BigDecimal("400.00"));
+        allowanceBudget.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        allowanceBudget.setActive(true);
+        allowanceBudget = budgetModelRepository.save(allowanceBudget);
 
         Transaction sharedGroceries = new Transaction();
         sharedGroceries.setType(TransactionType.EXPENSE);
@@ -161,7 +161,7 @@ class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Test
     void listDetailTransactionsAndBreakdownWork() throws Exception {
-        mockMvc.perform(get("/api/envelopes")
+        mockMvc.perform(get("/api/budgets")
                         .header("Authorization", "Bearer " + adminToken)
                         .param("referenceMonth", "2026-06-01")
                         .param("search", "allowance")
@@ -175,20 +175,20 @@ class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.totalItems").value(1))
                 .andExpect(jsonPath("$.totalPages").value(1));
 
-        mockMvc.perform(get("/api/envelopes/" + globalEnvelope.getId())
+        mockMvc.perform(get("/api/budgets/" + globalBudget.getId())
                         .header("Authorization", "Bearer " + adminToken)
                         .param("referenceMonth", "2026-06-01"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.consumedAmount").value(150.0))
                 .andExpect(jsonPath("$.transactions.length()").value(1));
 
-        mockMvc.perform(get("/api/envelopes/" + allowanceEnvelope.getId() + "/transactions")
+        mockMvc.perform(get("/api/budgets/" + allowanceBudget.getId() + "/transactions")
                         .header("Authorization", "Bearer " + adminToken)
                         .param("referenceMonth", "2026-06-01"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].memberName").value("Karol"));
 
-        mockMvc.perform(get("/api/envelopes/" + allowanceEnvelope.getId() + "/category-breakdown")
+        mockMvc.perform(get("/api/budgets/" + allowanceBudget.getId() + "/category-breakdown")
                         .header("Authorization", "Bearer " + adminToken)
                         .param("referenceMonth", "2026-06-01"))
                 .andExpect(status().isOk())
@@ -198,7 +198,7 @@ class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Test
     void createUpdateArchiveAndAuthorizationWork() throws Exception {
-        mockMvc.perform(post("/api/envelopes")
+        mockMvc.perform(post("/api/budgets")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
@@ -213,13 +213,13 @@ class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
                                         .formatted(allowanceMember.getId())))
                 .andExpect(status().isConflict());
 
-        MvcResult createResult = mockMvc.perform(post("/api/envelopes")
+        MvcResult createResult = mockMvc.perform(post("/api/budgets")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
                                 """
                                 {
-                                  "name": "Transport Envelope",
+                                  "name": "Transport Budget",
                                   "type": "GLOBAL",
                                   "categoryIds": ["%s"],
                                   "monthlyLimit": 200.00
@@ -232,13 +232,13 @@ class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
         String createdId =
                 JsonTestUtils.extractJsonValue(createResult.getResponse().getContentAsString(), "id");
 
-        mockMvc.perform(put("/api/envelopes/" + createdId)
+        mockMvc.perform(put("/api/budgets/" + createdId)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
                                 """
                                 {
-                                  "name": "Transport Envelope Updated",
+                                  "name": "Transport Budget Updated",
                                   "type": "GLOBAL",
                                   "categoryIds": ["%s"],
                                   "monthlyLimit": 250.00
@@ -246,30 +246,25 @@ class EnvelopeControllerIntegrationTest extends PostgresIntegrationTestSupport {
                                 """
                                         .formatted(transport.getId())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Transport Envelope Updated"));
+                .andExpect(jsonPath("$.name").value("Transport Budget Updated"));
 
-        mockMvc.perform(
-                        patch("/api/envelopes/" + createdId + "/archive")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "archivedFromMonth": "2026-07-01"
-                                }
-                                """))
+        mockMvc.perform(patch("/api/budgets/" + createdId + "/archive")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .param("referenceMonth", "2026-07-01")
+                        .content("{}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
 
-        mockMvc.perform(get("/api/envelopes")
+        mockMvc.perform(get("/api/budgets")
                         .header("Authorization", "Bearer " + adminToken)
                         .param("referenceMonth", "2026-07-01")
                         .param("status", "ARCHIVED"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[?(@.name=='Transport Envelope Updated')]")
+                .andExpect(jsonPath("$.items[?(@.name=='Transport Budget Updated')]")
                         .isNotEmpty());
 
-        mockMvc.perform(get("/api/envelopes")
+        mockMvc.perform(get("/api/budgets")
                         .header("Authorization", "Bearer " + userToken)
                         .param("referenceMonth", "2026-06-01"))
                 .andExpect(status().isForbidden());

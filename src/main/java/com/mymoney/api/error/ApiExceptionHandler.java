@@ -54,9 +54,7 @@ public class ApiExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiErrorResponse.from(
-                        HttpStatus.INTERNAL_SERVER_ERROR,
-                        "Unexpected server error.",
-                        request.getRequestURI()));
+                        HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error.", request.getRequestURI()));
     }
 
     private String currentUser() {
