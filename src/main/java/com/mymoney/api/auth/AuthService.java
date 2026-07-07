@@ -5,6 +5,7 @@ import com.mymoney.api.auth.api.AuthUserResponse;
 import com.mymoney.api.auth.api.LoginRequest;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
+import com.mymoney.api.preference.UserPreferencesService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final UserPreferencesService userPreferencesService;
 
     @Transactional
     public AuthResponse login(LoginRequest request, HttpServletResponse response) {
@@ -90,7 +92,8 @@ public class AuthService {
                 member.getName(),
                 member.getEmail(),
                 member.getRole().name(),
-                member.isAllowanceEnabled());
+                member.isAllowanceEnabled(),
+                userPreferencesService.resolvePreferences(member));
     }
 
     private ResponseStatusException invalidCredentials() {

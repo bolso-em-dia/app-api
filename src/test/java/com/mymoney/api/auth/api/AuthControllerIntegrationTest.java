@@ -1,5 +1,6 @@
 package com.mymoney.api.auth.api;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -38,6 +39,9 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(cookie().exists("my_money_refresh_token"))
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.user.email").value("admin@my-money.local"))
+                .andExpect(jsonPath("$.user.preferences.locale").value("pt-BR"))
+                .andExpect(jsonPath("$.user.preferences.defaultAccountId").value(nullValue()))
+                .andExpect(jsonPath("$.user.preferences.showBalanceWithBudgets").value(false))
                 .andReturn();
 
         String token = JsonTestUtils.extractJsonValue(result.getResponse().getContentAsString(), "accessToken");
@@ -45,6 +49,9 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
         mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("admin@my-money.local"))
-                .andExpect(jsonPath("$.role").value("ADMIN"));
+                .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.preferences.locale").value("pt-BR"))
+                .andExpect(jsonPath("$.preferences.defaultAccountId").value(nullValue()))
+                .andExpect(jsonPath("$.preferences.showBalanceWithBudgets").value(false));
     }
 }
