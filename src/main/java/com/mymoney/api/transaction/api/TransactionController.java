@@ -44,6 +44,7 @@ public class TransactionController {
             @RequestParam(required = false) TransactionType type,
             @RequestParam(required = false) OwnershipType ownershipType,
             @RequestParam(required = false) UUID accountId,
+            @RequestParam(required = false) List<UUID> categoryIds,
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) UUID memberId,
             @PageableDefault(size = 20)
@@ -51,7 +52,21 @@ public class TransactionController {
                     })
                     Pageable pageable) {
         return ResponseEntity.ok(PageResponse.from(transactionService.listResponseByFilters(
-                referenceMonth, type, ownershipType, accountId, categoryId, memberId, pageable)));
+                referenceMonth,
+                type,
+                ownershipType,
+                accountId,
+                normalizeCategoryIds(categoryIds, categoryId),
+                memberId,
+                pageable)));
+    }
+
+    private List<UUID> normalizeCategoryIds(List<UUID> categoryIds, UUID categoryId) {
+        if (categoryIds != null && !categoryIds.isEmpty()) {
+            return categoryIds;
+        }
+
+        return categoryId == null ? null : List.of(categoryId);
     }
 
     @GetMapping("/descriptions")

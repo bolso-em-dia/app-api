@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -41,6 +42,21 @@ public class ApiExceptionHandler {
         }
 
         return ResponseEntity.status(status).body(ApiErrorResponse.from(status, message, request.getRequestURI()));
+    }
+
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> handleAuthorizationDenied(
+            AuthorizationDeniedException exception, HttpServletRequest request) {
+        log.warn(
+                "Request denied on {} {} by user={} status={} message={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                currentUser(),
+                HttpStatus.FORBIDDEN.value(),
+                "Access Denied");
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiErrorResponse.from(HttpStatus.FORBIDDEN, "Access Denied", request.getRequestURI()));
     }
 
     @ExceptionHandler(Exception.class)

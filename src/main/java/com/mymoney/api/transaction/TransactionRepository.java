@@ -44,7 +44,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
               and (:type is null or t.type = :type)
               and (:ownershipType is null or t.ownershipType = :ownershipType)
               and (:accountId is null or t.account.id = :accountId)
-              and (:categoryId is null or t.category.id = :categoryId)
+              and (:categoryIds is null or t.category.id in :categoryIds)
               and (:memberId is null or t.member.id = :memberId)
             """)
     Page<TransactionResponse> findResponseByFilters(
@@ -52,7 +52,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             TransactionType type,
             OwnershipType ownershipType,
             UUID accountId,
-            UUID categoryId,
+            List<UUID> categoryIds,
             UUID memberId,
             Pageable pageable);
 
@@ -109,7 +109,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
               and (:type is null or t.type = :type)
               and (:ownershipType is null or t.ownershipType = :ownershipType)
               and (:accountId is null or t.account.id = :accountId)
-              and (:categoryId is null or t.category.id = :categoryId)
+              and (:categoryIds is null or t.category.id in :categoryIds)
               and (:memberId is null or t.member.id = :memberId)
             """)
     Page<Transaction> findByFilters(
@@ -117,7 +117,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             TransactionType type,
             OwnershipType ownershipType,
             UUID accountId,
-            UUID categoryId,
+            List<UUID> categoryIds,
             UUID memberId,
             Pageable pageable);
 
@@ -130,7 +130,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
               and (:type is null or t.type = :type)
               and (:ownershipType is null or t.ownershipType = :ownershipType)
               and (:accountId is null or t.account.id = :accountId)
-              and (:categoryId is null or t.category.id = :categoryId)
+              and (:categoryIds is null or t.category.id in :categoryIds)
               and (:memberId is null or t.member.id = :memberId)
             order by t.transactionDate, t.createdAt
             """)
@@ -139,7 +139,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             TransactionType type,
             OwnershipType ownershipType,
             UUID accountId,
-            UUID categoryId,
+            List<UUID> categoryIds,
             UUID memberId);
 
     boolean existsByFixedExpenseTemplateIdAndReferenceMonth(UUID fixedExpenseTemplateId, LocalDate referenceMonth);

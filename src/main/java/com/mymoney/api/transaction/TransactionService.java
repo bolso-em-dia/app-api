@@ -41,11 +41,11 @@ public class TransactionService {
             TransactionType type,
             OwnershipType ownershipType,
             UUID accountId,
-            UUID categoryId,
+            List<UUID> categoryIds,
             UUID memberId,
             Pageable pageable) {
         return transactionRepository.findResponseByFilters(
-                referenceMonth, type, ownershipType, accountId, categoryId, memberId, pageable);
+                referenceMonth, type, ownershipType, accountId, categoryIds, memberId, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -66,11 +66,11 @@ public class TransactionService {
             TransactionType type,
             OwnershipType ownershipType,
             UUID accountId,
-            UUID categoryId,
+            List<UUID> categoryIds,
             UUID memberId,
             Pageable pageable) {
         return transactionRepository.findByFilters(
-                referenceMonth, type, ownershipType, accountId, categoryId, memberId, pageable);
+                referenceMonth, type, ownershipType, accountId, categoryIds, memberId, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -79,10 +79,10 @@ public class TransactionService {
             TransactionType type,
             OwnershipType ownershipType,
             UUID accountId,
-            UUID categoryId,
+            List<UUID> categoryIds,
             UUID memberId) {
         return transactionRepository.findByFilters(
-                referenceMonth, type, ownershipType, accountId, categoryId, memberId);
+                referenceMonth, type, ownershipType, accountId, categoryIds, memberId);
     }
 
     @Transactional(readOnly = true)

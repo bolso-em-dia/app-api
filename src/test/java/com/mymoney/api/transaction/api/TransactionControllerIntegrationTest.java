@@ -65,6 +65,7 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
     private String userToken;
     private FamilyMember allowanceMember;
     private Category category;
+    private Category transportCategory;
     private Account account;
     private Transaction sharedTransaction;
 
@@ -95,6 +96,11 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
         category.setCreatedInMonth(LocalDate.of(2026, 6, 1));
         category = categoryRepository.save(category);
 
+        transportCategory = new Category();
+        transportCategory.setName("Transport");
+        transportCategory.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        transportCategory = categoryRepository.save(transportCategory);
+
         account = new Account();
         account.setName("Main Checking");
         account.setType(AccountType.CHECKING);
@@ -113,6 +119,18 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
         sharedTransaction.setAccount(account);
         sharedTransaction = transactionRepository.save(sharedTransaction);
 
+        Transaction transportTransaction = new Transaction();
+        transportTransaction.setType(TransactionType.EXPENSE);
+        transportTransaction.setOwnershipType(OwnershipType.SHARED);
+        transportTransaction.setSourceType(TransactionSourceType.MANUAL);
+        transportTransaction.setDescription("Taxi");
+        transportTransaction.setAmount(new BigDecimal("45.00"));
+        transportTransaction.setTransactionDate(LocalDate.of(2026, 6, 11));
+        transportTransaction.setReferenceMonth(LocalDate.of(2026, 6, 1));
+        transportTransaction.setCategory(transportCategory);
+        transportTransaction.setAccount(account);
+        transactionRepository.save(transportTransaction);
+
         adminToken = login("admin@my-money.local", "admin123456");
         userToken = login("user@my-money.local", "user123456");
     }
@@ -127,8 +145,8 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
                 .andExpect(jsonPath("$.items[*].description").isArray())
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(1))
-                .andExpect(jsonPath("$.totalItems").value(1))
-                .andExpect(jsonPath("$.totalPages").value(1));
+                .andExpect(jsonPath("$.totalItems").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
 
         mockMvc.perform(post("/api/transactions")
                         .header("Authorization", "Bearer " + adminToken)
@@ -224,6 +242,36 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
                                 """
                                         .formatted(account.getId(), category.getId())))
                 .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void listSupportsMultipleCategoryIdsAndKeepsSingleCategoryCompatibility() throws Exception {
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01")
+                        .param(
+                                "categoryIds",
+                                category.getId().toString(),
+                                transportCategory.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(2));
+
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01")
+                        .param("categoryId", category.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].categoryName").value("Groceries"));
+
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01")
+                        .param("categoryId", category.getId().toString())
+                        .param("categoryIds", transportCategory.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].categoryName").value("Transport"));
     }
 
     @Test
