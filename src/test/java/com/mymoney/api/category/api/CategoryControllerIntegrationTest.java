@@ -15,6 +15,7 @@ import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,14 +63,14 @@ class CategoryControllerIntegrationTest extends PostgresIntegrationTestSupport {
         familyMemberRepository.save(regularUser);
 
         categoryA = new Category();
-        categoryA.setName("Groceries");
+        categoryA.setName("Alpha Integration Category");
         categoryA.setIcon("shopping-cart");
         categoryA.setColor("#22aa66");
         categoryA.setCreatedInMonth(LocalDate.of(2026, 6, 1));
         categoryA = categoryRepository.save(categoryA);
 
         categoryB = new Category();
-        categoryB.setName("Transport");
+        categoryB.setName("Beta Integration Category");
         categoryB.setCreatedInMonth(LocalDate.of(2026, 5, 1));
         categoryB = categoryRepository.save(categoryB);
 
@@ -81,6 +82,7 @@ class CategoryControllerIntegrationTest extends PostgresIntegrationTestSupport {
     void adminCanListCreateGetAndUpdateCategories() throws Exception {
         mockMvc.perform(get("/api/categories")
                         .header("Authorization", "Bearer " + adminToken)
+                        .param("search", "Integration Category")
                         .param("size", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[*].name").isArray())
@@ -95,19 +97,20 @@ class CategoryControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
         mockMvc.perform(get("/api/categories")
                         .header("Authorization", "Bearer " + adminToken)
-                        .param("search", "trans")
+                        .param("search", "Beta Integration Category")
                         .param("status", "ACTIVE"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(1))
-                .andExpect(jsonPath("$.items[0].name").value("Transport"))
+                .andExpect(jsonPath("$.items[0].name").value("Beta Integration Category"))
                 .andExpect(jsonPath("$.totalItems").value(1));
 
         mockMvc.perform(get("/api/categories")
                         .header("Authorization", "Bearer " + adminToken)
+                        .param("search", "Alpha Integration Category")
                         .param("status", "ARCHIVED"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(1))
-                .andExpect(jsonPath("$.items[0].name").value("Groceries"));
+                .andExpect(jsonPath("$.items[0].name").value("Alpha Integration Category"));
 
         mockMvc.perform(
                         post("/api/categories")
@@ -123,11 +126,12 @@ class CategoryControllerIntegrationTest extends PostgresIntegrationTestSupport {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Restaurants"))
-                .andExpect(jsonPath("$.createdInMonth").value("2026-06-01"));
+                .andExpect(jsonPath("$.createdInMonth")
+                        .value(currentReferenceMonth().toString()));
 
         mockMvc.perform(get("/api/categories/" + categoryA.getId()).header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Groceries"));
+                .andExpect(jsonPath("$.name").value("Alpha Integration Category"));
 
         mockMvc.perform(
                         put("/api/categories/" + categoryA.getId())
@@ -155,13 +159,13 @@ class CategoryControllerIntegrationTest extends PostgresIntegrationTestSupport {
                         .content(
                                 """
                                 {
-                                  "archivedFromMonth": "2026-08-01",
                                   "replacementCategoryId": "%s"
                                 }
                                 """
                                         .formatted(categoryB.getId())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.archivedFromMonth").value("2026-08-01"))
+                .andExpect(jsonPath("$.archivedFromMonth")
+                        .value(currentReferenceMonth().toString()))
                 .andExpect(jsonPath("$.replacementCategoryId")
                         .value(categoryB.getId().toString()));
 
@@ -171,7 +175,6 @@ class CategoryControllerIntegrationTest extends PostgresIntegrationTestSupport {
                         .content(
                                 """
                                 {
-                                  "archivedFromMonth": "2026-08-01",
                                   "replacementCategoryId": "%s"
                                 }
                                 """
@@ -189,15 +192,17 @@ class CategoryControllerIntegrationTest extends PostgresIntegrationTestSupport {
                         .header("Authorization", "Bearer " + adminToken)
                         .param("referenceMonth", "2026-07-01"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.name=='Groceries')]").isNotEmpty())
-                .andExpect(jsonPath("$[?(@.name=='Transport')]").isNotEmpty());
+                .andExpect(
+                        jsonPath("$[?(@.name=='Alpha Integration Category')]").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.name=='Beta Integration Category')]").isNotEmpty());
 
         mockMvc.perform(get("/api/categories/options")
                         .header("Authorization", "Bearer " + adminToken)
                         .param("referenceMonth", "2026-08-01"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.name=='Groceries')]").isEmpty())
-                .andExpect(jsonPath("$[?(@.name=='Transport')]").isNotEmpty());
+                .andExpect(
+                        jsonPath("$[?(@.name=='Alpha Integration Category')]").isEmpty())
+                .andExpect(jsonPath("$[?(@.name=='Beta Integration Category')]").isNotEmpty());
     }
 
     @Test
@@ -218,6 +223,10 @@ class CategoryControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
         mockMvc.perform(get("/api/categories").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden());
+    }
+
+    private LocalDate currentReferenceMonth() {
+        return YearMonth.now().atDay(1);
     }
 
     private String login(String email, String password) throws Exception {

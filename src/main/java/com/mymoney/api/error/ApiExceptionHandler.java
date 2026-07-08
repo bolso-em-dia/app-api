@@ -10,6 +10,8 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.validation.BindException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
@@ -44,6 +46,22 @@ public class ApiExceptionHandler {
         }
 
         return ResponseEntity.status(status).body(ApiErrorResponse.from(status, message, request.getRequestURI()));
+    }
+
+    @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
+    public ResponseEntity<ApiErrorResponse> handleValidationFailure(Exception exception, HttpServletRequest request) {
+        String message = "Request validation failed.";
+
+        log.warn(
+                "Validation failed on {} {} by user={} status={} message={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                currentUser(),
+                HttpStatus.BAD_REQUEST.value(),
+                message);
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiErrorResponse.from(HttpStatus.BAD_REQUEST, message, request.getRequestURI()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
