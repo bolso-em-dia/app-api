@@ -9,6 +9,8 @@ import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.transaction.api.request.CreateTransactionRequest;
 import com.mymoney.api.transaction.api.request.UpdateTransactionRequest;
 import com.mymoney.api.transaction.api.response.TransactionResponse;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -108,6 +110,7 @@ public class TransactionService {
 
         int installmentCount = request.installmentCount() == null ? 1 : request.installmentCount();
         UUID installmentGroupId = installmentCount > 1 ? UUID.randomUUID() : null;
+        List<BigDecimal> installmentAmounts = calculateInstallmentAmounts(request.amount(), installmentCount);
 
         List<TransactionResponse> created = new ArrayList<>();
         for (int i = 0; i < installmentCount; i++) {
@@ -118,7 +121,7 @@ public class TransactionService {
             transaction.setSourceType(
                     installmentCount > 1 ? TransactionSourceType.INSTALLMENT : TransactionSourceType.MANUAL);
             transaction.setDescription(request.description().trim());
-            transaction.setAmount(request.amount());
+            transaction.setAmount(installmentAmounts.get(i));
             transaction.setTransactionDate(transactionDate);
             transaction.setReferenceMonth(referenceMonthFromDate(transactionDate));
             transaction.setAccount(account);
@@ -193,6 +196,25 @@ public class TransactionService {
         }
 
         return member;
+    }
+
+    private List<BigDecimal> calculateInstallmentAmounts(BigDecimal totalAmount, int installmentCount) {
+        BigDecimal normalizedTotal = totalAmount.setScale(2, RoundingMode.HALF_UP);
+        if (installmentCount == 1) {
+            return List.of(normalizedTotal);
+        }
+
+        long totalCents = normalizedTotal.movePointRight(2).longValueExact();
+        long baseCents = totalCents / installmentCount;
+        long remainderCents = totalCents % installmentCount;
+
+        List<BigDecimal> installmentAmounts = new ArrayList<>(installmentCount);
+        for (int i = 0; i < installmentCount; i++) {
+            long cents = baseCents + (i < remainderCents ? 1 : 0);
+            installmentAmounts.add(BigDecimal.valueOf(cents, 2));
+        }
+
+        return installmentAmounts;
     }
 
     private void validateInstallmentCount(Integer installmentCount) {

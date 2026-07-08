@@ -199,7 +199,7 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
 
     @Test
     void installmentsAndIndividualAllowanceValidationWork() throws Exception {
-        mockMvc.perform(post("/api/transactions")
+        MvcResult installmentResult = mockMvc.perform(post("/api/transactions")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
@@ -221,8 +221,27 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.length()").value(3))
                 .andExpect(jsonPath("$[0].sourceType").value("INSTALLMENT"))
+                .andExpect(jsonPath("$[0].amount").value(100.0))
+                .andExpect(jsonPath("$[0].referenceMonth").value("2026-06-01"))
+                .andExpect(jsonPath("$[1].amount").value(100.0))
+                .andExpect(jsonPath("$[1].referenceMonth").value("2026-07-01"))
+                .andExpect(jsonPath("$[2].amount").value(100.0))
+                .andExpect(jsonPath("$[2].referenceMonth").value("2026-08-01"))
                 .andExpect(jsonPath("$[2].installmentNumber").value(3))
-                .andExpect(jsonPath("$[2].installmentTotal").value(3));
+                .andExpect(jsonPath("$[2].installmentTotal").value(3))
+                .andReturn();
+
+        String installmentGroupId = OBJECT_MAPPER
+                .readTree(installmentResult.getResponse().getContentAsString())
+                .get(0)
+                .get("installmentGroupId")
+                .asText();
+
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-07-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].installmentGroupId").value(installmentGroupId));
 
         mockMvc.perform(post("/api/transactions")
                         .header("Authorization", "Bearer " + adminToken)
@@ -242,6 +261,33 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
                                 """
                                         .formatted(account.getId(), category.getId())))
                 .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void installmentAmountDistributionPreservesTotalForUnevenDivision() throws Exception {
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Notebook",
+                                  "amount": 1000.00,
+                                  "transactionDate": "2026-06-20",
+                                  "referenceMonth": "2026-06-01",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "installmentCount": 3
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].amount").value(333.34))
+                .andExpect(jsonPath("$[1].amount").value(333.33))
+                .andExpect(jsonPath("$[2].amount").value(333.33));
     }
 
     @Test
