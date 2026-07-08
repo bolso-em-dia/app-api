@@ -95,10 +95,16 @@ Open:
 - health: `http://localhost:8080/actuator/health`
 
 
+## CI
+
+- push validation workflow: `.github/workflows/ci.yml`
+- Docker publishing workflow: `.github/workflows/docker.yml`
+
 ## Docker releases
 
 - workflow: `.github/workflows/docker.yml`
 - release and tagging guide: `DOCKER.md`
+- published image: `danielarrais/bolso-em-dia-api`
 
 ## Build, tests, and quality
 
