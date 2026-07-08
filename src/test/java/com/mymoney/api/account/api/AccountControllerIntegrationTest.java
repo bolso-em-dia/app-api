@@ -52,10 +52,10 @@ class AccountControllerIntegrationTest extends PostgresIntegrationTestSupport {
     @BeforeEach
     void setUp() throws Exception {
         FamilyMember regularUser = familyMemberRepository
-                .findByEmailIgnoreCase("user@my-money.local")
+                .findByEmailIgnoreCase("user@bolso-em-dia.local")
                 .orElseGet(FamilyMember::new);
         regularUser.setName("Regular User");
-        regularUser.setEmail("user@my-money.local");
+        regularUser.setEmail("user@bolso-em-dia.local");
         regularUser.setPasswordHash(passwordEncoder.encode("user123456"));
         regularUser.setRole(FamilyRole.USER);
         regularUser.setActive(true);
@@ -78,8 +78,8 @@ class AccountControllerIntegrationTest extends PostgresIntegrationTestSupport {
         accountB.setCreatedInMonth(LocalDate.of(2026, 6, 1));
         accountB = accountRepository.save(accountB);
 
-        adminToken = login("admin@my-money.local", "admin123456");
-        userToken = login("user@my-money.local", "user123456");
+        adminToken = login("admin@bolso-em-dia.local", "admin123456");
+        userToken = login("user@bolso-em-dia.local", "user123456");
     }
 
     @Test

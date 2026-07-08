@@ -47,7 +47,7 @@ class UserPreferencesControllerIntegrationTest extends PostgresIntegrationTestSu
         activeAccount.setType(AccountType.CHECKING);
         activeAccount.setCreatedInMonth(LocalDate.of(2026, 1, 1));
         activeAccount = accountRepository.save(activeAccount);
-        adminToken = login("admin@my-money.local", "admin123456");
+        adminToken = login("admin@bolso-em-dia.local", "admin123456");
     }
 
     @Test
@@ -235,7 +235,7 @@ class UserPreferencesControllerIntegrationTest extends PostgresIntegrationTestSu
                                 """
                                         .formatted(email, password)))
                 .andExpect(status().isOk())
-                .andExpect(cookie().exists("my_money_refresh_token"))
+                .andExpect(cookie().exists("bolso_em_dia_refresh_token"))
                 .andReturn();
 
         return JsonTestUtils.extractJsonValue(result.getResponse().getContentAsString(), "accessToken");

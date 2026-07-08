@@ -10,11 +10,11 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.my-money</groupId>
+    <groupId>com.bolsoemdia</groupId>
     <artifactId>app-api</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>app-api</name>
-    <description>My Money API</description>
+    <description>Bolso em Dia API</description>
 
     <properties>
         <java.version>21</java.version>

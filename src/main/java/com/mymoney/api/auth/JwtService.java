@@ -37,7 +37,7 @@ public class JwtService {
     public String generateAccessToken(FamilyMember member) {
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
-                .issuer("my-money")
+                .issuer("bolso-em-dia")
                 .subject(member.getEmail())
                 .issuedAt(now)
                 .expiresAt(now.plus(accessTokenDuration))

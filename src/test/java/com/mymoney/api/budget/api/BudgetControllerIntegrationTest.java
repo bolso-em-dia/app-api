@@ -79,10 +79,10 @@ class BudgetControllerIntegrationTest extends PostgresIntegrationTestSupport {
     @BeforeEach
     void setUp() throws Exception {
         regularUser = familyMemberRepository
-                .findByEmailIgnoreCase("user@my-money.local")
+                .findByEmailIgnoreCase("user@bolso-em-dia.local")
                 .orElseGet(FamilyMember::new);
         regularUser.setName("Regular User");
-        regularUser.setEmail("user@my-money.local");
+        regularUser.setEmail("user@bolso-em-dia.local");
         regularUser.setPasswordHash(passwordEncoder.encode("user123456"));
         regularUser.setRole(FamilyRole.USER);
         regularUser.setActive(true);
@@ -91,7 +91,7 @@ class BudgetControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
         allowanceMember = new FamilyMember();
         allowanceMember.setName("Karol");
-        allowanceMember.setEmail("karol-budget@my-money.local");
+        allowanceMember.setEmail("karol-budget@bolso-em-dia.local");
         allowanceMember.setPasswordHash(passwordEncoder.encode("karol123456"));
         allowanceMember.setRole(FamilyRole.USER);
         allowanceMember.setActive(true);
@@ -157,8 +157,8 @@ class BudgetControllerIntegrationTest extends PostgresIntegrationTestSupport {
         individualTransport.setMember(allowanceMember);
         transactionRepository.save(individualTransport);
 
-        adminToken = login("admin@my-money.local", "admin123456");
-        userToken = login("user@my-money.local", "user123456");
+        adminToken = login("admin@bolso-em-dia.local", "admin123456");
+        userToken = login("user@bolso-em-dia.local", "user123456");
     }
 
     @Test

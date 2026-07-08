@@ -8,10 +8,10 @@ app:
     jwt-secret: test-secret-test-secret-test-secret
     access-token-minutes: 15
     refresh-token-days: 7
-    refresh-cookie-name: my_money_refresh_token
+    refresh-cookie-name: bolso_em_dia_refresh_token
     allowed-origins:
       - http://localhost:4173
   admin:
     name: Admin
-    email: admin@my-money.local
+    email: admin@bolso-em-dia.local
     password: admin123456

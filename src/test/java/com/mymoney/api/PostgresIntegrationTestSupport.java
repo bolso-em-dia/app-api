@@ -8,9 +8,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 public abstract class PostgresIntegrationTestSupport {
 
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("my_money_test")
-            .withUsername("my_money")
-            .withPassword("my_money")
+            .withDatabaseName("bolso_em_dia_test")
+            .withUsername("bolso_em_dia")
+            .withPassword("bolso_em_dia")
             .withTmpFs(Map.of("/var/lib/postgresql/data", "rw"));
 
     static {

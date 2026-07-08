@@ -44,18 +44,18 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
     @BeforeEach
     void setUp() throws Exception {
         regularUser = familyMemberRepository
-                .findByEmailIgnoreCase("user@my-money.local")
+                .findByEmailIgnoreCase("user@bolso-em-dia.local")
                 .orElseGet(FamilyMember::new);
         regularUser.setName("Regular User");
-        regularUser.setEmail("user@my-money.local");
+        regularUser.setEmail("user@bolso-em-dia.local");
         regularUser.setPasswordHash(passwordEncoder.encode("user123456"));
         regularUser.setRole(FamilyRole.USER);
         regularUser.setActive(true);
         regularUser.setAllowanceEnabled(false);
         regularUser = familyMemberRepository.save(regularUser);
 
-        adminToken = login("admin@my-money.local", "admin123456");
-        userToken = login("user@my-money.local", "user123456");
+        adminToken = login("admin@bolso-em-dia.local", "admin123456");
+        userToken = login("user@bolso-em-dia.local", "user123456");
     }
 
     @Test
@@ -66,7 +66,7 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
                         .param("status", "ACTIVE")
                         .param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].email").value("user@my-money.local"))
+                .andExpect(jsonPath("$.items[0].email").value("user@bolso-em-dia.local"))
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(1))
                 .andExpect(jsonPath("$.totalItems").value(1))
@@ -83,7 +83,7 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
                                         """
                                 {
                                   "name": "Karol",
-                                  "email": "karol@my-money.local",
+                                  "email": "karol@bolso-em-dia.local",
                                   "password": "karol123456",
                                   "role": "USER",
                                   "allowanceEnabled": true
@@ -91,7 +91,7 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Karol"))
-                .andExpect(jsonPath("$.email").value("karol@my-money.local"))
+                .andExpect(jsonPath("$.email").value("karol@bolso-em-dia.local"))
                 .andExpect(jsonPath("$.role").value("USER"))
                 .andExpect(jsonPath("$.allowanceEnabled").value(true));
     }
@@ -101,7 +101,7 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
         mockMvc.perform(get("/api/family-members/" + regularUser.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value("user@my-money.local"));
+                .andExpect(jsonPath("$.email").value("user@bolso-em-dia.local"));
 
         mockMvc.perform(
                         put("/api/family-members/" + regularUser.getId())
@@ -111,7 +111,7 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
                                         """
                                 {
                                   "name": "Updated User",
-                                  "email": "user@my-money.local",
+                                  "email": "user@bolso-em-dia.local",
                                   "password": "updated123456",
                                   "role": "USER",
                                   "allowanceEnabled": true
@@ -131,7 +131,7 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
                         .header("Authorization", "Bearer " + adminToken)
                         .param("status", "ARCHIVED"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].email").value("user@my-money.local"));
+                .andExpect(jsonPath("$.items[0].email").value("user@bolso-em-dia.local"));
 
         mockMvc.perform(patch("/api/family-members/" + regularUser.getId() + "/restore")
                         .header("Authorization", "Bearer " + adminToken))
@@ -176,7 +176,7 @@ class FamilyMemberControllerIntegrationTest extends PostgresIntegrationTestSuppo
                                 .content(
                                         """
                                 {
-                                  "email": "user@my-money.local",
+                                  "email": "user@bolso-em-dia.local",
                                   "password": "user123456"
                                 }
                                 """))

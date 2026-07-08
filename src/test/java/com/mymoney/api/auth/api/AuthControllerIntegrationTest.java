@@ -21,7 +21,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
-    private static final String REFRESH_COOKIE_NAME = "my_money_refresh_token";
+    private static final String REFRESH_COOKIE_NAME = "bolso_em_dia_refresh_token";
 
     @Autowired
     private MockMvc mockMvc;
@@ -34,7 +34,7 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
                                 .content(
                                         """
                                 {
-                                  "email": "admin@my-money.local",
+                                  "email": "admin@bolso-em-dia.local",
                                   "password": "wrong-password"
                                 }
                                 """))
@@ -69,7 +69,7 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
                                 .content(
                                         """
                                 {
-                                  "email": "admin@my-money.local",
+                                  "email": "admin@bolso-em-dia.local",
                                   "password": "admin123456"
                                 }
                                 """))
@@ -86,7 +86,7 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(cookie().exists(REFRESH_COOKIE_NAME))
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.user.email").value("admin@my-money.local"))
+                .andExpect(jsonPath("$.user.email").value("admin@bolso-em-dia.local"))
                 .andReturn();
 
         Cookie refreshedCookie = refreshResult.getResponse().getCookie(REFRESH_COOKIE_NAME);
@@ -109,14 +109,14 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
                                 .content(
                                         """
                                 {
-                                  "email": "admin@my-money.local",
+                                  "email": "admin@bolso-em-dia.local",
                                   "password": "admin123456"
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(cookie().exists("my_money_refresh_token"))
+                .andExpect(cookie().exists("bolso_em_dia_refresh_token"))
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.user.email").value("admin@my-money.local"))
+                .andExpect(jsonPath("$.user.email").value("admin@bolso-em-dia.local"))
                 .andExpect(jsonPath("$.user.preferences.locale").value("pt-BR"))
                 .andExpect(jsonPath("$.user.preferences.defaultAccountId").value(nullValue()))
                 .andExpect(jsonPath("$.user.preferences.showBalanceWithBudgets").value(false))
@@ -126,7 +126,7 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
         mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value("admin@my-money.local"))
+                .andExpect(jsonPath("$.email").value("admin@bolso-em-dia.local"))
                 .andExpect(jsonPath("$.role").value("ADMIN"))
                 .andExpect(jsonPath("$.preferences.locale").value("pt-BR"))
                 .andExpect(jsonPath("$.preferences.defaultAccountId").value(nullValue()))
