@@ -105,6 +105,8 @@ Open:
 - workflow: `.github/workflows/docker.yml`
 - release and tagging guide: `DOCKER.md`
 - published image: `danielarrais/bolso-em-dia-api`
+- pull example: `docker pull danielarrais/bolso-em-dia-api:latest`
+- run example: `docker run --rm -p 8081:8080 -e DB_URL=jdbc:postgresql://host.docker.internal:5432/bolso_em_dia -e DB_USERNAME=bolso_em_dia -e DB_PASSWORD=bolso_em_dia -e APP_JWT_SECRET=change-this-secret-change-this-secret danielarrais/bolso-em-dia-api:latest`
 
 ## Build, tests, and quality
 
@@ -210,8 +212,8 @@ services:
   app-web:
     build:
       context: ./app-web
-      args:
-        VITE_API_BASE_URL: http://localhost:8081
+    environment:
+      API_BASE_URL: http://localhost:8081
     ports:
       - "4173:80"
     depends_on:
