@@ -159,7 +159,6 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
                                   "description": "Water bill",
                                   "amount": 95.30,
                                   "transactionDate": "2026-06-12",
-                                  "referenceMonth": "2026-06-01",
                                   "accountId": "%s",
                                   "categoryId": "%s",
                                   "installmentCount": 1
@@ -186,7 +185,6 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
                                   "description": "Updated Market",
                                   "amount": 200.00,
                                   "transactionDate": "2026-06-15",
-                                  "referenceMonth": "2026-06-01",
                                   "accountId": "%s",
                                   "categoryId": "%s"
                                 }
@@ -195,6 +193,29 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("Updated Market"))
                 .andExpect(jsonPath("$.amount").value(200.0));
+    }
+
+    @Test
+    void createRejectsUnknownRequestFields() throws Exception {
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Water bill",
+                                  "amount": 95.30,
+                                  "transactionDate": "2026-06-12",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "referenceMonth": "2026-06-01"
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Request body contains unsupported field: referenceMonth."));
     }
 
     @Test
@@ -210,7 +231,6 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
                                   "description": "Personal shopping",
                                   "amount": 300.00,
                                   "transactionDate": "2026-06-20",
-                                  "referenceMonth": "2026-06-01",
                                   "accountId": "%s",
                                   "categoryId": "%s",
                                   "memberId": "%s",
@@ -254,7 +274,6 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
                                   "description": "Blocked personal expense",
                                   "amount": 30.00,
                                   "transactionDate": "2026-06-20",
-                                  "referenceMonth": "2026-06-01",
                                   "accountId": "%s",
                                   "categoryId": "%s"
                                 }
@@ -276,7 +295,6 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
                                   "description": "Notebook",
                                   "amount": 1000.00,
                                   "transactionDate": "2026-06-20",
-                                  "referenceMonth": "2026-06-01",
                                   "accountId": "%s",
                                   "categoryId": "%s",
                                   "installmentCount": 3
@@ -333,7 +351,6 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
                                   "description": "Notebook installment",
                                   "amount": 500.00,
                                   "transactionDate": "2026-06-25",
-                                  "referenceMonth": "2026-06-01",
                                   "accountId": "%s",
                                   "categoryId": "%s",
                                   "installmentCount": 3

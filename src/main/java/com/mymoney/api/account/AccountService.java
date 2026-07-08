@@ -1,6 +1,5 @@
 package com.mymoney.api.account;
 
-import com.mymoney.api.account.api.request.ArchiveAccountRequest;
 import com.mymoney.api.account.api.request.CreateAccountRequest;
 import com.mymoney.api.account.api.request.UpdateAccountRequest;
 import java.time.LocalDate;
@@ -63,7 +62,7 @@ public class AccountService {
     }
 
     @Transactional
-    public Account archive(UUID id, ArchiveAccountRequest request) {
+    public Account archive(UUID id) {
         Account account = getById(id);
         LocalDate archivedFromMonth = currentReferenceMonth();
         if (archivedFromMonth.isBefore(account.getCreatedInMonth())) {

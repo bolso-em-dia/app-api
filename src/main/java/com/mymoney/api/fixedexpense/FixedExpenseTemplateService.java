@@ -4,7 +4,6 @@ import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountService;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryService;
-import com.mymoney.api.fixedexpense.api.request.ArchiveFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.UpdateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.response.FixedExpenseTemplateResponse;
@@ -75,7 +74,7 @@ public class FixedExpenseTemplateService {
     }
 
     @Transactional
-    public FixedExpenseTemplateResponse archive(UUID id, ArchiveFixedExpenseTemplateRequest request) {
+    public FixedExpenseTemplateResponse archive(UUID id) {
         FixedExpenseTemplate template = getById(id);
         LocalDate archivedFromMonth = currentReferenceMonth();
         if (archivedFromMonth.isBefore(template.getCreatedInMonth())) {

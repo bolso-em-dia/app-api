@@ -1,10 +1,12 @@
 package com.mymoney.api.error;
 
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -42,6 +44,28 @@ public class ApiExceptionHandler {
         }
 
         return ResponseEntity.status(status).body(ApiErrorResponse.from(status, message, request.getRequestURI()));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnreadableRequest(
+            HttpMessageNotReadableException exception, HttpServletRequest request) {
+        String message = "Request body is invalid.";
+        Throwable cause = exception.getCause();
+        if (cause instanceof UnrecognizedPropertyException unrecognizedPropertyException) {
+            message =
+                    "Request body contains unsupported field: " + unrecognizedPropertyException.getPropertyName() + ".";
+        }
+
+        log.warn(
+                "Unreadable request on {} {} by user={} status={} message={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                currentUser(),
+                HttpStatus.BAD_REQUEST.value(),
+                message);
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiErrorResponse.from(HttpStatus.BAD_REQUEST, message, request.getRequestURI()));
     }
 
     @ExceptionHandler(AuthorizationDeniedException.class)

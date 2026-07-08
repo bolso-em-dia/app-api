@@ -1,6 +1,5 @@
 package com.mymoney.api.budget;
 
-import com.mymoney.api.budget.api.request.ArchiveBudgetRequest;
 import com.mymoney.api.budget.api.request.CreateBudgetRequest;
 import com.mymoney.api.budget.api.request.UpdateBudgetRequest;
 import com.mymoney.api.category.Category;
@@ -101,7 +100,7 @@ public class BudgetService {
     }
 
     @Transactional
-    public BudgetModel archive(UUID id, ArchiveBudgetRequest request, LocalDate referenceMonth) {
+    public BudgetModel archive(UUID id, LocalDate referenceMonth) {
         BudgetModel budget = getById(id);
         if (referenceMonth.isBefore(budget.getCreatedInMonth())) {
             throw new ResponseStatusException(

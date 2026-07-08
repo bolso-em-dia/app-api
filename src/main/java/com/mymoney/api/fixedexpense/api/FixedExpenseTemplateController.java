@@ -3,7 +3,6 @@ package com.mymoney.api.fixedexpense.api;
 import com.mymoney.api.PageResponse;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateListStatus;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateService;
-import com.mymoney.api.fixedexpense.api.request.ArchiveFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.UpdateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.response.FixedExpenseTemplateResponse;
@@ -60,9 +59,7 @@ public class FixedExpenseTemplateController {
     }
 
     @PatchMapping("/{id}/archive")
-    public ResponseEntity<FixedExpenseTemplateResponse> archive(
-            @PathVariable UUID id, @Valid @RequestBody(required = false) ArchiveFixedExpenseTemplateRequest request) {
-        return ResponseEntity.ok(fixedExpenseTemplateService.archive(
-                id, request == null ? new ArchiveFixedExpenseTemplateRequest() : request));
+    public ResponseEntity<FixedExpenseTemplateResponse> archive(@PathVariable UUID id) {
+        return ResponseEntity.ok(fixedExpenseTemplateService.archive(id));
     }
 }

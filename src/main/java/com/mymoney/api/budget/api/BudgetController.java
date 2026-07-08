@@ -4,7 +4,6 @@ import com.mymoney.api.PageResponse;
 import com.mymoney.api.budget.BudgetListStatus;
 import com.mymoney.api.budget.BudgetService;
 import com.mymoney.api.budget.BudgetType;
-import com.mymoney.api.budget.api.request.ArchiveBudgetRequest;
 import com.mymoney.api.budget.api.request.CreateBudgetRequest;
 import com.mymoney.api.budget.api.request.UpdateBudgetRequest;
 import com.mymoney.api.budget.api.response.BudgetCategoryBreakdownResponse;
@@ -80,9 +79,8 @@ public class BudgetController {
     @PatchMapping("/{id}/archive")
     public ResponseEntity<BudgetResponse> archive(
             @PathVariable UUID id,
-            @Valid @RequestBody(required = false) ArchiveBudgetRequest request,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate referenceMonth) {
-        var budget = budgetService.archive(id, request == null ? new ArchiveBudgetRequest() : request, referenceMonth);
+        var budget = budgetService.archive(id, referenceMonth);
         return ResponseEntity.ok(
                 budgetMapper.toResponse(budgetService.getViewById(budget.getId(), referenceMonth), List.of()));
     }

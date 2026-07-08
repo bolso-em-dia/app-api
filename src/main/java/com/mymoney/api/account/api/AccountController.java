@@ -4,7 +4,6 @@ import com.mymoney.api.PageResponse;
 import com.mymoney.api.account.AccountListStatus;
 import com.mymoney.api.account.AccountService;
 import com.mymoney.api.account.AccountType;
-import com.mymoney.api.account.api.request.ArchiveAccountRequest;
 import com.mymoney.api.account.api.request.CreateAccountRequest;
 import com.mymoney.api.account.api.request.UpdateAccountRequest;
 import com.mymoney.api.account.api.response.AccountOptionResponse;
@@ -67,10 +66,8 @@ public class AccountController {
     }
 
     @PatchMapping("/{id}/archive")
-    public ResponseEntity<AccountResponse> archive(
-            @PathVariable UUID id, @Valid @RequestBody(required = false) ArchiveAccountRequest request) {
-        return ResponseEntity.ok(accountMapper.toResponse(
-                accountService.archive(id, request == null ? new ArchiveAccountRequest() : request)));
+    public ResponseEntity<AccountResponse> archive(@PathVariable UUID id) {
+        return ResponseEntity.ok(accountMapper.toResponse(accountService.archive(id)));
     }
 
     @GetMapping("/options")
