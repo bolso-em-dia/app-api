@@ -163,6 +163,25 @@ class DashboardControllerIntegrationTest extends PostgresIntegrationTestSupport 
     }
 
     @Test
+    void dashboardRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/dashboard").param("referenceMonth", "2026-06-01"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void dashboardReturnsZeroTotalsForMonthWithoutTransactions() throws Exception {
+        mockMvc.perform(get("/api/dashboard")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2027-01-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.totalIncome").value(0.0))
+                .andExpect(jsonPath("$.summary.totalExpense").value(0.0))
+                .andExpect(jsonPath("$.summary.balance").value(0.0))
+                .andExpect(jsonPath("$.recentTransactions.length()").value(0))
+                .andExpect(jsonPath("$.categoryBreakdown.length()").value(0));
+    }
+
+    @Test
     void dashboardReturnsAggregatedDataForAdminAndUser() throws Exception {
         mockMvc.perform(get("/api/dashboard")
                         .header("Authorization", "Bearer " + adminToken)

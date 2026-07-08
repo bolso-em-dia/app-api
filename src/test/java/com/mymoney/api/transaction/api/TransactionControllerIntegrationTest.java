@@ -1,5 +1,6 @@
 package com.mymoney.api.transaction.api;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -25,6 +26,7 @@ import com.mymoney.api.transaction.TransactionSourceType;
 import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -283,6 +285,107 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
     }
 
     @Test
+    void unauthenticatedRequestsAreRejected() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("referenceMonth", "2026-06-01"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/transactions/descriptions").param("query", "Mar"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/transactions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Blocked write",
+                                  "amount": 50.00,
+                                  "transactionDate": "2026-06-12",
+                                  "accountId": "%s",
+                                  "categoryId": "%s"
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void sharedTransactionsIgnoreMemberIdAndUpdateMovesReferenceMonth() throws Exception {
+        MvcResult createResult = mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Shared With Member",
+                                  "amount": 25.00,
+                                  "transactionDate": "2026-06-13",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "memberId": "%s"
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId(), allowanceMember.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].memberId").value(nullValue()))
+                .andReturn();
+
+        String createdId = OBJECT_MAPPER
+                .readTree(createResult.getResponse().getContentAsString())
+                .get(0)
+                .get("id")
+                .asText();
+
+        mockMvc.perform(put("/api/transactions/" + createdId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Moved To July",
+                                  "amount": 25.00,
+                                  "transactionDate": "2026-07-05",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "memberId": "%s"
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId(), allowanceMember.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.referenceMonth").value("2026-07-01"))
+                .andExpect(jsonPath("$.memberId").value(nullValue()));
+    }
+
+    @Test
+    void descriptionSuggestionsClampTheRequestedLimit() throws Exception {
+        IntStream.range(0, 15).forEach(index -> {
+            Transaction transaction = new Transaction();
+            transaction.setType(TransactionType.EXPENSE);
+            transaction.setOwnershipType(OwnershipType.SHARED);
+            transaction.setSourceType(TransactionSourceType.MANUAL);
+            transaction.setDescription("Suggestion " + index);
+            transaction.setAmount(new BigDecimal("10.00"));
+            transaction.setTransactionDate(LocalDate.of(2026, 6, 12));
+            transaction.setReferenceMonth(LocalDate.of(2026, 6, 1));
+            transaction.setCategory(category);
+            transaction.setAccount(account);
+            transactionRepository.save(transaction);
+        });
+
+        mockMvc.perform(get("/api/transactions/descriptions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("query", "Suggestion")
+                        .param("limit", "99"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(12));
+    }
+
+    @Test
     void installmentAmountDistributionPreservesTotalForUnevenDivision() throws Exception {
         mockMvc.perform(post("/api/transactions")
                         .header("Authorization", "Bearer " + adminToken)
@@ -336,6 +439,128 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalItems").value(1))
                 .andExpect(jsonPath("$.items[0].categoryName").value("Transport"));
+    }
+
+    @Test
+    void userCannotAccessTransactionWriteOrDetailEndpoints() throws Exception {
+        mockMvc.perform(get("/api/transactions/descriptions")
+                        .header("Authorization", "Bearer " + userToken)
+                        .param("query", "Mar"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Blocked write",
+                                  "amount": 50.00,
+                                  "transactionDate": "2026-06-12",
+                                  "accountId": "%s",
+                                  "categoryId": "%s"
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/transactions/" + sharedTransaction.getId())
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/transactions/" + sharedTransaction.getId())
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Blocked update",
+                                  "amount": 200.00,
+                                  "transactionDate": "2026-06-15",
+                                  "accountId": "%s",
+                                  "categoryId": "%s"
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/api/transactions/" + sharedTransaction.getId())
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deleteSupportsSingleAndAllScopesForInstallments() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Phone installment",
+                                  "amount": 300.00,
+                                  "transactionDate": "2026-06-25",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "installmentCount": 3
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String firstInstallmentId = OBJECT_MAPPER
+                .readTree(result.getResponse().getContentAsString())
+                .get(0)
+                .get("id")
+                .asText();
+        String secondInstallmentId = OBJECT_MAPPER
+                .readTree(result.getResponse().getContentAsString())
+                .get(1)
+                .get("id")
+                .asText();
+        String installmentGroupId = OBJECT_MAPPER
+                .readTree(result.getResponse().getContentAsString())
+                .get(0)
+                .get("installmentGroupId")
+                .asText();
+
+        mockMvc.perform(delete("/api/transactions/" + secondInstallmentId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("scope", "SINGLE"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-07-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[?(@.installmentGroupId=='" + installmentGroupId + "')]")
+                        .isEmpty());
+
+        mockMvc.perform(delete("/api/transactions/" + firstInstallmentId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("scope", "ALL"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[?(@.installmentGroupId=='" + installmentGroupId + "')]")
+                        .isEmpty());
+
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-08-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[?(@.installmentGroupId=='" + installmentGroupId + "')]")
+                        .isEmpty());
     }
 
     @Test

@@ -14,6 +14,7 @@ import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
 import com.mymoney.api.auth.api.JsonTestUtils;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,24 @@ class UserPreferencesControllerIntegrationTest extends PostgresIntegrationTestSu
         activeAccount.setCreatedInMonth(LocalDate.of(2026, 1, 1));
         activeAccount = accountRepository.save(activeAccount);
         adminToken = login("admin@my-money.local", "admin123456");
+    }
+
+    @Test
+    void preferencesEndpointsRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/api/me/preferences")).andExpect(status().isUnauthorized());
+
+        mockMvc.perform(
+                        put("/api/me/preferences")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "defaultAccountId": null,
+                                  "locale": "pt-BR",
+                                  "showBalanceWithBudgets": false
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -84,6 +103,102 @@ class UserPreferencesControllerIntegrationTest extends PostgresIntegrationTestSu
                         .value(activeAccount.getId().toString()))
                 .andExpect(jsonPath("$.locale").value("en-US"))
                 .andExpect(jsonPath("$.showBalanceWithBudgets").value(true));
+    }
+
+    @Test
+    void allowsClearingDefaultAccountAfterSaving() throws Exception {
+        mockMvc.perform(put("/api/me/preferences")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "defaultAccountId": "%s",
+                                  "locale": "en-US",
+                                  "showBalanceWithBudgets": true
+                                }
+                                """
+                                        .formatted(activeAccount.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.defaultAccountId")
+                        .value(activeAccount.getId().toString()));
+
+        mockMvc.perform(
+                        put("/api/me/preferences")
+                                .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "defaultAccountId": null,
+                                  "locale": "pt-BR",
+                                  "showBalanceWithBudgets": false
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.defaultAccountId").value(nullValue()))
+                .andExpect(jsonPath("$.locale").value("pt-BR"))
+                .andExpect(jsonPath("$.showBalanceWithBudgets").value(false));
+    }
+
+    @Test
+    void rejectsUnknownDefaultAccount() throws Exception {
+        mockMvc.perform(
+                        put("/api/me/preferences")
+                                .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "defaultAccountId": "11111111-1111-1111-1111-111111111111",
+                                  "locale": "pt-BR",
+                                  "showBalanceWithBudgets": false
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Account was not found."));
+    }
+
+    @Test
+    void rejectsDefaultAccountCreatedInFuture() throws Exception {
+        activeAccount.setCreatedInMonth(YearMonth.now().plusMonths(1).atDay(1));
+        accountRepository.save(activeAccount);
+
+        mockMvc.perform(put("/api/me/preferences")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "defaultAccountId": "%s",
+                                  "locale": "pt-BR",
+                                  "showBalanceWithBudgets": false
+                                }
+                                """
+                                        .formatted(activeAccount.getId())))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("Default account must be active for the current month."));
+    }
+
+    @Test
+    void rejectsDefaultAccountThatIsInactiveForCurrentMonth() throws Exception {
+        activeAccount.setArchivedFromMonth(YearMonth.now().atDay(1));
+        accountRepository.save(activeAccount);
+
+        mockMvc.perform(put("/api/me/preferences")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "defaultAccountId": "%s",
+                                  "locale": "pt-BR",
+                                  "showBalanceWithBudgets": false
+                                }
+                                """
+                                        .formatted(activeAccount.getId())))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("Default account must be active for the current month."));
     }
 
     @Test

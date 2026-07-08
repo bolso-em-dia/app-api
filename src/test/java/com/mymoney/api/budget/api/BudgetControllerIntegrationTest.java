@@ -1,5 +1,6 @@
 package com.mymoney.api.budget.api;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -67,6 +68,7 @@ class BudgetControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
     private String adminToken;
     private String userToken;
+    private FamilyMember regularUser;
     private FamilyMember allowanceMember;
     private Category groceries;
     private Category transport;
@@ -76,7 +78,7 @@ class BudgetControllerIntegrationTest extends PostgresIntegrationTestSupport {
 
     @BeforeEach
     void setUp() throws Exception {
-        FamilyMember regularUser = familyMemberRepository
+        regularUser = familyMemberRepository
                 .findByEmailIgnoreCase("user@my-money.local")
                 .orElseGet(FamilyMember::new);
         regularUser.setName("Regular User");
@@ -85,7 +87,7 @@ class BudgetControllerIntegrationTest extends PostgresIntegrationTestSupport {
         regularUser.setRole(FamilyRole.USER);
         regularUser.setActive(true);
         regularUser.setAllowanceEnabled(false);
-        familyMemberRepository.save(regularUser);
+        regularUser = familyMemberRepository.save(regularUser);
 
         allowanceMember = new FamilyMember();
         allowanceMember.setName("Karol");
@@ -194,6 +196,85 @@ class BudgetControllerIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].categoryName").value("Transport"))
                 .andExpect(jsonPath("$[0].amount").value(45.0));
+    }
+
+    @Test
+    void budgetBusinessValidationRulesWork() throws Exception {
+        mockMvc.perform(
+                        post("/api/budgets")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "name": "Invalid Global",
+                                  "type": "GLOBAL",
+                                  "monthlyLimit": 150.00
+                                }
+                                """))
+                .andExpect(status().isUnprocessableEntity());
+
+        mockMvc.perform(post("/api/budgets")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "name": "Invalid Allowance",
+                                  "type": "ALLOWANCE",
+                                  "ownerMemberId": "%s",
+                                  "monthlyLimit": 150.00
+                                }
+                                """
+                                        .formatted(regularUser.getId())))
+                .andExpect(status().isUnprocessableEntity());
+
+        mockMvc.perform(patch("/api/budgets/" + globalBudget.getId() + "/archive")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .param("referenceMonth", "2026-05-01")
+                        .content("{}"))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void budgetTypeSwitchClearsIncompatibleFields() throws Exception {
+        mockMvc.perform(put("/api/budgets/" + allowanceBudget.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "name": "Allowance To Global",
+                                  "type": "GLOBAL",
+                                  "categoryIds": ["%s"],
+                                  "monthlyLimit": 500.00
+                                }
+                                """
+                                        .formatted(groceries.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("GLOBAL"))
+                .andExpect(jsonPath("$.ownerMemberId").value(nullValue()))
+                .andExpect(jsonPath("$.categories.length()").value(1));
+
+        mockMvc.perform(put("/api/budgets/" + globalBudget.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "name": "Global To Allowance",
+                                  "type": "ALLOWANCE",
+                                  "ownerMemberId": "%s",
+                                  "monthlyLimit": 320.00
+                                }
+                                """
+                                        .formatted(allowanceMember.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("ALLOWANCE"))
+                .andExpect(jsonPath("$.ownerMemberId")
+                        .value(allowanceMember.getId().toString()))
+                .andExpect(jsonPath("$.categories.length()").value(0));
     }
 
     @Test
