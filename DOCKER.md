@@ -1,88 +1,16 @@
-# Docker Publishing
+# Docker Usage
 
-This repository publishes one Docker Hub image:
-
-- `bolso-em-dia-api`
-
-The GitHub Actions workflow is defined in `.github/workflows/docker.yml`.
-
-## Published image name
-
-The workflow publishes:
+This image is published on Docker Hub as:
 
 - `<dockerhub-namespace>/bolso-em-dia-api`
 
-The namespace comes from:
-
-1. repository variable `DOCKERHUB_NAMESPACE`, if present
-2. otherwise `DOCKERHUB_USERNAME`
-
-## Workflow triggers
-
-The Docker workflow runs in two modes:
-
-- only after the backend validation job in the same workflow succeeds
-
-- automatically on pushed Git tags that match `v*`
-- manually through `workflow_dispatch`
-
-## Tagging model
-
-Release tags must use semantic versioning in this format:
-
-- `vMAJOR.MINOR.PATCH`
-
-Examples:
-
-- `v1.0.0`
-- `v1.4.2`
-
-For a release tag such as `v1.4.2`, the image receives:
-
-- `latest`
-- `1.4.2`
-- `1.4`
-- `1`
-- `sha-<commit>`
-
-For manual `workflow_dispatch`, the workflow publishes only the `sha-<commit>`
-variant.
-
-## Required GitHub secrets
-
-The workflow requires these repository secrets:
-
-- `DOCKERHUB_USERNAME`
-- `DOCKERHUB_TOKEN`
-
-`DOCKERHUB_TOKEN` should be a Docker Hub access token. The same token is used
-for image push and repository description sync — no additional scopes needed.
-
-## Recommended GitHub repository variables
-
-Optional but recommended:
-
-- `DOCKERHUB_NAMESPACE`
-
-## Docker Hub description sync
-
-The workflow automatically updates the Docker Hub repository description page
-from `DOCKER.md` after a successful image publish. This keeps the public
-documentation in sync with the repository-maintained source.
-
-The sync step uses `peter-evans/dockerhub-description@v4` and fails the
-workflow if the description update is rejected — out-of-sync descriptions are
-treated as a publish failure.
-
-## Using the published image from Docker Hub
-
-Pull the published API image with:
+## Pull
 
 ```bash
 docker pull <dockerhub-namespace>/bolso-em-dia-api:latest
 ```
 
-Run it directly with:
+## Run
 
 ```bash
 docker run --rm \
@@ -97,12 +25,8 @@ docker run --rm \
   <dockerhub-namespace>/bolso-em-dia-api:latest
 ```
 
-The published container always listens on port `8080` internally. The host-side
-published port is yours to choose.
-
-The image publishes its own Docker health check against:
-
-- `http://localhost:8080/actuator/health`
+The container always listens on port `8080` internally. The published host port
+is yours to choose.
 
 Example with a custom published port:
 
@@ -119,37 +43,24 @@ docker run --rm \
   <dockerhub-namespace>/bolso-em-dia-api:latest
 ```
 
-## Release tagging process
+## Runtime Variables
 
-Use this process for an official Docker release:
+Required runtime variables:
 
-1. make sure the target commit is already in the branch you want to release
-2. make sure validation is green for that commit
-3. create the release tag locally
-4. push the tag to GitHub
-5. wait for the Docker workflow to publish the image
-6. verify the generated tags on Docker Hub
+- `DB_URL`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `APP_ALLOWED_ORIGINS`
+- `APP_ADMIN_EMAIL`
+- `APP_ADMIN_PASSWORD`
+- `APP_JWT_SECRET`
 
-Example:
+## Health Check
 
-```bash
-git tag -a v1.0.0 -m "Release v1.0.0"
-git push origin v1.0.0
-```
+The image publishes its own Docker health check against:
 
-## Manual publish process
+- `http://localhost:8080/actuator/health`
 
-Use `workflow_dispatch` when you want to publish a commit-addressable image
-without creating a formal release tag.
+## Source Repository
 
-Expected result:
-
-- `sha-<commit>` tags are published
-- semver tags and `latest` are not published
-
-## Multi-architecture output
-
-The image is published for:
-
-- `linux/amd64`
-- `linux/arm64`
+- GitHub repository: [github.com/bolso-em-dia/app-api](https://github.com/bolso-em-dia/app-api)

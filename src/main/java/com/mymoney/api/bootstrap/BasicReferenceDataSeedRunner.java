@@ -20,18 +20,20 @@ public class BasicReferenceDataSeedRunner implements CommandLineRunner {
     private static final String PIX_ACCOUNT_NAME = "Pix";
 
     private static final List<SeedCategory> DEFAULT_CATEGORIES = List.of(
-            new SeedCategory("Compras", "shopping-cart"),
-            new SeedCategory("Cuidados Pessoais", "sparkles"),
-            new SeedCategory("Educação", "book"),
-            new SeedCategory("Empréstimos", "hand-coins"),
-            new SeedCategory("Farmácia", "pill"),
-            new SeedCategory("Lazer", "gamepad"),
-            new SeedCategory("Mercado", "shopping-basket"),
-            new SeedCategory("Pets", "paw-print"),
-            new SeedCategory("Saúde", "heart"),
-            new SeedCategory("Serviços", "wrench"),
-            new SeedCategory("Transporte", "car"),
-            new SeedCategory("Viagem", "plane"));
+            new SeedCategory("Compras", "shopping-cart", "#3b82f6"),
+            new SeedCategory("Cuidados Pessoais", "sparkles", "#ec4899"),
+            new SeedCategory("Educação", "book", "#8b5cf6"),
+            new SeedCategory("Empréstimos", "hand-coins", "#f97316"),
+            new SeedCategory("Farmácia", "pill", "#10b981"),
+            new SeedCategory("Lazer", "gamepad", "#a855f7"),
+            new SeedCategory("Mercado", "shopping-basket", "#84cc16"),
+            new SeedCategory("Pets", "paw-print", "#f59e0b"),
+            new SeedCategory("Saúde", "heart", "#ef4444"),
+            new SeedCategory("Serviços", "wrench", "#6b7280"),
+            new SeedCategory("Transporte", "car", "#0ea5e9"),
+            new SeedCategory("Viagem", "plane", "#14b8a6"),
+            new SeedCategory("Salário", "briefcase", "#22c55e"),
+            new SeedCategory("Investimentos", "hand-coins", "#6366f1"));
 
     private final CategoryRepository categoryRepository;
     private final AccountRepository accountRepository;
@@ -46,14 +48,31 @@ public class BasicReferenceDataSeedRunner implements CommandLineRunner {
 
     private void seedCategories(LocalDate referenceMonth) {
         for (SeedCategory seedCategory : DEFAULT_CATEGORIES) {
-            if (categoryRepository.findByNormalizedName(seedCategory.name()).isPresent()) {
+            Category existingCategory =
+                    categoryRepository.findByNormalizedName(seedCategory.name()).orElse(null);
+            if (existingCategory != null) {
+                boolean shouldSave = false;
+
+                if (isBlank(existingCategory.getIcon())) {
+                    existingCategory.setIcon(seedCategory.iconId());
+                    shouldSave = true;
+                }
+
+                if (isBlank(existingCategory.getColor())) {
+                    existingCategory.setColor(seedCategory.color());
+                    shouldSave = true;
+                }
+
+                if (shouldSave) {
+                    categoryRepository.save(existingCategory);
+                }
                 continue;
             }
 
             Category category = new Category();
             category.setName(seedCategory.name());
             category.setIcon(seedCategory.iconId());
-            category.setColor(null);
+            category.setColor(seedCategory.color());
             category.setCreatedInMonth(referenceMonth);
             categoryRepository.save(category);
         }
@@ -79,5 +98,9 @@ public class BasicReferenceDataSeedRunner implements CommandLineRunner {
         return YearMonth.now().atDay(1);
     }
 
-    private record SeedCategory(String name, String iconId) {}
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private record SeedCategory(String name, String iconId, String color) {}
 }

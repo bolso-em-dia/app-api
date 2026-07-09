@@ -45,7 +45,7 @@ class BasicReferenceDataSeedRunnerTest {
         basicReferenceDataSeedRunner.run();
 
         ArgumentCaptor<Category> categoryCaptor = ArgumentCaptor.forClass(Category.class);
-        verify(categoryRepository, org.mockito.Mockito.times(12)).save(categoryCaptor.capture());
+        verify(categoryRepository, org.mockito.Mockito.times(14)).save(categoryCaptor.capture());
 
         List<Category> savedCategories = categoryCaptor.getAllValues();
         assertThat(savedCategories)
@@ -62,7 +62,9 @@ class BasicReferenceDataSeedRunnerTest {
                         "Saúde",
                         "Serviços",
                         "Transporte",
-                        "Viagem");
+                        "Viagem",
+                        "Salário",
+                        "Investimentos");
         assertThat(savedCategories)
                 .extracting(Category::getIcon)
                 .containsExactly(
@@ -77,9 +79,16 @@ class BasicReferenceDataSeedRunnerTest {
                         "heart",
                         "wrench",
                         "car",
-                        "plane");
+                        "plane",
+                        "briefcase",
+                        "hand-coins");
+        assertThat(savedCategories)
+                .extracting(Category::getColor)
+                .containsExactly(
+                        "#3b82f6", "#ec4899", "#8b5cf6", "#f97316", "#10b981", "#a855f7", "#84cc16", "#f59e0b",
+                        "#ef4444", "#6b7280", "#0ea5e9", "#14b8a6", "#22c55e", "#6366f1");
         assertThat(savedCategories).allSatisfy(category -> {
-            assertThat(category.getColor()).isNull();
+            assertThat(category.getColor()).isNotBlank();
             assertThat(category.getArchivedFromMonth()).isNull();
             assertThat(category.getCreatedInMonth()).isNotNull();
         });
@@ -99,12 +108,32 @@ class BasicReferenceDataSeedRunnerTest {
 
     @Test
     void doesNotCreateDuplicatesWhenRecordsAlreadyExist() throws Exception {
-        when(categoryRepository.findByNormalizedName(any())).thenReturn(Optional.of(new Category()));
+        Category existingCategory = new Category();
+        existingCategory.setIcon("shopping-cart");
+        existingCategory.setColor("#3b82f6");
+
+        when(categoryRepository.findByNormalizedName(any())).thenReturn(Optional.of(existingCategory));
         when(accountRepository.findByNormalizedName(eq("Pix"))).thenReturn(Optional.of(new Account()));
 
         basicReferenceDataSeedRunner.run();
 
         verify(categoryRepository, never()).save(any(Category.class));
         verify(accountRepository, never()).save(any(Account.class));
+    }
+
+    @Test
+    void backfillsMissingSeedCategoryColorWithoutCreatingDuplicate() throws Exception {
+        Category existingCategory = new Category();
+        existingCategory.setName("Compras");
+        existingCategory.setIcon("shopping-cart");
+        existingCategory.setColor(null);
+
+        when(categoryRepository.findByNormalizedName(any())).thenReturn(Optional.of(existingCategory));
+        when(accountRepository.findByNormalizedName(eq("Pix"))).thenReturn(Optional.of(new Account()));
+
+        basicReferenceDataSeedRunner.run();
+
+        verify(categoryRepository).save(existingCategory);
+        assertThat(existingCategory.getColor()).isEqualTo("#3b82f6");
     }
 }
