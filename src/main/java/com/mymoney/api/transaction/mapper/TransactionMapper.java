@@ -8,6 +8,10 @@ import org.springframework.stereotype.Component;
 public class TransactionMapper {
 
     public TransactionResponse toResponse(Transaction transaction) {
+        return toResponse(transaction, transaction.getCreatedAt() == null);
+    }
+
+    public TransactionResponse toResponse(Transaction transaction, boolean projected) {
         return new TransactionResponse(
                 transaction.getId().toString(),
                 transaction.getType().name(),
@@ -28,6 +32,10 @@ public class TransactionMapper {
                 transaction.getInstallmentGroupId(),
                 transaction.getInstallmentNumber(),
                 transaction.getInstallmentTotal(),
+                transaction.getFixedExpenseTemplate() == null
+                        ? null
+                        : transaction.getFixedExpenseTemplate().getId().toString(),
+                projected,
                 transaction.getCreatedAt(),
                 transaction.getUpdatedAt());
     }

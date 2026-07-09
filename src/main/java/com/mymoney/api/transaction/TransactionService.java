@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -33,11 +34,13 @@ public class TransactionService {
     private static final int MAX_DESCRIPTION_SUGGESTION_LIMIT = 12;
 
     private final TransactionRepository transactionRepository;
+    private final EffectiveMonthlyTransactionService effectiveMonthlyTransactionService;
     private final CategoryService categoryService;
     private final AccountService accountService;
     private final FamilyMemberRepository familyMemberRepository;
+    private final com.mymoney.api.transaction.mapper.TransactionMapper transactionMapper;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Page<TransactionResponse> listResponseByFilters(
             LocalDate referenceMonth,
             TransactionType type,
@@ -46,8 +49,20 @@ public class TransactionService {
             List<UUID> categoryIds,
             UUID memberId,
             Pageable pageable) {
-        return transactionRepository.findResponseByFilters(
-                referenceMonth, type, ownershipType, accountId, categoryIds, memberId, pageable);
+        List<EffectiveMonthlyTransactionService.EffectiveTransaction> effectiveTransactions =
+                effectiveMonthlyTransactionService.listEffectiveTransactions(
+                        referenceMonth, type, ownershipType, accountId, categoryIds, memberId);
+
+        int start = Math.toIntExact(pageable.getOffset());
+        if (start >= effectiveTransactions.size()) {
+            return new PageImpl<>(List.of(), pageable, effectiveTransactions.size());
+        }
+
+        int end = Math.min(start + pageable.getPageSize(), effectiveTransactions.size());
+        List<TransactionResponse> items = effectiveTransactions.subList(start, end).stream()
+                .map(item -> transactionMapper.toResponse(item.transaction(), item.projected()))
+                .toList();
+        return new PageImpl<>(items, pageable, effectiveTransactions.size());
     }
 
     @Transactional(readOnly = true)
@@ -62,7 +77,7 @@ public class TransactionService {
         return transactionRepository.findDescriptionSuggestions(normalizedQuery, PageRequest.of(0, normalizedLimit));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Page<Transaction> listByFilters(
             LocalDate referenceMonth,
             TransactionType type,
@@ -71,11 +86,17 @@ public class TransactionService {
             List<UUID> categoryIds,
             UUID memberId,
             Pageable pageable) {
-        return transactionRepository.findByFilters(
-                referenceMonth, type, ownershipType, accountId, categoryIds, memberId, pageable);
+        List<Transaction> filteredTransactions =
+                listByFilters(referenceMonth, type, ownershipType, accountId, categoryIds, memberId);
+        int start = Math.toIntExact(pageable.getOffset());
+        if (start >= filteredTransactions.size()) {
+            return new PageImpl<>(List.of(), pageable, filteredTransactions.size());
+        }
+        int end = Math.min(start + pageable.getPageSize(), filteredTransactions.size());
+        return new PageImpl<>(filteredTransactions.subList(start, end), pageable, filteredTransactions.size());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<Transaction> listByFilters(
             LocalDate referenceMonth,
             TransactionType type,
@@ -83,8 +104,11 @@ public class TransactionService {
             UUID accountId,
             List<UUID> categoryIds,
             UUID memberId) {
-        return transactionRepository.findByFilters(
-                referenceMonth, type, ownershipType, accountId, categoryIds, memberId);
+        return effectiveMonthlyTransactionService
+                .listEffectiveTransactions(referenceMonth, type, ownershipType, accountId, categoryIds, memberId)
+                .stream()
+                .map(EffectiveMonthlyTransactionService.EffectiveTransaction::transaction)
+                .toList();
     }
 
     @Transactional(readOnly = true)

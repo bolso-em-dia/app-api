@@ -13,6 +13,8 @@ import com.mymoney.api.budget.BudgetModelRepository;
 import com.mymoney.api.budget.BudgetType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
+import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
+import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
@@ -23,6 +25,7 @@ import com.mymoney.api.transaction.TransactionSourceType;
 import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.LinkedHashSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,6 +57,9 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
 
     @Autowired
     private BudgetModelRepository budgetModelRepository;
+
+    @Autowired
+    private FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
 
     private String adminToken;
     private String userToken;
@@ -193,6 +199,49 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
                         .param("referenceMonth", "2026-06-01"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.summary.totalExpense").value(195.0));
+    }
+
+    @Test
+    void futureMonthDashboardIncludesProjectedFixedTransactions() throws Exception {
+        LocalDate currentReferenceMonth = YearMonth.now().atDay(1);
+        LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(1);
+
+        Category groceries =
+                categoryRepository.findByNormalizedName("groceries").orElseThrow();
+        Category salary = categoryRepository.findByNormalizedName("salary").orElseThrow();
+        Account account =
+                accountRepository.findByNormalizedName("main checking").orElseThrow();
+
+        FixedExpenseTemplate projectedExpense = new FixedExpenseTemplate();
+        projectedExpense.setName("Projected Rent");
+        projectedExpense.setType(TransactionType.EXPENSE);
+        projectedExpense.setAmount(new BigDecimal("200.00"));
+        projectedExpense.setCategory(groceries);
+        projectedExpense.setAccount(account);
+        projectedExpense.setDueDay((short) 8);
+        projectedExpense.setCreatedInMonth(currentReferenceMonth.minusMonths(1));
+        projectedExpense.setActive(true);
+        fixedExpenseTemplateRepository.save(projectedExpense);
+
+        FixedExpenseTemplate projectedIncome = new FixedExpenseTemplate();
+        projectedIncome.setName("Projected Salary");
+        projectedIncome.setType(TransactionType.INCOME);
+        projectedIncome.setAmount(new BigDecimal("1000.00"));
+        projectedIncome.setCategory(salary);
+        projectedIncome.setAccount(account);
+        projectedIncome.setDueDay((short) 6);
+        projectedIncome.setCreatedInMonth(currentReferenceMonth.minusMonths(1));
+        projectedIncome.setActive(true);
+        fixedExpenseTemplateRepository.save(projectedIncome);
+
+        mockMvc.perform(get("/api/dashboard")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", futureReferenceMonth.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.totalIncome").value(1000.0))
+                .andExpect(jsonPath("$.summary.totalExpense").value(200.0))
+                .andExpect(jsonPath("$.summary.balance").value(800.0))
+                .andExpect(jsonPath("$.recentTransactions[0].projected").value(true));
     }
 
     private Transaction createTransaction(

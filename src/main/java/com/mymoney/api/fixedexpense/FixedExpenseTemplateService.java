@@ -7,10 +7,7 @@ import com.mymoney.api.category.CategoryService;
 import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.UpdateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.response.FixedExpenseTemplateResponse;
-import com.mymoney.api.transaction.OwnershipType;
-import com.mymoney.api.transaction.Transaction;
-import com.mymoney.api.transaction.TransactionRepository;
-import com.mymoney.api.transaction.TransactionSourceType;
+import com.mymoney.api.transaction.EffectiveMonthlyTransactionService;
 import com.mymoney.api.transaction.TransactionType;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -30,7 +27,7 @@ public class FixedExpenseTemplateService {
     private final FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
     private final CategoryService categoryService;
     private final AccountService accountService;
-    private final TransactionRepository transactionRepository;
+    private final EffectiveMonthlyTransactionService effectiveMonthlyTransactionService;
 
     @Transactional(readOnly = true)
     public Page<FixedExpenseTemplateResponse> listAllResponses(
@@ -68,7 +65,7 @@ public class FixedExpenseTemplateService {
         template.setCreatedInMonth(currentReferenceMonth());
         template.setActive(true);
         FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
-        createCurrentMonthTransactionIfMissing(saved);
+        effectiveMonthlyTransactionService.syncCurrentMonthTransaction(saved);
         return getResponseById(saved.getId());
     }
 
@@ -84,6 +81,7 @@ public class FixedExpenseTemplateService {
                 request.accountId(),
                 request.dueDay());
         FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
+        effectiveMonthlyTransactionService.syncCurrentMonthTransaction(saved);
         return getResponseById(saved.getId());
     }
 
@@ -100,33 +98,6 @@ public class FixedExpenseTemplateService {
         template.setActive(false);
         FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
         return getResponseById(saved.getId());
-    }
-
-    private void createCurrentMonthTransactionIfMissing(FixedExpenseTemplate template) {
-        LocalDate referenceMonth = currentReferenceMonth();
-        if (transactionRepository.existsByFixedExpenseTemplateIdAndReferenceMonth(template.getId(), referenceMonth)) {
-            return;
-        }
-
-        Transaction transaction = new Transaction();
-        transaction.setType(template.getType());
-        transaction.setOwnershipType(OwnershipType.SHARED);
-        transaction.setSourceType(TransactionSourceType.FIXED_EXPENSE);
-        transaction.setDescription(template.getName());
-        transaction.setAmount(template.getAmount());
-        transaction.setTransactionDate(resolveTransactionDate(referenceMonth, template.getDueDay()));
-        transaction.setReferenceMonth(referenceMonth);
-        transaction.setAccount(template.getAccount());
-        transaction.setCategory(template.getCategory());
-        transaction.setMember(null);
-        transaction.setFixedExpenseTemplate(template);
-        transactionRepository.save(transaction);
-    }
-
-    private LocalDate resolveTransactionDate(LocalDate referenceMonth, Short dueDay) {
-        YearMonth yearMonth = YearMonth.from(referenceMonth);
-        int day = Math.min(dueDay.intValue(), yearMonth.lengthOfMonth());
-        return yearMonth.atDay(day);
     }
 
     private void apply(

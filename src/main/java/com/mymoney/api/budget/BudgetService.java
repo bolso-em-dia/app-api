@@ -8,7 +8,7 @@ import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.Transaction;
-import com.mymoney.api.transaction.TransactionRepository;
+import com.mymoney.api.transaction.TransactionService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -36,9 +36,9 @@ public class BudgetService {
     private final BudgetModelRepository budgetModelRepository;
     private final CategoryService categoryService;
     private final FamilyMemberRepository familyMemberRepository;
-    private final TransactionRepository transactionRepository;
+    private final TransactionService transactionService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Page<BudgetView> listForMonth(
             LocalDate referenceMonth, String search, BudgetListStatus status, BudgetType type, Pageable pageable) {
         Page<UUID> idPage = budgetModelRepository.findIdsForMonth(
@@ -49,7 +49,7 @@ public class BudgetService {
         return new PageImpl<>(views, pageable, idPage.getTotalElements());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<BudgetView> listForMonth(LocalDate referenceMonth) {
         return loadByIds(budgetModelRepository
                         .findIdsForMonth(referenceMonth, "", BudgetListStatus.ACTIVE.name(), null, Pageable.unpaged())
@@ -59,7 +59,7 @@ public class BudgetService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public BudgetView getViewById(UUID id, LocalDate referenceMonth) {
         return toView(getById(id), referenceMonth);
     }
@@ -111,12 +111,12 @@ public class BudgetService {
         return budgetModelRepository.save(budget);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<Transaction> listTransactions(UUID id, LocalDate referenceMonth) {
         return filterTransactions(getById(id), referenceMonth);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<BudgetCategoryBreakdownItem> categoryBreakdown(UUID id, LocalDate referenceMonth) {
         List<Transaction> transactions = filterTransactions(getById(id), referenceMonth);
         return transactions.stream()
@@ -161,7 +161,7 @@ public class BudgetService {
 
     private List<Transaction> filterTransactions(BudgetModel budget, LocalDate referenceMonth) {
         List<Transaction> monthlyTransactions =
-                transactionRepository.findByFilters(referenceMonth, null, null, null, null, null);
+                transactionService.listByFilters(referenceMonth, null, null, null, null, null);
 
         if (budget.getType() == BudgetType.ALLOWANCE) {
             UUID ownerId = budget.getOwnerMember() == null

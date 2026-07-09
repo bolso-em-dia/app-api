@@ -3,7 +3,7 @@ package com.mymoney.api.dashboard;
 import com.mymoney.api.budget.BudgetService;
 import com.mymoney.api.budget.BudgetView;
 import com.mymoney.api.transaction.Transaction;
-import com.mymoney.api.transaction.TransactionRepository;
+import com.mymoney.api.transaction.TransactionService;
 import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -18,13 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DashboardService {
 
-    private final TransactionRepository transactionRepository;
+    private final TransactionService transactionService;
     private final BudgetService budgetService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public DashboardView getDashboard(LocalDate referenceMonth) {
-        List<Transaction> transactions =
-                transactionRepository.findByFilters(referenceMonth, null, null, null, null, null);
+        List<Transaction> transactions = transactionService.listByFilters(referenceMonth, null, null, null, null, null);
         List<BudgetView> budgets = budgetService.listForMonth(referenceMonth);
 
         BigDecimal totalIncome = sumByType(transactions, TransactionType.INCOME);

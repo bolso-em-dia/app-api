@@ -33,6 +33,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
                 t.installmentGroupId,
                 t.installmentNumber,
                 t.installmentTotal,
+                ft.id,
+                false,
                 t.createdAt,
                 t.updatedAt
             )
@@ -40,6 +42,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             join t.account a
             join t.category c
             left join t.member m
+            left join t.fixedExpenseTemplate ft
             where t.referenceMonth = :referenceMonth
               and (:type is null or t.type = :type)
               and (:ownershipType is null or t.ownershipType = :ownershipType)
@@ -76,6 +79,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
                 t.installmentGroupId,
                 t.installmentNumber,
                 t.installmentTotal,
+                ft.id,
+                false,
                 t.createdAt,
                 t.updatedAt
             )
@@ -83,6 +88,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             join t.account a
             join t.category c
             left join t.member m
+            left join t.fixedExpenseTemplate ft
             where t.id = :id
             """)
     Optional<TransactionResponse> findResponseById(UUID id);
@@ -142,7 +148,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             List<UUID> categoryIds,
             UUID memberId);
 
+    @EntityGraph(attributePaths = {"account", "category", "member", "fixedExpenseTemplate"})
+    List<Transaction> findByReferenceMonthOrderByTransactionDateAscCreatedAtAsc(LocalDate referenceMonth);
+
     boolean existsByFixedExpenseTemplateIdAndReferenceMonth(UUID fixedExpenseTemplateId, LocalDate referenceMonth);
+
+    Optional<Transaction> findByFixedExpenseTemplateIdAndReferenceMonth(
+            UUID fixedExpenseTemplateId, LocalDate referenceMonth);
 
     List<Transaction> findByInstallmentGroupIdOrderByInstallmentNumber(UUID installmentGroupId);
 

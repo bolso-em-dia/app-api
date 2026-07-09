@@ -15,6 +15,8 @@ import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
+import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
+import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
@@ -25,6 +27,7 @@ import com.mymoney.api.transaction.TransactionSourceType;
 import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,6 +60,9 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
 
     @Autowired
     private TransactionRepository transactionRepository;
+
+    @Autowired
+    private FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
 
     private String adminToken;
     private String userToken;
@@ -354,6 +360,35 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.referenceMonth").value("2026-07-01"))
                 .andExpect(jsonPath("$.memberId").value(nullValue()));
+    }
+
+    @Test
+    void futureMonthListIncludesProjectedFixedTransaction() throws Exception {
+        LocalDate currentReferenceMonth = YearMonth.now().atDay(1);
+        LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(1);
+
+        FixedExpenseTemplate template = new FixedExpenseTemplate();
+        template.setName("Projected Rent");
+        template.setType(TransactionType.EXPENSE);
+        template.setAmount(new BigDecimal("880.00"));
+        template.setCategory(category);
+        template.setAccount(account);
+        template.setDueDay((short) 12);
+        template.setCreatedInMonth(currentReferenceMonth.minusMonths(1));
+        template.setActive(true);
+        template = fixedExpenseTemplateRepository.save(template);
+
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", futureReferenceMonth.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].description").value("Projected Rent"))
+                .andExpect(jsonPath("$.items[0].sourceType").value("FIXED_EXPENSE"))
+                .andExpect(jsonPath("$.items[0].fixedExpenseTemplateId")
+                        .value(template.getId().toString()))
+                .andExpect(jsonPath("$.items[0].projected").value(true))
+                .andExpect(jsonPath("$.items[0].transactionDate")
+                        .value(futureReferenceMonth.withDayOfMonth(12).toString()));
     }
 
     @Test

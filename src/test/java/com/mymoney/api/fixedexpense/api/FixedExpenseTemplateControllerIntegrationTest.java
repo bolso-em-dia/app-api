@@ -18,9 +18,11 @@ import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
+import com.mymoney.api.transaction.TransactionRepository;
 import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +51,9 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
 
     @Autowired
     private FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
+
+    @Autowired
+    private TransactionRepository transactionRepository;
 
     private String adminToken;
     private String userToken;
@@ -203,5 +208,47 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
 
         mockMvc.perform(get("/api/fixed-transactions").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updateSynchronizesCurrentMonthMaterializedTransaction() throws Exception {
+        LocalDate currentReferenceMonth = YearMonth.now().atDay(1);
+        LocalDate previousReferenceMonth = currentReferenceMonth.minusMonths(1);
+
+        template.setCreatedInMonth(previousReferenceMonth);
+        fixedExpenseTemplateRepository.save(template);
+
+        mockMvc.perform(put("/api/fixed-transactions/" + template.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "name": "Rent August",
+                                  "type": "INCOME",
+                                  "amount": 2450.00,
+                                  "categoryId": "%s",
+                                  "accountId": "%s",
+                                  "dueDay": 9
+                                }
+                                """
+                                        .formatted(category.getId(), account.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Rent August"))
+                .andExpect(jsonPath("$.type").value("INCOME"))
+                .andExpect(jsonPath("$.amount").value(2450.0))
+                .andExpect(jsonPath("$.dueDay").value(9));
+
+        var materializedTransaction = transactionRepository
+                .findByFixedExpenseTemplateIdAndReferenceMonth(template.getId(), currentReferenceMonth)
+                .orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(materializedTransaction.getDescription())
+                .isEqualTo("Rent August");
+        org.assertj.core.api.Assertions.assertThat(materializedTransaction.getType())
+                .isEqualTo(TransactionType.INCOME);
+        org.assertj.core.api.Assertions.assertThat(materializedTransaction.getAmount())
+                .isEqualByComparingTo("2450.00");
+        org.assertj.core.api.Assertions.assertThat(materializedTransaction.getTransactionDate())
+                .isEqualTo(currentReferenceMonth.withDayOfMonth(9));
     }
 }

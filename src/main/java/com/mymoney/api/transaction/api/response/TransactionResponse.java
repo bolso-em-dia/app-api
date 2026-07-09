@@ -26,6 +26,8 @@ public record TransactionResponse(
         UUID installmentGroupId,
         Short installmentNumber,
         Short installmentTotal,
+        String fixedExpenseTemplateId,
+        boolean projected,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
 
@@ -47,6 +49,8 @@ public record TransactionResponse(
             UUID installmentGroupId,
             Short installmentNumber,
             Short installmentTotal,
+            UUID fixedExpenseTemplateId,
+            boolean projected,
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt) {
         this(
@@ -67,6 +71,8 @@ public record TransactionResponse(
                 installmentGroupId,
                 installmentNumber,
                 installmentTotal,
+                fixedExpenseTemplateId == null ? null : fixedExpenseTemplateId.toString(),
+                projected,
                 createdAt,
                 updatedAt);
     }

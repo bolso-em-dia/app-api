@@ -18,6 +18,8 @@ import com.mymoney.api.budget.BudgetModelRepository;
 import com.mymoney.api.budget.BudgetType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
+import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
+import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
@@ -28,6 +30,7 @@ import com.mymoney.api.transaction.TransactionSourceType;
 import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.LinkedHashSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,6 +64,9 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
 
     @Autowired
     private BudgetModelRepository budgetModelRepository;
+
+    @Autowired
+    private FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
 
     private String adminToken;
     private String userToken;
@@ -345,5 +351,31 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
                         .header("Authorization", "Bearer " + userToken)
                         .param("referenceMonth", "2026-06-01"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void futureMonthBudgetConsumesProjectedFixedExpense() throws Exception {
+        LocalDate currentReferenceMonth = YearMonth.now().atDay(1);
+        LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(1);
+
+        FixedExpenseTemplate projectedExpense = new FixedExpenseTemplate();
+        projectedExpense.setName("Projected Market");
+        projectedExpense.setType(TransactionType.EXPENSE);
+        projectedExpense.setAmount(new BigDecimal("210.00"));
+        projectedExpense.setCategory(groceries);
+        projectedExpense.setAccount(account);
+        projectedExpense.setDueDay((short) 14);
+        projectedExpense.setCreatedInMonth(currentReferenceMonth.minusMonths(1));
+        projectedExpense.setActive(true);
+        fixedExpenseTemplateRepository.save(projectedExpense);
+
+        mockMvc.perform(get("/api/budgets/" + globalBudget.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", futureReferenceMonth.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.consumedAmount").value(210.0))
+                .andExpect(jsonPath("$.transactions.length()").value(1))
+                .andExpect(jsonPath("$.transactions[0].sourceType").value("FIXED_EXPENSE"))
+                .andExpect(jsonPath("$.transactions[0].projected").value(true));
     }
 }
