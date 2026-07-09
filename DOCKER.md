@@ -55,13 +55,24 @@ The workflow requires these repository secrets:
 - `DOCKERHUB_USERNAME`
 - `DOCKERHUB_TOKEN`
 
-`DOCKERHUB_TOKEN` should be a Docker Hub access token.
+`DOCKERHUB_TOKEN` should be a Docker Hub access token. The same token is used
+for image push and repository description sync — no additional scopes needed.
 
 ## Recommended GitHub repository variables
 
 Optional but recommended:
 
 - `DOCKERHUB_NAMESPACE`
+
+## Docker Hub description sync
+
+The workflow automatically updates the Docker Hub repository description page
+from `DOCKER.md` after a successful image publish. This keeps the public
+documentation in sync with the repository-maintained source.
+
+The sync step uses `peter-evans/dockerhub-description@v4` and fails the
+workflow if the description update is rejected — out-of-sync descriptions are
+treated as a publish failure.
 
 ## Using the published image from Docker Hub
 
