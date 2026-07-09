@@ -8,6 +8,7 @@ import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateReques
 import com.mymoney.api.fixedexpense.api.request.UpdateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.response.FixedExpenseTemplateResponse;
 import com.mymoney.api.transaction.EffectiveMonthlyTransactionService;
+import com.mymoney.api.transaction.TransactionRepository;
 import com.mymoney.api.transaction.TransactionType;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -28,6 +29,7 @@ public class FixedExpenseTemplateService {
     private final CategoryService categoryService;
     private final AccountService accountService;
     private final EffectiveMonthlyTransactionService effectiveMonthlyTransactionService;
+    private final TransactionRepository transactionRepository;
 
     @Transactional(readOnly = true)
     public Page<FixedExpenseTemplateResponse> listAllResponses(
@@ -98,6 +100,15 @@ public class FixedExpenseTemplateService {
         template.setActive(false);
         FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
         return getResponseById(saved.getId());
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        FixedExpenseTemplate template = getById(id);
+        LocalDate currentMonth = currentReferenceMonth();
+        transactionRepository.deleteByFixedExpenseTemplateIdAndReferenceMonthGreaterThanEqual(
+                template.getId(), currentMonth);
+        fixedExpenseTemplateRepository.delete(template);
     }
 
     private void apply(

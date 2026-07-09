@@ -156,6 +156,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     Optional<Transaction> findByFixedExpenseTemplateIdAndReferenceMonth(
             UUID fixedExpenseTemplateId, LocalDate referenceMonth);
 
+    void deleteByFixedExpenseTemplateIdAndReferenceMonthGreaterThanEqual(
+            UUID fixedExpenseTemplateId, LocalDate referenceMonth);
+
     List<Transaction> findByInstallmentGroupIdOrderByInstallmentNumber(UUID installmentGroupId);
 
     void deleteByInstallmentGroupIdAndInstallmentNumberGreaterThanEqual(
