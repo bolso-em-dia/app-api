@@ -1,5 +1,6 @@
 package com.mymoney.api.fixedexpense.api;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -250,5 +251,30 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
                 .isEqualByComparingTo("2450.00");
         org.assertj.core.api.Assertions.assertThat(materializedTransaction.getTransactionDate())
                 .isEqualTo(currentReferenceMonth.withDayOfMonth(9));
+    }
+
+    @Test
+    void deleteRemovesTemplateAndCurrentMonthTransactions() throws Exception {
+        LocalDate currentMonth = YearMonth.now().atDay(1);
+        LocalDate pastMonth = currentMonth.minusMonths(1);
+
+        template.setCreatedInMonth(pastMonth);
+        FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
+
+        mockMvc.perform(delete("/api/fixed-transactions/00000000-0000-0000-0000-000000000000")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(delete("/api/fixed-transactions/" + saved.getId())
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/api/fixed-transactions/" + saved.getId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/fixed-transactions/" + saved.getId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
     }
 }
