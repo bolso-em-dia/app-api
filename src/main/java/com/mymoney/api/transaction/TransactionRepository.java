@@ -162,7 +162,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             UUID fixedExpenseTemplateId, LocalDate referenceMonth);
 
     @Modifying
-    @Query("UPDATE Transaction t SET t.fixedExpenseTemplate = null WHERE t.fixedExpenseTemplate = :template AND t.referenceMonth < :beforeMonth")
+    @Query(
+            "UPDATE Transaction t SET t.fixedExpenseTemplate = null WHERE t.fixedExpenseTemplate = :template AND t.referenceMonth < :beforeMonth")
     void detachFixedExpenseTemplateBeforeMonth(FixedExpenseTemplate template, LocalDate beforeMonth);
 
     List<Transaction> findByInstallmentGroupIdOrderByInstallmentNumber(UUID installmentGroupId);
