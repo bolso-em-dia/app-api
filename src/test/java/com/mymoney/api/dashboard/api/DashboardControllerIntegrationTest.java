@@ -1,15 +1,13 @@
 package com.mymoney.api.dashboard.api;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.mymoney.api.PostgresIntegrationTestSupport;
+import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
-import com.mymoney.api.auth.api.JsonTestUtils;
 import com.mymoney.api.budget.BudgetModel;
 import com.mymoney.api.budget.BudgetModelRepository;
 import com.mymoney.api.budget.BudgetType;
@@ -31,19 +29,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class DashboardControllerIntegrationTest extends PostgresIntegrationTestSupport {
-
-    @Autowired
-    private MockMvc mockMvc;
+class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
 
     @Autowired
     private FamilyMemberRepository familyMemberRepository;
@@ -158,8 +150,8 @@ class DashboardControllerIntegrationTest extends PostgresIntegrationTestSupport 
                 transport,
                 allowanceMember));
 
-        adminToken = login("admin@bolso-em-dia.local", "admin123456");
-        userToken = login("user@bolso-em-dia.local", "user123456");
+        adminToken = loginAsAdmin();
+        userToken = loginAsUser();
     }
 
     @Test
@@ -225,22 +217,5 @@ class DashboardControllerIntegrationTest extends PostgresIntegrationTestSupport 
         transaction.setCategory(category);
         transaction.setMember(member);
         return transaction;
-    }
-
-    private String login(String email, String password) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                """
-                                {
-                                  "email": "%s",
-                                  "password": "%s"
-                                }
-                                """
-                                        .formatted(email, password)))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        return JsonTestUtils.extractJsonValue(result.getResponse().getContentAsString(), "accessToken");
     }
 }

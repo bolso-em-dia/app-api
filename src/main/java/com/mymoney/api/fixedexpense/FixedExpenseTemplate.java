@@ -2,8 +2,11 @@ package com.mymoney.api.fixedexpense;
 
 import com.mymoney.api.account.Account;
 import com.mymoney.api.category.Category;
+import com.mymoney.api.transaction.TransactionType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -35,6 +38,10 @@ public class FixedExpenseTemplate {
 
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal amount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private TransactionType type;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)

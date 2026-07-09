@@ -9,11 +9,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mymoney.api.PostgresIntegrationTestSupport;
+import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
-import com.mymoney.api.auth.api.JsonTestUtils;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
 import com.mymoney.api.member.FamilyMember;
@@ -34,19 +33,15 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class TransactionControllerIntegrationTest extends PostgresIntegrationTestSupport {
+class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
-    @Autowired
-    private MockMvc mockMvc;
 
     @Autowired
     private FamilyMemberRepository familyMemberRepository;
@@ -133,8 +128,8 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
         transportTransaction.setAccount(account);
         transactionRepository.save(transportTransaction);
 
-        adminToken = login("admin@bolso-em-dia.local", "admin123456");
-        userToken = login("user@bolso-em-dia.local", "user123456");
+        adminToken = loginAsAdmin();
+        userToken = loginAsUser();
     }
 
     @Test
@@ -605,22 +600,5 @@ class TransactionControllerIntegrationTest extends PostgresIntegrationTestSuppor
                         .header("Authorization", "Bearer " + userToken)
                         .param("referenceMonth", "2026-06-01"))
                 .andExpect(status().isForbidden());
-    }
-
-    private String login(String email, String password) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                """
-                                {
-                                  "email": "%s",
-                                  "password": "%s"
-                                }
-                                """
-                                        .formatted(email, password)))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        return JsonTestUtils.extractJsonValue(result.getResponse().getContentAsString(), "accessToken");
     }
 }

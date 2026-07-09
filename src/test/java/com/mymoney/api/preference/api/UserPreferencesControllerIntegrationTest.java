@@ -4,15 +4,13 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.mymoney.api.PostgresIntegrationTestSupport;
+import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
-import com.mymoney.api.auth.api.JsonTestUtils;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,17 +20,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class UserPreferencesControllerIntegrationTest extends PostgresIntegrationTestSupport {
-
-    @Autowired
-    private MockMvc mockMvc;
+class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
 
     @Autowired
     private AccountRepository accountRepository;
@@ -47,7 +40,7 @@ class UserPreferencesControllerIntegrationTest extends PostgresIntegrationTestSu
         activeAccount.setType(AccountType.CHECKING);
         activeAccount.setCreatedInMonth(LocalDate.of(2026, 1, 1));
         activeAccount = accountRepository.save(activeAccount);
-        adminToken = login("admin@bolso-em-dia.local", "admin123456");
+        adminToken = loginAsAdmin();
     }
 
     @Test
@@ -219,25 +212,25 @@ class UserPreferencesControllerIntegrationTest extends PostgresIntegrationTestSu
                 .andExpect(jsonPath("$.message").value("Locale is not supported."));
     }
 
-    private String bearerToken() {
-        return "Bearer " + adminToken;
+    @Test
+    void changesCurrentUserPasswordWhenCurrentPasswordMatches() throws Exception {
+        mockMvc.perform(
+                        post("/api/auth/change-password")
+                                .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "currentPassword": "admin123456",
+                                  "newPassword": "admin98765432",
+                                  "confirmPassword": "admin98765432"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mustChangePassword").value(false));
     }
 
-    private String login(String email, String password) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                """
-                                {
-                                  "email": "%s",
-                                  "password": "%s"
-                                }
-                                """
-                                        .formatted(email, password)))
-                .andExpect(status().isOk())
-                .andExpect(cookie().exists("bolso_em_dia_refresh_token"))
-                .andReturn();
-
-        return JsonTestUtils.extractJsonValue(result.getResponse().getContentAsString(), "accessToken");
+    private String bearerToken() {
+        return "Bearer " + adminToken;
     }
 }

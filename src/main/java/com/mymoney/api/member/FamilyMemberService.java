@@ -42,6 +42,7 @@ public class FamilyMemberService {
         member.setRole(request.role());
         member.setActive(true);
         member.setAllowanceEnabled(request.allowanceEnabled());
+        member.setMustChangePassword(false);
         return familyMemberRepository.save(member);
     }
 

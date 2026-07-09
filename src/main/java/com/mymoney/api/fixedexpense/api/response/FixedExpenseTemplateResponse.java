@@ -1,5 +1,6 @@
 package com.mymoney.api.fixedexpense.api.response;
 
+import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -8,6 +9,7 @@ import java.util.UUID;
 public record FixedExpenseTemplateResponse(
         String id,
         String name,
+        String type,
         BigDecimal amount,
         String categoryId,
         String categoryName,
@@ -23,6 +25,7 @@ public record FixedExpenseTemplateResponse(
     public FixedExpenseTemplateResponse(
             UUID id,
             String name,
+            TransactionType type,
             BigDecimal amount,
             UUID categoryId,
             String categoryName,
@@ -37,6 +40,7 @@ public record FixedExpenseTemplateResponse(
         this(
                 id.toString(),
                 name,
+                type.name(),
                 amount,
                 categoryId.toString(),
                 categoryName,

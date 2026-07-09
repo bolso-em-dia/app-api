@@ -15,6 +15,7 @@ public interface FixedExpenseTemplateRepository extends JpaRepository<FixedExpen
             select new com.mymoney.api.fixedexpense.api.response.FixedExpenseTemplateResponse(
                 t.id,
                 t.name,
+                t.type,
                 t.amount,
                 c.id,
                 c.name,
@@ -44,6 +45,7 @@ public interface FixedExpenseTemplateRepository extends JpaRepository<FixedExpen
             select new com.mymoney.api.fixedexpense.api.response.FixedExpenseTemplateResponse(
                 t.id,
                 t.name,
+                t.type,
                 t.amount,
                 c.id,
                 c.name,

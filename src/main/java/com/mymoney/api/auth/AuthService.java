@@ -2,6 +2,7 @@ package com.mymoney.api.auth;
 
 import com.mymoney.api.auth.api.AuthResponse;
 import com.mymoney.api.auth.api.AuthUserResponse;
+import com.mymoney.api.auth.api.ChangePasswordRequest;
 import com.mymoney.api.auth.api.LoginRequest;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
@@ -66,16 +67,24 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public AuthUserResponse currentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getName() == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User is not authenticated.");
+        return mapUser(currentMember());
+    }
+
+    @Transactional
+    public AuthUserResponse changeCurrentUserPassword(ChangePasswordRequest request) {
+        FamilyMember member = currentMember();
+
+        if (!passwordEncoder.matches(request.currentPassword(), member.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Current password is incorrect.");
         }
 
-        FamilyMember member = memberRepository
-                .findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User was not found."));
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Password confirmation does not match.");
+        }
 
-        return mapUser(member);
+        member.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        member.setMustChangePassword(false);
+        return mapUser(memberRepository.save(member));
     }
 
     private AuthResponse issueTokens(FamilyMember member, HttpServletResponse response) {
@@ -93,7 +102,20 @@ public class AuthService {
                 member.getEmail(),
                 member.getRole().name(),
                 member.isAllowanceEnabled(),
+                member.isMustChangePassword(),
                 userPreferencesService.resolvePreferences(member));
+    }
+
+    private FamilyMember currentMember() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User is not authenticated.");
+        }
+
+        return memberRepository
+                .findByEmailIgnoreCase(authentication.getName())
+                .filter(FamilyMember::isActive)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User was not found."));
     }
 
     private ResponseStatusException invalidCredentials() {

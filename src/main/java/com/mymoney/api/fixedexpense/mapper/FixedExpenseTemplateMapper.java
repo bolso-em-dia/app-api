@@ -11,6 +11,7 @@ public class FixedExpenseTemplateMapper {
         return new FixedExpenseTemplateResponse(
                 template.getId().toString(),
                 template.getName(),
+                template.getType().name(),
                 template.getAmount(),
                 template.getCategory().getId().toString(),
                 template.getCategory().getName(),

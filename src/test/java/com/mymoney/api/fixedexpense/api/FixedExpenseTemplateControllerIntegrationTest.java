@@ -7,11 +7,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.mymoney.api.PostgresIntegrationTestSupport;
+import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
-import com.mymoney.api.auth.api.JsonTestUtils;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
@@ -19,6 +18,7 @@ import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
+import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,17 +28,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class FixedExpenseTemplateControllerIntegrationTest extends PostgresIntegrationTestSupport {
-
-    @Autowired
-    private MockMvc mockMvc;
+class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
 
     @Autowired
     private FamilyMemberRepository familyMemberRepository;
@@ -87,6 +82,7 @@ class FixedExpenseTemplateControllerIntegrationTest extends PostgresIntegrationT
 
         template = new FixedExpenseTemplate();
         template.setName("Rent");
+        template.setType(TransactionType.EXPENSE);
         template.setAmount(new BigDecimal("1800.00"));
         template.setCategory(category);
         template.setAccount(account);
@@ -95,13 +91,13 @@ class FixedExpenseTemplateControllerIntegrationTest extends PostgresIntegrationT
         template.setActive(true);
         template = fixedExpenseTemplateRepository.save(template);
 
-        adminToken = login("admin@bolso-em-dia.local", "admin123456");
-        userToken = login("user@bolso-em-dia.local", "user123456");
+        adminToken = loginAsAdmin();
+        userToken = loginAsUser();
     }
 
     @Test
     void adminCanListCreateGetAndUpdateTemplates() throws Exception {
-        mockMvc.perform(get("/api/fixed-expense-templates")
+        mockMvc.perform(get("/api/fixed-transactions")
                         .header("Authorization", "Bearer " + adminToken)
                         .param("size", "1"))
                 .andExpect(status().isOk())
@@ -115,7 +111,7 @@ class FixedExpenseTemplateControllerIntegrationTest extends PostgresIntegrationT
         template.setActive(false);
         fixedExpenseTemplateRepository.save(template);
 
-        mockMvc.perform(get("/api/fixed-expense-templates")
+        mockMvc.perform(get("/api/fixed-transactions")
                         .header("Authorization", "Bearer " + adminToken)
                         .param("search", "rent")
                         .param("status", "ARCHIVED"))
@@ -124,13 +120,14 @@ class FixedExpenseTemplateControllerIntegrationTest extends PostgresIntegrationT
                 .andExpect(jsonPath("$.items[0].name").value("Rent"))
                 .andExpect(jsonPath("$.totalItems").value(1));
 
-        mockMvc.perform(post("/api/fixed-expense-templates")
+        mockMvc.perform(post("/api/fixed-transactions")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
                                 """
                                 {
                                   "name": "Internet",
+                                  "type": "INCOME",
                                   "amount": 120.50,
                                   "categoryId": "%s",
                                   "accountId": "%s",
@@ -140,21 +137,24 @@ class FixedExpenseTemplateControllerIntegrationTest extends PostgresIntegrationT
                                         .formatted(category.getId(), account.getId())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Internet"))
+                .andExpect(jsonPath("$.type").value("INCOME"))
                 .andExpect(jsonPath("$.amount").value(120.5))
                 .andExpect(jsonPath("$.dueDay").value(12));
 
-        mockMvc.perform(get("/api/fixed-expense-templates/" + template.getId())
+        mockMvc.perform(get("/api/fixed-transactions/" + template.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Rent"));
+                .andExpect(jsonPath("$.name").value("Rent"))
+                .andExpect(jsonPath("$.type").value("EXPENSE"));
 
-        mockMvc.perform(put("/api/fixed-expense-templates/" + template.getId())
+        mockMvc.perform(put("/api/fixed-transactions/" + template.getId())
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
                                 """
                                 {
                                   "name": "Rent Updated",
+                                  "type": "EXPENSE",
                                   "amount": 1850.00,
                                   "categoryId": "%s",
                                   "accountId": "%s",
@@ -170,13 +170,14 @@ class FixedExpenseTemplateControllerIntegrationTest extends PostgresIntegrationT
 
     @Test
     void archiveValidationAndAuthorizationAreEnforced() throws Exception {
-        mockMvc.perform(post("/api/fixed-expense-templates")
+        mockMvc.perform(post("/api/fixed-transactions")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
                                 """
                                 {
                                   "name": "Invalid Due Day",
+                                  "type": "EXPENSE",
                                   "amount": 10.00,
                                   "categoryId": "%s",
                                   "accountId": "%s",
@@ -187,7 +188,7 @@ class FixedExpenseTemplateControllerIntegrationTest extends PostgresIntegrationT
                 .andExpect(status().isUnprocessableEntity());
 
         mockMvc.perform(
-                        patch("/api/fixed-expense-templates/" + template.getId() + "/archive")
+                        patch("/api/fixed-transactions/" + template.getId() + "/archive")
                                 .header("Authorization", "Bearer " + adminToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -200,24 +201,7 @@ class FixedExpenseTemplateControllerIntegrationTest extends PostgresIntegrationT
                 .andExpect(jsonPath("$.archivedFromMonth").value("2026-07-01"))
                 .andExpect(jsonPath("$.active").value(false));
 
-        mockMvc.perform(get("/api/fixed-expense-templates").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/fixed-transactions").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden());
-    }
-
-    private String login(String email, String password) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                """
-                                {
-                                  "email": "%s",
-                                  "password": "%s"
-                                }
-                                """
-                                        .formatted(email, password)))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        return JsonTestUtils.extractJsonValue(result.getResponse().getContentAsString(), "accessToken");
     }
 }

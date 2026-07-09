@@ -44,6 +44,9 @@ public class FamilyMember {
     @Column(name = "allowance_enabled", nullable = false)
     private boolean allowanceEnabled;
 
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword;
+
     @Column(name = "created_at", nullable = false)
     @Setter(AccessLevel.NONE)
     private OffsetDateTime createdAt;

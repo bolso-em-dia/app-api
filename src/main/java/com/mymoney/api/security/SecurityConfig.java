@@ -23,6 +23,7 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationFilter jwtAuthenticationFilter,
+            ForcedPasswordChangeFilter forcedPasswordChangeFilter,
             ApiAuthenticationEntryPoint apiAuthenticationEntryPoint,
             ApiAccessDeniedHandler apiAccessDeniedHandler)
             throws Exception {
@@ -41,6 +42,9 @@ public class SecurityConfig {
                         .authenticated())
                 .addFilterBefore(
                         jwtAuthenticationFilter,
+                        org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(
+                        forcedPasswordChangeFilter,
                         org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

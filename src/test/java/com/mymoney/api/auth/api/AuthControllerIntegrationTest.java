@@ -87,6 +87,7 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(cookie().exists(REFRESH_COOKIE_NAME))
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.user.email").value("admin@bolso-em-dia.local"))
+                .andExpect(jsonPath("$.user.mustChangePassword").value(true))
                 .andReturn();
 
         Cookie refreshedCookie = refreshResult.getResponse().getCookie(REFRESH_COOKIE_NAME);
@@ -117,6 +118,7 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(cookie().exists("bolso_em_dia_refresh_token"))
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.user.email").value("admin@bolso-em-dia.local"))
+                .andExpect(jsonPath("$.user.mustChangePassword").value(true))
                 .andExpect(jsonPath("$.user.preferences.locale").value("pt-BR"))
                 .andExpect(jsonPath("$.user.preferences.defaultAccountId").value(nullValue()))
                 .andExpect(jsonPath("$.user.preferences.showBalanceWithBudgets").value(false))
@@ -128,8 +130,62 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("admin@bolso-em-dia.local"))
                 .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.mustChangePassword").value(true))
                 .andExpect(jsonPath("$.preferences.locale").value("pt-BR"))
                 .andExpect(jsonPath("$.preferences.defaultAccountId").value(nullValue()))
                 .andExpect(jsonPath("$.preferences.showBalanceWithBudgets").value(false));
+    }
+
+    @Test
+    void flaggedAdminCanOnlyChangePasswordBeforeUsingProtectedApis() throws Exception {
+        MvcResult result = mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "email": "admin@bolso-em-dia.local",
+                                  "password": "admin123456"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String token = JsonTestUtils.extractJsonValue(result.getResponse().getContentAsString(), "accessToken");
+
+        mockMvc.perform(get("/api/me/preferences").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        post("/api/auth/change-password")
+                                .header("Authorization", "Bearer " + token)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "currentPassword": "admin123456",
+                                  "newPassword": "admin12345678",
+                                  "confirmPassword": "admin12345678"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mustChangePassword").value(false));
+
+        mockMvc.perform(get("/api/me/preferences").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(
+                        post("/api/auth/change-password")
+                                .header("Authorization", "Bearer " + token)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "currentPassword": "admin12345678",
+                                  "newPassword": "admin123456",
+                                  "confirmPassword": "admin123456"
+                                }
+                                """))
+                .andExpect(status().isOk());
     }
 }

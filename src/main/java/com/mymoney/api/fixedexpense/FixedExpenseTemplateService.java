@@ -57,7 +57,14 @@ public class FixedExpenseTemplateService {
     @Transactional
     public FixedExpenseTemplateResponse create(CreateFixedExpenseTemplateRequest request) {
         FixedExpenseTemplate template = new FixedExpenseTemplate();
-        apply(template, request.name(), request.amount(), request.categoryId(), request.accountId(), request.dueDay());
+        apply(
+                template,
+                request.name(),
+                request.type(),
+                request.amount(),
+                request.categoryId(),
+                request.accountId(),
+                request.dueDay());
         template.setCreatedInMonth(currentReferenceMonth());
         template.setActive(true);
         FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
@@ -68,7 +75,14 @@ public class FixedExpenseTemplateService {
     @Transactional
     public FixedExpenseTemplateResponse update(UUID id, UpdateFixedExpenseTemplateRequest request) {
         FixedExpenseTemplate template = getById(id);
-        apply(template, request.name(), request.amount(), request.categoryId(), request.accountId(), request.dueDay());
+        apply(
+                template,
+                request.name(),
+                request.type(),
+                request.amount(),
+                request.categoryId(),
+                request.accountId(),
+                request.dueDay());
         FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
         return getResponseById(saved.getId());
     }
@@ -95,7 +109,7 @@ public class FixedExpenseTemplateService {
         }
 
         Transaction transaction = new Transaction();
-        transaction.setType(TransactionType.EXPENSE);
+        transaction.setType(template.getType());
         transaction.setOwnershipType(OwnershipType.SHARED);
         transaction.setSourceType(TransactionSourceType.FIXED_EXPENSE);
         transaction.setDescription(template.getName());
@@ -118,6 +132,7 @@ public class FixedExpenseTemplateService {
     private void apply(
             FixedExpenseTemplate template,
             String name,
+            TransactionType type,
             java.math.BigDecimal amount,
             UUID categoryId,
             UUID accountId,
@@ -127,6 +142,7 @@ public class FixedExpenseTemplateService {
         Account account = accountService.getById(accountId);
 
         template.setName(name.trim());
+        template.setType(type);
         template.setAmount(amount);
         template.setCategory(category);
         template.setAccount(account);

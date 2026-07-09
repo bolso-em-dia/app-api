@@ -63,6 +63,51 @@ Optional but recommended:
 
 - `DOCKERHUB_NAMESPACE`
 
+## Using the published image from Docker Hub
+
+Pull the published API image with:
+
+```bash
+docker pull <dockerhub-namespace>/bolso-em-dia-api:latest
+```
+
+Run it directly with:
+
+```bash
+docker run --rm \
+  -p 8081:8080 \
+  -e DB_URL=jdbc:postgresql://host.docker.internal:5432/bolso_em_dia \
+  -e DB_USERNAME=bolso_em_dia \
+  -e DB_PASSWORD=bolso_em_dia \
+  -e APP_ALLOWED_ORIGINS=http://localhost:4173 \
+  -e APP_ADMIN_EMAIL=admin@bolso-em-dia.local \
+  -e APP_ADMIN_PASSWORD=admin123456 \
+  -e APP_JWT_SECRET=change-this-secret-change-this-secret \
+  <dockerhub-namespace>/bolso-em-dia-api:latest
+```
+
+The published container always listens on port `8080` internally. The host-side
+published port is yours to choose.
+
+The image publishes its own Docker health check against:
+
+- `http://localhost:8080/actuator/health`
+
+Example with a custom published port:
+
+```bash
+docker run --rm \
+  -p 18081:8080 \
+  -e DB_URL=jdbc:postgresql://host.docker.internal:5432/bolso_em_dia \
+  -e DB_USERNAME=bolso_em_dia \
+  -e DB_PASSWORD=bolso_em_dia \
+  -e APP_ALLOWED_ORIGINS=http://localhost:14173 \
+  -e APP_ADMIN_EMAIL=admin@bolso-em-dia.local \
+  -e APP_ADMIN_PASSWORD=admin123456 \
+  -e APP_JWT_SECRET=change-this-secret-change-this-secret \
+  <dockerhub-namespace>/bolso-em-dia-api:latest
+```
+
 ## Release tagging process
 
 Use this process for an official Docker release:

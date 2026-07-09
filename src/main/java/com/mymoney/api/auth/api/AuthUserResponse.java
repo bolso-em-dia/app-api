@@ -8,4 +8,5 @@ public record AuthUserResponse(
         String email,
         String role,
         boolean allowanceEnabled,
+        boolean mustChangePassword,
         UserPreferencesResponse preferences) {}

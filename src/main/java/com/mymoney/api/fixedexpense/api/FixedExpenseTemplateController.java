@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/fixed-expense-templates")
+@RequestMapping("/api/fixed-transactions")
 @PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 public class FixedExpenseTemplateController {
