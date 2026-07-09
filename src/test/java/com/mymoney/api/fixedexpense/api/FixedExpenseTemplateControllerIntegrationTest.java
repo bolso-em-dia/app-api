@@ -16,14 +16,19 @@ import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
+import com.mymoney.api.transaction.EffectiveMonthlyTransactionService;
+import jakarta.persistence.EntityManager;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
 import com.mymoney.api.transaction.TransactionRepository;
+import com.mymoney.api.transaction.TransactionSourceType;
 import com.mymoney.api.transaction.TransactionType;
+import com.mymoney.api.transaction.Transaction;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +60,12 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
 
     @Autowired
     private TransactionRepository transactionRepository;
+
+    @Autowired
+    private EffectiveMonthlyTransactionService effectiveMonthlyTransactionService;
+
+    @Autowired
+    private EntityManager entityManager;
 
     private String adminToken;
     private String userToken;
@@ -276,5 +287,53 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
         mockMvc.perform(get("/api/fixed-transactions/" + saved.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteDetachesPastTransactionsAndRemovesCurrentAndFuture() throws Exception {
+        LocalDate twoMonthsAgo = YearMonth.now().minusMonths(2).atDay(1);
+        LocalDate pastMonth = YearMonth.now().minusMonths(1).atDay(1);
+        LocalDate currentMonth = YearMonth.now().atDay(1);
+
+        template.setCreatedInMonth(twoMonthsAgo);
+        FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
+
+        effectiveMonthlyTransactionService.ensureMaterializedForMonth(pastMonth);
+        effectiveMonthlyTransactionService.ensureMaterializedForMonth(currentMonth);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        mockMvc.perform(delete("/api/fixed-transactions/" + saved.getId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+
+        entityManager.flush();
+        entityManager.clear();
+
+        mockMvc.perform(get("/api/fixed-transactions/" + saved.getId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+
+        List<Transaction> pastTransactions = transactionRepository
+                .findByReferenceMonthOrderByTransactionDateAscCreatedAtAsc(pastMonth);
+        org.assertj.core.api.Assertions.assertThat(pastTransactions)
+                .isNotEmpty();
+
+        org.assertj.core.api.Assertions.assertThat(pastTransactions.get(0).getFixedExpenseTemplate())
+                .isNull();
+
+        List<Transaction> currentTransactions = transactionRepository
+                .findByReferenceMonthOrderByTransactionDateAscCreatedAtAsc(currentMonth);
+        org.assertj.core.api.Assertions.assertThat(
+                        currentTransactions.stream()
+                                .filter(t -> t.getSourceType() == com.mymoney.api.transaction.TransactionSourceType.FIXED_EXPENSE))
+                .isEmpty();
+    }
+
+    @Test
+    void deleteWithoutAuthReturns401() throws Exception {
+        mockMvc.perform(delete("/api/fixed-transactions/" + template.getId()))
+                .andExpect(status().isUnauthorized());
     }
 }

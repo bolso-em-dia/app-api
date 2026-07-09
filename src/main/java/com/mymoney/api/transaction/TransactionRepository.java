@@ -1,5 +1,6 @@
 package com.mymoney.api.transaction;
 
+import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.transaction.api.response.TransactionResponse;
 import java.time.LocalDate;
 import java.util.List;
@@ -9,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
@@ -158,6 +160,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
 
     void deleteByFixedExpenseTemplateIdAndReferenceMonthGreaterThanEqual(
             UUID fixedExpenseTemplateId, LocalDate referenceMonth);
+
+    @Modifying
+    @Query("UPDATE Transaction t SET t.fixedExpenseTemplate = null WHERE t.fixedExpenseTemplate = :template AND t.referenceMonth < :beforeMonth")
+    void detachFixedExpenseTemplateBeforeMonth(FixedExpenseTemplate template, LocalDate beforeMonth);
 
     List<Transaction> findByInstallmentGroupIdOrderByInstallmentNumber(UUID installmentGroupId);
 

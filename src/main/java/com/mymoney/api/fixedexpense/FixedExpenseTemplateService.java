@@ -106,6 +106,7 @@ public class FixedExpenseTemplateService {
     public void delete(UUID id) {
         FixedExpenseTemplate template = getById(id);
         LocalDate currentMonth = currentReferenceMonth();
+        transactionRepository.detachFixedExpenseTemplateBeforeMonth(template, currentMonth);
         transactionRepository.deleteByFixedExpenseTemplateIdAndReferenceMonthGreaterThanEqual(
                 template.getId(), currentMonth);
         fixedExpenseTemplateRepository.delete(template);
