@@ -636,4 +636,101 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                         .param("referenceMonth", "2026-06-01"))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void listTransactionsRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("referenceMonth", "2026-06-01"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void createTransactionRequiresAuthentication() throws Exception {
+        mockMvc.perform(
+                        post("/api/transactions")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Test",
+                                  "amount": 50.0,
+                                  "transactionDate": "2026-06-10",
+                                  "accountId": "00000000-0000-0000-0000-000000000000",
+                                  "categoryId": "00000000-0000-0000-0000-000000000000"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void updateTransactionReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(put("/api/transactions/00000000-0000-0000-0000-000000000000")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Updated",
+                                  "amount": 75.0,
+                                  "transactionDate": "2026-06-10",
+                                  "accountId": "%s",
+                                  "categoryId": "%s"
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteTransactionReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(delete("/api/transactions/00000000-0000-0000-0000-000000000000")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("scope", "SINGLE"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void createTransactionWithEmptyDescriptionReturns400() throws Exception {
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "",
+                                  "amount": 50.0,
+                                  "transactionDate": "2026-06-10",
+                                  "accountId": "%s",
+                                  "categoryId": "%s"
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createTransactionWithZeroAmountReturns400() throws Exception {
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Groceries",
+                                  "amount": 0,
+                                  "transactionDate": "2026-06-10",
+                                  "accountId": "%s",
+                                  "categoryId": "%s"
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isBadRequest());
+    }
 }

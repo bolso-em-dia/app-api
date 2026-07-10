@@ -15,6 +15,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -73,6 +74,9 @@ public class BudgetModel {
     @Column(name = "updated_at", nullable = false)
     @Setter(AccessLevel.NONE)
     private OffsetDateTime updatedAt;
+
+    @Version
+    private Long version;
 
     @PrePersist
     void onCreate() {

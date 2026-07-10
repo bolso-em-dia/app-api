@@ -12,6 +12,7 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -54,6 +55,9 @@ public class MemberPreferences {
     @Column(name = "updated_at", nullable = false)
     @Setter(AccessLevel.NONE)
     private OffsetDateTime updatedAt;
+
+    @Version
+    private Long version;
 
     public FamilyMember getMember() {
         return member;

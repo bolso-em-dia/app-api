@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -58,6 +59,9 @@ public class Account {
     @Column(name = "updated_at", nullable = false)
     @Setter(AccessLevel.NONE)
     private OffsetDateTime updatedAt;
+
+    @Version
+    private Long version;
 
     @PrePersist
     void onCreate() {
