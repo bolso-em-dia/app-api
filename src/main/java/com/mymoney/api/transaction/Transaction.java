@@ -53,6 +53,12 @@ public class Transaction {
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal amount;
 
+    @Column(name = "original_amount", precision = 14, scale = 2)
+    private BigDecimal originalAmount;
+
+    @Column(length = 3)
+    private String currency;
+
     @Column(name = "transaction_date", nullable = false)
     private LocalDate transactionDate;
 

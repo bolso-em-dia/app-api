@@ -34,6 +34,10 @@ public class Account {
     @Column(nullable = false, length = 30)
     private AccountType type;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 3)
+    private CurrencyType currency;
+
     @Column(length = 40)
     private String brand;
 
@@ -68,6 +72,9 @@ public class Account {
         var now = OffsetDateTime.now();
         if (id == null) {
             id = UUID.randomUUID();
+        }
+        if (currency == null) {
+            currency = CurrencyType.BRL;
         }
         createdAt = now;
         updatedAt = now;

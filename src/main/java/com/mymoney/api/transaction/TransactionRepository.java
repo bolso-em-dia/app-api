@@ -2,6 +2,7 @@ package com.mymoney.api.transaction;
 
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.transaction.api.response.TransactionResponse;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +25,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
                 t.sourceType,
                 t.description,
                 t.amount,
+                t.originalAmount,
+                t.currency,
                 t.transactionDate,
                 t.referenceMonth,
                 a.id,
@@ -70,6 +73,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
                 t.sourceType,
                 t.description,
                 t.amount,
+                t.originalAmount,
+                t.currency,
                 t.transactionDate,
                 t.referenceMonth,
                 a.id,
@@ -173,4 +178,26 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             UUID installmentGroupId, Short installmentNumber);
 
     void deleteByInstallmentGroupId(UUID installmentGroupId);
+
+    @Modifying
+    @Query(
+            """
+            update Transaction t
+            set t.amount = t.originalAmount * :rate
+            where t.currency = :currency
+              and t.referenceMonth >= :since
+              and t.originalAmount is not null
+            """)
+    void updateAmountsForCurrency(String currency, BigDecimal rate, LocalDate since);
+
+    @Modifying
+    @Query(
+            """
+            update Transaction t
+            set t.amount = t.originalAmount * :rate
+            where t.currency = :currency
+              and t.referenceMonth = :referenceMonth
+              and t.originalAmount is not null
+            """)
+    void freezeAmountsForMonth(String currency, BigDecimal rate, LocalDate referenceMonth);
 }
