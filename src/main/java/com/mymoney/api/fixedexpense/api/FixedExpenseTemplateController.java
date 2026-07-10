@@ -16,7 +16,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -57,11 +56,6 @@ public class FixedExpenseTemplateController {
     public ResponseEntity<FixedExpenseTemplateResponse> update(
             @PathVariable UUID id, @Valid @RequestBody UpdateFixedExpenseTemplateRequest request) {
         return ResponseEntity.ok(fixedExpenseTemplateService.update(id, request));
-    }
-
-    @PatchMapping("/{id}/archive")
-    public ResponseEntity<FixedExpenseTemplateResponse> archive(@PathVariable UUID id) {
-        return ResponseEntity.ok(fixedExpenseTemplateService.archive(id));
     }
 
     @DeleteMapping("/{id}")

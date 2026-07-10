@@ -88,21 +88,6 @@ public class FixedExpenseTemplateService {
     }
 
     @Transactional
-    public FixedExpenseTemplateResponse archive(UUID id) {
-        FixedExpenseTemplate template = getById(id);
-        LocalDate archivedFromMonth = currentReferenceMonth();
-        if (archivedFromMonth.isBefore(template.getCreatedInMonth())) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY,
-                    "Archive month cannot be before the fixed expense template creation month.");
-        }
-        template.setArchivedFromMonth(archivedFromMonth);
-        template.setActive(false);
-        FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
-        return getResponseById(saved.getId());
-    }
-
-    @Transactional
     public void delete(UUID id) {
         FixedExpenseTemplate template = getById(id);
         LocalDate currentMonth = currentReferenceMonth();

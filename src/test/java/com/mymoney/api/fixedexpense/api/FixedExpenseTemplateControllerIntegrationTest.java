@@ -2,7 +2,6 @@ package com.mymoney.api.fixedexpense.api;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -182,43 +181,6 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
                 .andExpect(jsonPath("$.name").value("Rent Updated"))
                 .andExpect(jsonPath("$.amount").value(1850.0))
                 .andExpect(jsonPath("$.dueDay").value(7));
-    }
-
-    @Test
-    void archiveValidationAndAuthorizationAreEnforced() throws Exception {
-        mockMvc.perform(post("/api/fixed-transactions")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                """
-                                {
-                                  "name": "Invalid Due Day",
-                                  "type": "EXPENSE",
-                                  "amount": 10.00,
-                                  "categoryId": "%s",
-                                  "accountId": "%s",
-                                  "dueDay": 40
-                                }
-                                """
-                                        .formatted(category.getId(), account.getId())))
-                .andExpect(status().isUnprocessableEntity());
-
-        mockMvc.perform(
-                        patch("/api/fixed-transactions/" + template.getId() + "/archive")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "archivedFromMonth": "2026-07-01"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.archivedFromMonth").value("2026-07-01"))
-                .andExpect(jsonPath("$.active").value(false));
-
-        mockMvc.perform(get("/api/fixed-transactions").header("Authorization", "Bearer " + userToken))
-                .andExpect(status().isForbidden());
     }
 
     @Test
