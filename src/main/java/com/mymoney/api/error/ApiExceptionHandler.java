@@ -2,6 +2,7 @@ package com.mymoney.api.error;
 
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -11,6 +12,7 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -50,18 +52,25 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
     public ResponseEntity<ApiErrorResponse> handleValidationFailure(Exception exception, HttpServletRequest request) {
-        String message = "Request validation failed.";
+        List<FieldError> fieldErrors = List.of();
+        if (exception instanceof MethodArgumentNotValidException manve) {
+            fieldErrors = manve.getBindingResult().getFieldErrors();
+        } else if (exception instanceof BindException be) {
+            fieldErrors = be.getBindingResult().getFieldErrors();
+        }
 
+        String message = "Request validation failed.";
         log.warn(
-                "Validation failed on {} {} by user={} status={} message={}",
+                "Validation failed on {} {} by user={} status={} fields=[{}]",
                 request.getMethod(),
                 request.getRequestURI(),
                 currentUser(),
-                HttpStatus.BAD_REQUEST.value(),
-                message);
+                fieldErrors.stream()
+                        .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+                        .collect(java.util.stream.Collectors.joining(", ")));
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiErrorResponse.from(HttpStatus.BAD_REQUEST, message, request.getRequestURI()));
+                .body(ApiErrorResponse.validationError(message, request.getRequestURI(), fieldErrors));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
