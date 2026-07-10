@@ -2,7 +2,6 @@ package com.mymoney.api.transaction;
 
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -19,9 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-@SuppressFBWarnings(
-        value = "EI_EXPOSE_REP2",
-        justification = "Spring service dependencies and JPA-managed entities are intentionally stored by reference.")
 public class EffectiveMonthlyTransactionService {
 
     private static final Comparator<EffectiveTransaction> EFFECTIVE_TRANSACTION_ORDER = Comparator.comparing(
@@ -202,9 +198,6 @@ public class EffectiveMonthlyTransactionService {
             this.projected = projected;
         }
 
-        @SuppressFBWarnings(
-                value = "EI_EXPOSE_REP",
-                justification = "The effective monthly view intentionally exposes the managed transaction entity.")
         public Transaction transaction() {
             return transaction;
         }
