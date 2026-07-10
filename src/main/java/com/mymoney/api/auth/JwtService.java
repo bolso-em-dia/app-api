@@ -42,6 +42,7 @@ public class JwtService {
                 .issuedAt(now)
                 .expiresAt(now.plus(accessTokenDuration))
                 .claim("role", member.getRole().name())
+                .claim("mustChangePwd", member.isMustChangePassword())
                 .build();
 
         return encoder.encode(JwtEncoderParameters.from(

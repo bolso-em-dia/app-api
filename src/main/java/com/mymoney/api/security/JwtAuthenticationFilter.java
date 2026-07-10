@@ -33,7 +33,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Jwt jwt = jwtService.decode(token);
                 var authentication = new UsernamePasswordAuthenticationToken(
                         jwt.getSubject(),
-                        null,
+                        jwt,
                         List.of(new SimpleGrantedAuthority("ROLE_" + jwt.getClaimAsString("role"))));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } catch (JwtException exception) {

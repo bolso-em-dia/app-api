@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -33,17 +34,28 @@ public class ForcedPasswordChangeFilter extends OncePerRequestFilter {
             return;
         }
 
-        boolean mustChangePassword = familyMemberRepository
-                .findByEmailIgnoreCase(authentication.getName())
-                .filter(member -> member.isActive() && member.isMustChangePassword())
-                .isPresent();
+        boolean needsPasswordChange = isFlaggedInJwt(authentication) && isFlaggedInDatabase(authentication);
 
-        if (mustChangePassword) {
+        if (needsPasswordChange) {
             accessDeniedHandler.handle(request, response, new AccessDeniedException("Password change is required."));
             return;
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isFlaggedInJwt(Authentication authentication) {
+        if (authentication.getCredentials() instanceof Jwt jwt) {
+            return Boolean.TRUE.equals(jwt.getClaim("mustChangePwd"));
+        }
+        return false;
+    }
+
+    private boolean isFlaggedInDatabase(Authentication authentication) {
+        return familyMemberRepository
+                .findByEmailIgnoreCase(authentication.getName())
+                .filter(member -> member.isActive() && member.isMustChangePassword())
+                .isPresent();
     }
 
     private boolean isAllowedPath(String path) {
