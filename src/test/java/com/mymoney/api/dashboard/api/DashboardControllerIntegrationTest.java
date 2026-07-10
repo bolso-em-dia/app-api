@@ -244,6 +244,20 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
                 .andExpect(jsonPath("$.recentTransactions[0].projected").value(true));
     }
 
+    @Test
+    void dashboardReturns401WithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/api/dashboard").param("referenceMonth", "2026-06-01"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void dashboardWithInvalidReferenceMonthReturns400() throws Exception {
+        mockMvc.perform(get("/api/dashboard")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "not-a-date"))
+                .andExpect(status().isBadRequest());
+    }
+
     private Transaction createTransaction(
             TransactionType type,
             OwnershipType ownershipType,

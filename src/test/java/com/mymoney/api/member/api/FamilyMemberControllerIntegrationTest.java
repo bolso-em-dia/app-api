@@ -176,4 +176,100 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
                                 """))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void listFamilyMembersRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/family-members")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void createFamilyMemberRequiresAuthentication() throws Exception {
+        mockMvc.perform(
+                        post("/api/family-members")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "Test", "email": "test@bolso-em-dia.local", "role": "USER", "password": "test123456"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getFamilyMemberReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(get("/api/family-members/00000000-0000-0000-0000-000000000000")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void updateFamilyMemberReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(
+                        put("/api/family-members/00000000-0000-0000-0000-000000000000")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "Updated", "email": "updated@bolso-em-dia.local", "role": "USER"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void archiveFamilyMemberReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(patch("/api/family-members/00000000-0000-0000-0000-000000000000/archive")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void restoreFamilyMemberReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(patch("/api/family-members/00000000-0000-0000-0000-000000000000/restore")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void archiveFamilyMemberRequiresAuthentication() throws Exception {
+        mockMvc.perform(patch("/api/family-members/" + regularUser.getId() + "/archive"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void createFamilyMemberWithEmptyNameReturns400() throws Exception {
+        mockMvc.perform(
+                        post("/api/family-members")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "", "email": "test@bolso-em-dia.local", "role": "USER", "password": "test123456"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createFamilyMemberWithInvalidEmailReturns400() throws Exception {
+        mockMvc.perform(
+                        post("/api/family-members")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "Test", "email": "not-an-email", "role": "USER", "password": "test123456"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createFamilyMemberWithShortPasswordReturns400() throws Exception {
+        mockMvc.perform(
+                        post("/api/family-members")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "Test", "email": "test@bolso-em-dia.local", "role": "USER", "password": "123"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
 }

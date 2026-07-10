@@ -733,4 +733,44 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                                         .formatted(account.getId(), category.getId())))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void getTransactionReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(get("/api/transactions/00000000-0000-0000-0000-000000000000")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getTransactionRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/transactions/00000000-0000-0000-0000-000000000000"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void putTransactionRequiresAuthentication() throws Exception {
+        mockMvc.perform(
+                        put("/api/transactions/00000000-0000-0000-0000-000000000000")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"type": "EXPENSE", "ownershipType": "SHARED", "description": "T", "amount": 50.0, "transactionDate": "2026-06-10", "accountId": "00000000-0000-0000-0000-000000000000", "categoryId": "00000000-0000-0000-0000-000000000000"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void deleteTransactionRequiresAuthentication() throws Exception {
+        mockMvc.perform(delete("/api/transactions/00000000-0000-0000-0000-000000000000")
+                        .param("scope", "SINGLE"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void deleteTransactionWithInvalidScopeReturns400() throws Exception {
+        mockMvc.perform(delete("/api/transactions/" + sharedTransaction.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("scope", "INVALID"))
+                .andExpect(status().isBadRequest());
+    }
 }

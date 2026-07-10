@@ -208,4 +208,99 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
         mockMvc.perform(get("/api/accounts").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void listAccountsRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/accounts")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void createAccountRequiresAuthentication() throws Exception {
+        mockMvc.perform(
+                        post("/api/accounts")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "Test", "type": "CHECKING"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void createAccountAsUserIsForbidden() throws Exception {
+        mockMvc.perform(
+                        post("/api/accounts")
+                                .header("Authorization", "Bearer " + userToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "Test", "type": "CHECKING"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getAccountReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(get("/api/accounts/00000000-0000-0000-0000-000000000000")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void updateAccountReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(
+                        put("/api/accounts/00000000-0000-0000-0000-000000000000")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "Updated", "type": "CHECKING"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void archiveAccountReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(patch("/api/accounts/00000000-0000-0000-0000-000000000000/archive")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void archiveAccountRequiresAuthentication() throws Exception {
+        mockMvc.perform(patch("/api/accounts/" + accountA.getId() + "/archive")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void archiveAccountAsUserIsForbidden() throws Exception {
+        mockMvc.perform(patch("/api/accounts/" + accountA.getId() + "/archive")
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createAccountWithEmptyNameReturns400() throws Exception {
+        mockMvc.perform(
+                        post("/api/accounts")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "", "type": "CHECKING"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createAccountWithNullTypeReturns400() throws Exception {
+        mockMvc.perform(
+                        post("/api/accounts")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "Test"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
 }
