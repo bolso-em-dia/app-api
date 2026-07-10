@@ -9,6 +9,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -38,6 +39,9 @@ public class RefreshToken {
 
     @Column(name = "revoked_at")
     private OffsetDateTime revokedAt;
+
+    @Version
+    private Long version;
 
     @Column(name = "created_at", nullable = false)
     @Setter(AccessLevel.NONE)

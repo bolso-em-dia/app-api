@@ -378,4 +378,43 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
                 .andExpect(jsonPath("$.transactions[0].sourceType").value("FIXED_EXPENSE"))
                 .andExpect(jsonPath("$.transactions[0].projected").value(true));
     }
+
+    @Test
+    void listBudgetsRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/budgets").param("referenceMonth", "2026-06-01"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void createBudgetRequiresAuthentication() throws Exception {
+        mockMvc.perform(
+                        post("/api/budgets")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "name": "Test Budget",
+                                  "type": "GLOBAL",
+                                  "monthlyLimit": 500.0,
+                                  "categoryIds": []
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getBudgetReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(get("/api/budgets/00000000-0000-0000-0000-000000000000")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void archiveBudgetReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(patch("/api/budgets/00000000-0000-0000-0000-000000000000/archive")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-07-01"))
+                .andExpect(status().isNotFound());
+    }
 }
