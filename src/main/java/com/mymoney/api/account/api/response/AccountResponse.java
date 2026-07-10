@@ -7,6 +7,7 @@ public record AccountResponse(
         String id,
         String name,
         String type,
+        String currency,
         String brand,
         String color,
         Short closingDay,

@@ -7,7 +7,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties({AppSecurityProperties.class, AdminSeedProperties.class})
+@EnableConfigurationProperties({AppSecurityProperties.class, AdminSeedProperties.class, AppExchangeRateProperties.class
+})
 public class AppConfig {
 
     @Bean

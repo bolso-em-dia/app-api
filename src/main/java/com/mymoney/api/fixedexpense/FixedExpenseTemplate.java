@@ -1,6 +1,7 @@
 package com.mymoney.api.fixedexpense;
 
 import com.mymoney.api.account.Account;
+import com.mymoney.api.account.CurrencyType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.transaction.TransactionType;
 import jakarta.persistence.Column;
@@ -44,6 +45,10 @@ public class FixedExpenseTemplate {
     @Column(nullable = false, length = 20)
     private TransactionType type;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 3)
+    private CurrencyType currency;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
@@ -80,6 +85,9 @@ public class FixedExpenseTemplate {
         var now = OffsetDateTime.now();
         if (id == null) {
             id = UUID.randomUUID();
+        }
+        if (currency == null) {
+            currency = CurrencyType.BRL;
         }
         createdAt = now;
         updatedAt = now;

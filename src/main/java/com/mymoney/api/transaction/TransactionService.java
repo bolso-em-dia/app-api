@@ -2,8 +2,11 @@ package com.mymoney.api.transaction;
 
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountService;
+import com.mymoney.api.account.CurrencyType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryService;
+import com.mymoney.api.exchangerate.ExchangeRate;
+import com.mymoney.api.exchangerate.ExchangeRateRepository;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.transaction.api.request.CreateTransactionRequest;
@@ -38,6 +41,7 @@ public class TransactionService {
     private final CategoryService categoryService;
     private final AccountService accountService;
     private final FamilyMemberRepository familyMemberRepository;
+    private final ExchangeRateRepository exchangeRateRepository;
     private final com.mymoney.api.transaction.mapper.TransactionMapper transactionMapper;
 
     @Transactional
@@ -138,6 +142,16 @@ public class TransactionService {
         UUID installmentGroupId = installmentCount > 1 ? UUID.randomUUID() : null;
         List<BigDecimal> installmentAmounts = calculateInstallmentAmounts(request.amount(), installmentCount);
 
+        BigDecimal rate = null;
+        boolean isForeignCurrency = account.getCurrency() == CurrencyType.USD;
+        if (isForeignCurrency) {
+            rate = exchangeRateRepository
+                    .findFirstByCurrencyOrderByFetchedAtDesc("USD")
+                    .map(ExchangeRate::getRate)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.UNPROCESSABLE_ENTITY, "Exchange rate not available."));
+        }
+
         List<TransactionResponse> created = new ArrayList<>();
         for (int i = 0; i < installmentCount; i++) {
             LocalDate transactionDate = request.transactionDate().plusMonths(i);
@@ -147,7 +161,14 @@ public class TransactionService {
             transaction.setSourceType(
                     installmentCount > 1 ? TransactionSourceType.INSTALLMENT : TransactionSourceType.MANUAL);
             transaction.setDescription(request.description().trim());
-            transaction.setAmount(installmentAmounts.get(i));
+            BigDecimal rawAmount = installmentAmounts.get(i);
+            if (isForeignCurrency) {
+                transaction.setOriginalAmount(rawAmount);
+                transaction.setCurrency("USD");
+                transaction.setAmount(rawAmount.multiply(rate));
+            } else {
+                transaction.setAmount(rawAmount);
+            }
             transaction.setTransactionDate(transactionDate);
             transaction.setReferenceMonth(referenceMonthFromDate(transactionDate));
             transaction.setAccount(account);
@@ -172,7 +193,20 @@ public class TransactionService {
         transaction.setType(request.type());
         transaction.setOwnershipType(request.ownershipType());
         transaction.setDescription(request.description().trim());
-        transaction.setAmount(request.amount());
+        if (account.getCurrency() == CurrencyType.USD) {
+            BigDecimal rate = exchangeRateRepository
+                    .findFirstByCurrencyOrderByFetchedAtDesc("USD")
+                    .map(ExchangeRate::getRate)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.UNPROCESSABLE_ENTITY, "Exchange rate not available."));
+            transaction.setOriginalAmount(request.amount());
+            transaction.setCurrency("USD");
+            transaction.setAmount(request.amount().multiply(rate));
+        } else {
+            transaction.setOriginalAmount(null);
+            transaction.setCurrency(null);
+            transaction.setAmount(request.amount());
+        }
         transaction.setTransactionDate(request.transactionDate());
         transaction.setReferenceMonth(referenceMonthFromDate(request.transactionDate()));
         transaction.setCategory(category);

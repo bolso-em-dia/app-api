@@ -13,6 +13,7 @@ public class AccountMapper {
                 account.getId().toString(),
                 account.getName(),
                 account.getType().name(),
+                account.getCurrency().name(),
                 account.getBrand(),
                 account.getColor(),
                 account.getClosingDay(),
