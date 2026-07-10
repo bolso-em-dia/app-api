@@ -2,7 +2,6 @@ package com.mymoney.api.preference;
 
 import com.mymoney.api.account.Account;
 import com.mymoney.api.member.FamilyMember;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -56,30 +55,18 @@ public class MemberPreferences {
     @Setter(AccessLevel.NONE)
     private OffsetDateTime updatedAt;
 
-    @SuppressFBWarnings(
-            value = "EI_EXPOSE_REP",
-            justification = "JPA entity association intentionally returns a managed entity reference.")
     public FamilyMember getMember() {
         return member;
     }
 
-    @SuppressFBWarnings(
-            value = "EI_EXPOSE_REP2",
-            justification = "JPA entity association intentionally stores a managed entity reference.")
     public void setMember(FamilyMember member) {
         this.member = member;
     }
 
-    @SuppressFBWarnings(
-            value = "EI_EXPOSE_REP",
-            justification = "JPA entity association intentionally returns a managed entity reference.")
     public Account getDefaultAccount() {
         return defaultAccount;
     }
 
-    @SuppressFBWarnings(
-            value = "EI_EXPOSE_REP2",
-            justification = "JPA entity association intentionally stores a managed entity reference.")
     public void setDefaultAccount(Account defaultAccount) {
         this.defaultAccount = defaultAccount;
     }

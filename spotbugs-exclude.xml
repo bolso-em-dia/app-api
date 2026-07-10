@@ -68,4 +68,20 @@
         <Class name="com.mymoney.api.security.ApiAccessDeniedHandler"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
+    <Match>
+        <Class name="com.mymoney.api.fixedexpense.api.FixedExpenseTemplateController"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.preference.MemberPreferences"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.transaction.EffectiveMonthlyTransactionService"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.transaction.EffectiveMonthlyTransactionService$EffectiveTransaction"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>
