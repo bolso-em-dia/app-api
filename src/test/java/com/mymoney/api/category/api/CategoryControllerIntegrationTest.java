@@ -219,6 +219,100 @@ class CategoryControllerIntegrationTest extends AuthenticatedIntegrationTestSupp
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void listCategoriesRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/categories")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void createCategoryRequiresAuthentication() throws Exception {
+        mockMvc.perform(
+                        post("/api/categories")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "Test", "icon": "x", "color": "y"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void createCategoryAsUserIsForbidden() throws Exception {
+        mockMvc.perform(
+                        post("/api/categories")
+                                .header("Authorization", "Bearer " + userToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "Test", "icon": "x", "color": "y"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getCategoryReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(get("/api/categories/00000000-0000-0000-0000-000000000000")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void updateCategoryReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(
+                        put("/api/categories/00000000-0000-0000-0000-000000000000")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "Updated", "icon": "x", "color": "y"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void archiveCategoryReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(patch("/api/categories/00000000-0000-0000-0000-000000000000/archive")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"replacementCategoryId\": \"" + categoryA.getId() + "\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void archiveCategoryRequiresAuthentication() throws Exception {
+        mockMvc.perform(patch("/api/categories/" + categoryA.getId() + "/archive")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"replacementCategoryId\": \"" + categoryB.getId() + "\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void updateCategoryAsUserIsForbidden() throws Exception {
+        mockMvc.perform(
+                        put("/api/categories/" + categoryA.getId())
+                                .header("Authorization", "Bearer " + userToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "Updated", "icon": "x", "color": "y"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createCategoryWithNameExceedingMaxLengthReturns400() throws Exception {
+        String longName = "a".repeat(121);
+        mockMvc.perform(post("/api/categories")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {"name": "%s", "icon": "x", "color": "y"}
+                                """
+                                        .formatted(longName)))
+                .andExpect(status().isBadRequest());
+    }
+
     private LocalDate currentReferenceMonth() {
         return YearMonth.now().atDay(1);
     }

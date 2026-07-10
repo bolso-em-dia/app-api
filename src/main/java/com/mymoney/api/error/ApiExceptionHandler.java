@@ -16,6 +16,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
@@ -108,6 +109,37 @@ public class ApiExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiErrorResponse.from(HttpStatus.FORBIDDEN, "Access Denied", request.getRequestURI()));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleTypeMismatch(
+            MethodArgumentTypeMismatchException exception, HttpServletRequest request) {
+        String message = "Invalid value for parameter '" + exception.getName() + "'.";
+        log.warn(
+                "Type mismatch on {} {} by user={} status={} message={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                currentUser(),
+                HttpStatus.BAD_REQUEST.value(),
+                message);
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiErrorResponse.from(HttpStatus.BAD_REQUEST, message, request.getRequestURI()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiErrorResponse> handleIllegalArgument(
+            IllegalArgumentException exception, HttpServletRequest request) {
+        log.warn(
+                "Invalid argument on {} {} by user={} status={} message={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                currentUser(),
+                HttpStatus.BAD_REQUEST.value(),
+                exception.getMessage());
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiErrorResponse.from(HttpStatus.BAD_REQUEST, exception.getMessage(), request.getRequestURI()));
     }
 
     @ExceptionHandler(Exception.class)

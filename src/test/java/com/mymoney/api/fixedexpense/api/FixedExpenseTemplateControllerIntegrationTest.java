@@ -293,4 +293,116 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
     void deleteWithoutAuthReturns401() throws Exception {
         mockMvc.perform(delete("/api/fixed-transactions/" + template.getId())).andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void listFixedTransactionsRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/fixed-transactions")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void listFixedTransactionsAsUserIsForbidden() throws Exception {
+        mockMvc.perform(get("/api/fixed-transactions").header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getFixedTransactionRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/fixed-transactions/" + template.getId())).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getFixedTransactionAsUserIsForbidden() throws Exception {
+        mockMvc.perform(get("/api/fixed-transactions/" + template.getId())
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createFixedTransactionRequiresAuthentication() throws Exception {
+        mockMvc.perform(post("/api/fixed-transactions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {"name": "Test", "type": "EXPENSE", "amount": 100.0, "categoryId": "%s", "accountId": "%s", "dueDay": 10}
+                                """
+                                        .formatted(category.getId(), account.getId())))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void createFixedTransactionAsUserIsForbidden() throws Exception {
+        mockMvc.perform(post("/api/fixed-transactions")
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {"name": "Test", "type": "EXPENSE", "amount": 100.0, "categoryId": "%s", "accountId": "%s", "dueDay": 10}
+                                """
+                                        .formatted(category.getId(), account.getId())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updateFixedTransactionRequiresAuthentication() throws Exception {
+        mockMvc.perform(put("/api/fixed-transactions/" + template.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {"name": "Updated", "type": "EXPENSE", "amount": 200.0, "categoryId": "%s", "accountId": "%s", "dueDay": 15}
+                                """
+                                        .formatted(category.getId(), account.getId())))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void updateFixedTransactionAsUserIsForbidden() throws Exception {
+        mockMvc.perform(put("/api/fixed-transactions/" + template.getId())
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {"name": "Updated", "type": "EXPENSE", "amount": 200.0, "categoryId": "%s", "accountId": "%s", "dueDay": 15}
+                                """
+                                        .formatted(category.getId(), account.getId())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updateFixedTransactionReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(put("/api/fixed-transactions/00000000-0000-0000-0000-000000000000")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {"name": "Updated", "type": "EXPENSE", "amount": 200.0, "categoryId": "%s", "accountId": "%s", "dueDay": 15}
+                                """
+                                        .formatted(category.getId(), account.getId())))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void createFixedTransactionWithEmptyNameReturns400() throws Exception {
+        mockMvc.perform(post("/api/fixed-transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {"name": "", "type": "EXPENSE", "amount": 100.0, "categoryId": "%s", "accountId": "%s", "dueDay": 10}
+                                """
+                                        .formatted(category.getId(), account.getId())))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createFixedTransactionWithZeroAmountReturns400() throws Exception {
+        mockMvc.perform(post("/api/fixed-transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {"name": "Test", "type": "EXPENSE", "amount": 0, "categoryId": "%s", "accountId": "%s", "dueDay": 10}
+                                """
+                                        .formatted(category.getId(), account.getId())))
+                .andExpect(status().isBadRequest());
+    }
 }

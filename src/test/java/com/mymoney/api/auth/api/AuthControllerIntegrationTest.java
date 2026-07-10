@@ -188,4 +188,76 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
                                 """))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void loginWithEmptyEmailReturns400() throws Exception {
+        mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"email": "", "password": "admin123456"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void loginWithInvalidEmailReturns400() throws Exception {
+        mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"email": "not-an-email", "password": "admin123456"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void loginWithNonExistentEmailReturns401() throws Exception {
+        mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"email": "nobody@example.com", "password": "admin123456"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void changePasswordRequiresAuthentication() throws Exception {
+        mockMvc.perform(
+                        post("/api/auth/change-password")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"currentPassword": "admin123456", "newPassword": "admin12345678", "confirmPassword": "admin12345678"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void changePasswordWithShortNewPasswordReturns400() throws Exception {
+        MvcResult loginResult = mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"email": "admin@bolso-em-dia.local", "password": "admin123456"}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        String token = JsonTestUtils.extractJsonValue(loginResult.getResponse().getContentAsString(), "accessToken");
+
+        mockMvc.perform(
+                        post("/api/auth/change-password")
+                                .header("Authorization", "Bearer " + token)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"currentPassword": "admin123456", "newPassword": "123", "confirmPassword": "123"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
 }
