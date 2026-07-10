@@ -258,6 +258,43 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void dashboardIncludesProjectedFlagInRecentTransactions() throws Exception {
+        LocalDate futureReferenceMonth = YearMonth.now().atDay(1).plusMonths(1);
+
+        Category groceries =
+                categoryRepository.findByNormalizedName("groceries").orElseThrow();
+        Account account =
+                accountRepository.findByNormalizedName("main checking").orElseThrow();
+
+        FixedExpenseTemplate projectedExpense = new FixedExpenseTemplate();
+        projectedExpense.setName("Projected Rent");
+        projectedExpense.setType(TransactionType.EXPENSE);
+        projectedExpense.setAmount(new BigDecimal("200.00"));
+        projectedExpense.setCategory(groceries);
+        projectedExpense.setAccount(account);
+        projectedExpense.setDueDay((short) 8);
+        projectedExpense.setCreatedInMonth(YearMonth.now().atDay(1).minusMonths(1));
+        projectedExpense.setActive(true);
+        fixedExpenseTemplateRepository.save(projectedExpense);
+
+        mockMvc.perform(get("/api/dashboard")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", futureReferenceMonth.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recentTransactions[0].projected").value(true));
+    }
+
+    @Test
+    void dashboardIncludesReservedBudgetAmountWhenBudgetsExist() throws Exception {
+        mockMvc.perform(get("/api/dashboard")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.reservedBudgetAmount").isNumber())
+                .andExpect(jsonPath("$.summary.totalExpense").isNumber());
+    }
+
     private Transaction createTransaction(
             TransactionType type,
             OwnershipType ownershipType,
