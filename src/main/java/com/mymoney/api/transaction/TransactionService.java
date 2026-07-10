@@ -74,7 +74,9 @@ public class TransactionService {
         } else {
             normalizedLimit = Math.max(1, Math.min(limit, MAX_DESCRIPTION_SUGGESTION_LIMIT));
         }
-        return transactionRepository.findDescriptionSuggestions(normalizedQuery, PageRequest.of(0, normalizedLimit));
+        LocalDate since = YearMonth.now().minusMonths(12).atDay(1);
+        return transactionRepository.findDescriptionSuggestions(
+                normalizedQuery, since, PageRequest.of(0, normalizedLimit));
     }
 
     @Transactional

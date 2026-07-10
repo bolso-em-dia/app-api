@@ -99,14 +99,15 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             """
             select t.description
             from Transaction t
-            where (:query = '' or lower(t.description) like concat('%', lower(:query), '%'))
+            where t.referenceMonth >= :since
+              and (:query = '' or lower(t.description) like concat('%', lower(:query), '%'))
             group by t.description
             order by
                 case when :query <> '' and lower(t.description) like concat(lower(:query), '%') then 0 else 1 end,
                 count(t) desc,
                 max(t.updatedAt) desc
             """)
-    List<String> findDescriptionSuggestions(String query, Pageable pageable);
+    List<String> findDescriptionSuggestions(String query, LocalDate since, Pageable pageable);
 
     @EntityGraph(attributePaths = {"account", "category", "member"})
     @Query(

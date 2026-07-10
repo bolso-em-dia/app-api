@@ -14,10 +14,13 @@ import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseCookie;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RefreshTokenService {
@@ -89,6 +92,16 @@ public class RefreshTokenService {
             return HexFormat.of().formatHex(digest.digest(rawToken.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable.", exception);
+        }
+    }
+
+    @Scheduled(cron = "0 0 3 * * *")
+    @Transactional
+    public void purgeExpiredTokens() {
+        OffsetDateTime cutoff = OffsetDateTime.now().minusDays(7);
+        int deleted = refreshTokenRepository.deleteByExpiresAtBefore(cutoff);
+        if (deleted > 0) {
+            log.info("Purged {} expired refresh tokens older than {}.", deleted, cutoff);
         }
     }
 }

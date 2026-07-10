@@ -121,20 +121,15 @@ public class BudgetService {
         List<Transaction> transactions = filterTransactions(getById(id), referenceMonth);
         return transactions.stream()
                 .collect(Collectors.groupingBy(
-                        transaction -> transaction.getCategory().getId(),
-                        Collectors.reducing(BigDecimal.ZERO, Transaction::getAmount, BigDecimal::add)))
+                        transaction -> transaction.getCategory().getId()))
                 .entrySet()
                 .stream()
                 .map(entry -> {
-                    Transaction firstMatch = transactions.stream()
-                            .filter(transaction ->
-                                    transaction.getCategory().getId().equals(entry.getKey()))
-                            .findFirst()
-                            .orElseThrow();
-                    return new BudgetCategoryBreakdownItem(
-                            firstMatch.getCategory().getId().toString(),
-                            firstMatch.getCategory().getName(),
-                            entry.getValue());
+                    List<Transaction> items = entry.getValue();
+                    BigDecimal total =
+                            items.stream().map(Transaction::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+                    String categoryName = items.get(0).getCategory().getName();
+                    return new BudgetCategoryBreakdownItem(entry.getKey().toString(), categoryName, total);
                 })
                 .sorted(Comparator.comparing(BudgetCategoryBreakdownItem::categoryName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
