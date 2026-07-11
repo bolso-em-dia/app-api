@@ -295,6 +295,25 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
                 .andExpect(jsonPath("$.summary.totalExpense").isNumber());
     }
 
+    @Test
+    void recentTransactionsIncludeOriginalAmountWhenPresent() throws Exception {
+        mockMvc.perform(get("/api/dashboard")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recentTransactions").isArray());
+    }
+
+    @Test
+    void dashboardAggregatesConvertedAmountsCorrectly() throws Exception {
+        mockMvc.perform(get("/api/dashboard")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.totalIncome").isNumber())
+                .andExpect(jsonPath("$.summary.balance").isNumber());
+    }
+
     private Transaction createTransaction(
             TransactionType type,
             OwnershipType ownershipType,

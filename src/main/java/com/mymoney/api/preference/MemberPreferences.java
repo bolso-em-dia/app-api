@@ -48,6 +48,9 @@ public class MemberPreferences {
     @Column(name = "show_balance_with_budgets", nullable = false)
     private boolean showBalanceWithBudgets;
 
+    @Column(name = "show_foreign_currency", nullable = false)
+    private boolean showForeignCurrency;
+
     @Column(name = "created_at", nullable = false)
     @Setter(AccessLevel.NONE)
     private OffsetDateTime createdAt;

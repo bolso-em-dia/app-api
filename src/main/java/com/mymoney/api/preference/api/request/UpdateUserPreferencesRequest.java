@@ -4,4 +4,4 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.UUID;
 
 public record UpdateUserPreferencesRequest(
-        UUID defaultAccountId, @NotBlank String locale, boolean showBalanceWithBudgets) {}
+        UUID defaultAccountId, @NotBlank String locale, boolean showBalanceWithBudgets, boolean showForeignCurrency) {}

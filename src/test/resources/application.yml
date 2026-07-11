@@ -17,3 +17,4 @@ app:
     password: admin123456
   exchange-rate:
     enabled: true
+  version: "1.0.17"

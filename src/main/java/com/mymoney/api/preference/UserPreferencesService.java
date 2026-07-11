@@ -24,6 +24,7 @@ public class UserPreferencesService {
 
     private static final String DEFAULT_LOCALE = "pt-BR";
     private static final boolean DEFAULT_SHOW_BALANCE_WITH_BUDGETS = false;
+    private static final boolean DEFAULT_SHOW_FOREIGN_CURRENCY = false;
     private static final Set<String> SUPPORTED_LOCALES = Set.of("pt-BR", "en-US");
 
     private final MemberPreferencesRepository memberPreferencesRepository;
@@ -58,13 +59,15 @@ public class UserPreferencesService {
 
         preferences.setLocale(request.locale().trim());
         preferences.setShowBalanceWithBudgets(request.showBalanceWithBudgets());
+        preferences.setShowForeignCurrency(request.showForeignCurrency());
         preferences.setDefaultAccount(resolveDefaultAccount(request.defaultAccountId()));
 
         return toResponse(memberPreferencesRepository.save(preferences));
     }
 
     private UserPreferencesResponse defaultResponse() {
-        return new UserPreferencesResponse(null, DEFAULT_LOCALE, DEFAULT_SHOW_BALANCE_WITH_BUDGETS);
+        return new UserPreferencesResponse(
+                null, DEFAULT_LOCALE, DEFAULT_SHOW_BALANCE_WITH_BUDGETS, DEFAULT_SHOW_FOREIGN_CURRENCY);
     }
 
     private UserPreferencesResponse toResponse(MemberPreferences preferences) {
@@ -73,7 +76,8 @@ public class UserPreferencesService {
                         ? preferences.getDefaultAccount().getId().toString()
                         : null,
                 preferences.getLocale(),
-                preferences.isShowBalanceWithBudgets());
+                preferences.isShowBalanceWithBudgets(),
+                preferences.isShowForeignCurrency());
     }
 
     private void validateLocale(String locale) {
