@@ -37,7 +37,7 @@ public class DashboardService {
 
         List<Transaction> recentTransactions = transactions.stream()
                 .sorted(Comparator.comparing(Transaction::getTransactionDate)
-                        .thenComparing(Transaction::getCreatedAt)
+                        .thenComparing(Transaction::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
                         .reversed())
                 .limit(10)
                 .toList();
