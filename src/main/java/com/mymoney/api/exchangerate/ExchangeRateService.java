@@ -15,6 +15,8 @@ import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -65,6 +67,20 @@ public class ExchangeRateService {
         } catch (Exception e) {
             log.warn("Failed to fetch exchange rate, keeping last saved value.", e);
         }
+    }
+
+    @Transactional
+    @EventListener(ApplicationReadyEvent.class)
+    public void onStartup() {
+        if (!properties.enabled()) {
+            return;
+        }
+        if (exchangeRateRepository
+                .findFirstByCurrencyOrderByFetchedAtDesc(CURRENCY)
+                .isPresent()) {
+            return;
+        }
+        fetchAndUpdateRates();
     }
 
     @Transactional

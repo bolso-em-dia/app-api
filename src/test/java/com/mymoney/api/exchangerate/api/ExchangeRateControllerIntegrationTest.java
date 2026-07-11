@@ -30,6 +30,7 @@ class ExchangeRateControllerIntegrationTest extends AuthenticatedIntegrationTest
     @BeforeEach
     void setUp() throws Exception {
         adminToken = loginAsAdmin();
+        exchangeRateRepository.deleteAll();
     }
 
     @Test

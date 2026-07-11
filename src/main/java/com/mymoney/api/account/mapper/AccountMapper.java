@@ -26,6 +26,10 @@ public class AccountMapper {
 
     public AccountOptionResponse toOptionResponse(Account account) {
         return new AccountOptionResponse(
-                account.getId().toString(), account.getName(), account.getType().name(), account.getColor());
+                account.getId().toString(),
+                account.getName(),
+                account.getType().name(),
+                account.getCurrency().name(),
+                account.getColor());
     }
 }
