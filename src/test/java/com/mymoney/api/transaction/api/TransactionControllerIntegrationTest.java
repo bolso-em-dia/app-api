@@ -13,8 +13,11 @@ import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
+import com.mymoney.api.account.CurrencyType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
+import com.mymoney.api.exchangerate.ExchangeRate;
+import com.mymoney.api.exchangerate.ExchangeRateRepository;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
@@ -27,6 +30,7 @@ import com.mymoney.api.transaction.TransactionSourceType;
 import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +67,9 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
 
     @Autowired
     private FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
+
+    @Autowired
+    private ExchangeRateRepository exchangeRateRepository;
 
     private String adminToken;
     private String userToken;
@@ -772,5 +779,88 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                         .header("Authorization", "Bearer " + adminToken)
                         .param("scope", "INVALID"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createTransactionWithUSDAccount_convertsAmount() throws Exception {
+        ExchangeRate rate = new ExchangeRate();
+        rate.setCurrency("USD");
+        rate.setRate(new BigDecimal("5.10"));
+        rate.setFetchedAt(OffsetDateTime.now());
+        exchangeRateRepository.save(rate);
+
+        Account usdAccount = new Account();
+        usdAccount.setName("US Account");
+        usdAccount.setType(AccountType.CHECKING);
+        usdAccount.setCurrency(CurrencyType.USD);
+        usdAccount.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        usdAccount = accountRepository.save(usdAccount);
+
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {"type":"EXPENSE","ownershipType":"SHARED","description":"USD expense",
+                                "amount":100,"transactionDate":"2026-06-10",
+                                "accountId":"%s","categoryId":"%s"}
+                                """
+                                        .formatted(usdAccount.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].amount").value(510.00))
+                .andExpect(jsonPath("$[0].originalAmount").value(100.00))
+                .andExpect(jsonPath("$[0].currency").value("USD"));
+    }
+
+    @Test
+    void createTransactionWithBRLAccount_noConversion() throws Exception {
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {"type":"EXPENSE","ownershipType":"SHARED","description":"BRL expense",
+                                "amount":150,"transactionDate":"2026-06-10",
+                                "accountId":"%s","categoryId":"%s"}
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].amount").value(150.00))
+                .andExpect(jsonPath("$[0].originalAmount").doesNotExist());
+    }
+
+    @Test
+    void getTransactionWithUSD_showsCurrencyFields() throws Exception {
+        ExchangeRate rate = new ExchangeRate();
+        rate.setCurrency("USD");
+        rate.setRate(new BigDecimal("5.10"));
+        rate.setFetchedAt(OffsetDateTime.now());
+        exchangeRateRepository.save(rate);
+
+        Account usdAccount = new Account();
+        usdAccount.setName("US Account");
+        usdAccount.setType(AccountType.CHECKING);
+        usdAccount.setCurrency(CurrencyType.USD);
+        usdAccount.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        usdAccount = accountRepository.save(usdAccount);
+
+        Transaction usdTx = new Transaction();
+        usdTx.setType(TransactionType.EXPENSE);
+        usdTx.setOwnershipType(OwnershipType.SHARED);
+        usdTx.setSourceType(TransactionSourceType.MANUAL);
+        usdTx.setDescription("USD Tx");
+        usdTx.setAmount(new BigDecimal("510.00"));
+        usdTx.setOriginalAmount(new BigDecimal("100.00"));
+        usdTx.setCurrency("USD");
+        usdTx.setTransactionDate(LocalDate.of(2026, 6, 10));
+        usdTx.setReferenceMonth(LocalDate.of(2026, 6, 1));
+        usdTx.setAccount(usdAccount);
+        usdTx.setCategory(category);
+        transactionRepository.save(usdTx);
+
+        mockMvc.perform(get("/api/transactions/" + usdTx.getId()).header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.originalAmount").value(100.00))
+                .andExpect(jsonPath("$.currency").value("USD"));
     }
 }

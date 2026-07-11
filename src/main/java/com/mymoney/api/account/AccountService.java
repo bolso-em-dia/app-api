@@ -39,6 +39,7 @@ public class AccountService {
                 account,
                 request.name(),
                 request.type(),
+                request.currency(),
                 request.brand(),
                 request.color(),
                 request.closingDay(),
@@ -54,6 +55,7 @@ public class AccountService {
                 account,
                 request.name(),
                 request.type(),
+                request.currency(),
                 request.brand(),
                 request.color(),
                 request.closingDay(),
@@ -82,6 +84,7 @@ public class AccountService {
             Account account,
             String name,
             AccountType type,
+            CurrencyType currency,
             String brand,
             String color,
             Integer closingDay,
@@ -89,6 +92,7 @@ public class AccountService {
         validateTypeFields(type, closingDay, dueDay);
         account.setName(name.trim());
         account.setType(type);
+        account.setCurrency(currency != null ? currency : CurrencyType.BRL);
         account.setColor(normalizeNullable(color));
 
         if (type == AccountType.CREDIT_CARD) {

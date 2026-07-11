@@ -15,3 +15,5 @@ app:
     name: Admin
     email: admin@bolso-em-dia.local
     password: admin123456
+  exchange-rate:
+    enabled: true

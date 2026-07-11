@@ -1,0 +1,78 @@
+package com.mymoney.api.exchangerate.api;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.mymoney.api.AuthenticatedIntegrationTestSupport;
+import com.mymoney.api.exchangerate.ExchangeRate;
+import com.mymoney.api.exchangerate.ExchangeRateRepository;
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@Transactional
+class ExchangeRateControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
+
+    @Autowired
+    private ExchangeRateRepository exchangeRateRepository;
+
+    private String adminToken;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        adminToken = loginAsAdmin();
+    }
+
+    @Test
+    void latestEndpoint_returns404WhenNoData() throws Exception {
+        mockMvc.perform(get("/api/exchange-rate/latest").header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void latestEndpoint_returnsRateWhenDataExists() throws Exception {
+        ExchangeRate rate = new ExchangeRate();
+        rate.setCurrency("USD");
+        rate.setRate(new BigDecimal("5.1064"));
+        rate.setFetchedAt(OffsetDateTime.now());
+        exchangeRateRepository.save(rate);
+
+        mockMvc.perform(get("/api/exchange-rate/latest").header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rate").value(5.1064))
+                .andExpect(jsonPath("$.stale").value(false))
+                .andExpect(jsonPath("$.fetchedAt").isNotEmpty());
+    }
+
+    @Test
+    void latestEndpoint_returnsStaleWhenOld() throws Exception {
+        ExchangeRate rate = new ExchangeRate();
+        rate.setCurrency("USD");
+        rate.setRate(new BigDecimal("5.10"));
+        rate.setFetchedAt(OffsetDateTime.now().minusHours(3));
+        exchangeRateRepository.save(rate);
+
+        mockMvc.perform(get("/api/exchange-rate/latest").header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stale").value(true));
+    }
+
+    @Test
+    void latestEndpoint_requiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/exchange-rate/latest")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void refreshEndpoint_requiresAuthentication() throws Exception {
+        mockMvc.perform(post("/api/exchange-rate/refresh")).andExpect(status().isUnauthorized());
+    }
+}
