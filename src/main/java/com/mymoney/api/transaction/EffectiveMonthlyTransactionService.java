@@ -1,7 +1,11 @@
 package com.mymoney.api.transaction;
 
+import com.mymoney.api.account.CurrencyType;
+import com.mymoney.api.exchangerate.ExchangeRate;
+import com.mymoney.api.exchangerate.ExchangeRateRepository;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -27,6 +31,7 @@ public class EffectiveMonthlyTransactionService {
 
     private final TransactionRepository transactionRepository;
     private final FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
+    private final ExchangeRateRepository exchangeRateRepository;
 
     @Transactional
     public List<EffectiveTransaction> listEffectiveTransactions(
@@ -154,7 +159,17 @@ public class EffectiveMonthlyTransactionService {
         transaction.setOwnershipType(OwnershipType.SHARED);
         transaction.setSourceType(TransactionSourceType.FIXED_EXPENSE);
         transaction.setDescription(template.getName());
-        transaction.setAmount(template.getAmount());
+        if (template.getCurrency() == CurrencyType.USD) {
+            BigDecimal rate = exchangeRateRepository
+                    .findFirstByCurrencyOrderByFetchedAtDesc("USD")
+                    .map(ExchangeRate::getRate)
+                    .orElse(BigDecimal.ONE);
+            transaction.setOriginalAmount(template.getAmount());
+            transaction.setCurrency("USD");
+            transaction.setAmount(template.getAmount().multiply(rate));
+        } else {
+            transaction.setAmount(template.getAmount());
+        }
         transaction.setTransactionDate(resolveTransactionDate(referenceMonth, template.getDueDay()));
         transaction.setReferenceMonth(referenceMonth);
         transaction.setAccount(template.getAccount());
