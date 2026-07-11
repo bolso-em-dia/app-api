@@ -92,4 +92,8 @@
         <Class name="com.mymoney.api.auth.RefreshTokenService"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
+    <Match>
+        <Class name="com.mymoney.api.exchangerate.ExchangeRateService"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>

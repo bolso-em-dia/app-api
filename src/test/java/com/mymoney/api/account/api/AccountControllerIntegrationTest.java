@@ -303,4 +303,53 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
                                 """))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void createAccountWithCurrencyUSD() throws Exception {
+        mockMvc.perform(
+                        post("/api/accounts")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "US Account", "type": "CHECKING", "currency": "USD"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.currency").value("USD"));
+    }
+
+    @Test
+    void createAccountDefaultsToBRL() throws Exception {
+        mockMvc.perform(
+                        post("/api/accounts")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "BR Account", "type": "CHECKING"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.currency").value("BRL"));
+    }
+
+    @Test
+    void updateAccountChangesCurrency() throws Exception {
+        mockMvc.perform(
+                        put("/api/accounts/" + accountA.getId())
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {"name": "Updated", "type": "CHECKING", "currency": "USD"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currency").value("USD"));
+    }
+
+    @Test
+    void listAccountsShowsCurrencyField() throws Exception {
+        mockMvc.perform(get("/api/accounts").header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].currency").value("BRL"));
+    }
 }
