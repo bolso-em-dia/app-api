@@ -16,7 +16,7 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
             """
             select c
             from Category c
-            where lower(trim(c.name)) = lower(trim(:name))
+            where f_unaccent_lower(trim(c.name)) = f_unaccent_lower(trim(:name))
             """)
     Optional<Category> findByNormalizedName(String name);
 
@@ -35,7 +35,7 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
             )
             from Category c
             left join c.replacementCategory rc
-            where (:search = '' or lower(c.name) like concat('%', lower(:search), '%'))
+            where (:search = '' or f_unaccent_lower(c.name) like concat('%', f_unaccent_lower(:search), '%'))
               and (
                 :status = 'ALL'
                 or (:status = 'ACTIVE' and c.archivedFromMonth is null)
@@ -69,7 +69,7 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
             from Category c
             where c.createdInMonth <= :referenceMonth
               and (c.archivedFromMonth is null or c.archivedFromMonth > :referenceMonth)
-            order by lower(c.name)
+            order by f_unaccent_lower(c.name)
             """)
     List<Category> findAvailableForMonth(LocalDate referenceMonth);
 }

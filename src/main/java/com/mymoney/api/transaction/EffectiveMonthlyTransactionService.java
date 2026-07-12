@@ -1,12 +1,10 @@
 package com.mymoney.api.transaction;
 
-import com.mymoney.api.account.CurrencyType;
-import com.mymoney.api.exchangerate.ExchangeRate;
-import com.mymoney.api.exchangerate.ExchangeRateRepository;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
-import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
+import com.mymoney.api.shared.DateProvider;
+import com.mymoney.api.shared.DayValidator;
+import com.mymoney.api.shared.InputNormalizer;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -28,10 +26,12 @@ public class EffectiveMonthlyTransactionService {
                     (EffectiveTransaction item) -> item.transaction().getTransactionDate())
             .thenComparing(item -> item.transaction().getCreatedAt(), Comparator.nullsLast(Comparator.naturalOrder()))
             .thenComparing(item -> item.transaction().getId());
+    private static final int FUTURE_MATERIALIZATION_MONTHS = 3;
 
     private final TransactionRepository transactionRepository;
     private final FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
-    private final ExchangeRateRepository exchangeRateRepository;
+    private final CurrencyConversionService currencyConversionService;
+    private final DateProvider dateProvider;
 
     @Transactional
     public List<EffectiveTransaction> listEffectiveTransactions(
@@ -40,39 +40,21 @@ public class EffectiveMonthlyTransactionService {
             OwnershipType ownershipType,
             UUID accountId,
             List<UUID> categoryIds,
-            UUID memberId) {
-        if (!referenceMonth.isAfter(currentReferenceMonth())) {
-            ensureMaterializedForMonth(referenceMonth);
-        }
+            UUID memberId,
+            String search) {
+        String normalizedSearch = InputNormalizer.normalizeNullable(search);
+        List<Transaction> persistedTransactions = transactionRepository.findByFilters(
+                referenceMonth, type, ownershipType, accountId, categoryIds, memberId, normalizedSearch);
 
-        List<Transaction> persistedTransactions =
-                transactionRepository.findByReferenceMonthOrderByTransactionDateAscCreatedAtAsc(referenceMonth);
-        Set<UUID> materializedTemplateIds = materializedTemplateIds(persistedTransactions);
-
-        List<EffectiveTransaction> effectiveTransactions = new ArrayList<>(persistedTransactions.size());
-        for (Transaction transaction : persistedTransactions) {
-            effectiveTransactions.add(new EffectiveTransaction(transaction, false));
-        }
-
-        if (referenceMonth.isAfter(currentReferenceMonth())) {
-            for (FixedExpenseTemplate template : fixedExpenseTemplateRepository.findActiveForMonth(referenceMonth)) {
-                if (materializedTemplateIds.contains(template.getId())) {
-                    continue;
-                }
-                effectiveTransactions.add(new EffectiveTransaction(projectTransaction(template, referenceMonth), true));
-            }
-        }
-
-        return effectiveTransactions.stream()
-                .filter(item ->
-                        matchesFilters(item.transaction(), type, ownershipType, accountId, categoryIds, memberId))
+        return persistedTransactions.stream()
+                .map(t -> new EffectiveTransaction(t, false))
                 .sorted(EFFECTIVE_TRANSACTION_ORDER)
                 .toList();
     }
 
     @Transactional
     public void ensureMaterializedForMonth(LocalDate referenceMonth) {
-        if (referenceMonth.isAfter(currentReferenceMonth())) {
+        if (referenceMonth.isAfter(dateProvider.currentReferenceMonth())) {
             return;
         }
 
@@ -89,18 +71,60 @@ public class EffectiveMonthlyTransactionService {
     }
 
     @Transactional
-    public void syncCurrentMonthTransaction(FixedExpenseTemplate template) {
-        LocalDate referenceMonth = currentReferenceMonth();
-        if (!isTemplateActiveForMonth(template, referenceMonth)) {
+    public void materializeMonth(LocalDate referenceMonth) {
+        List<FixedExpenseTemplate> templatesToMaterialize =
+                fixedExpenseTemplateRepository.findActiveNotMaterializedForMonth(referenceMonth);
+
+        if (templatesToMaterialize.isEmpty()) {
             return;
         }
 
-        Transaction transaction = transactionRepository
-                .findByFixedExpenseTemplateIdAndReferenceMonth(template.getId(), referenceMonth)
-                .orElseGet(() -> materializeTransaction(template, referenceMonth));
+        List<Transaction> transactions = new ArrayList<>(templatesToMaterialize.size());
+        for (FixedExpenseTemplate template : templatesToMaterialize) {
+            transactions.add(materializeTransaction(template, referenceMonth));
+        }
 
-        applyTemplateValues(transaction, template, referenceMonth);
+        transactionRepository.saveAll(transactions);
+    }
+
+    @Transactional
+    public void syncCurrentMonthTransaction(FixedExpenseTemplate template) {
+        LocalDate horizon = horizonMonth();
+        for (LocalDate month = dateProvider.currentReferenceMonth();
+                !month.isAfter(horizon);
+                month = month.plusMonths(1)) {
+            syncMonth(template, month);
+        }
+
+        deleteBeyondHorizon(template, horizon);
+    }
+
+    private void syncMonth(FixedExpenseTemplate template, LocalDate month) {
+        if (isTemplateActiveForMonth(template, month)) {
+            upsertTemplateTransaction(template, month);
+            return;
+        }
+
+        transactionRepository
+                .findByFixedExpenseTemplateIdAndReferenceMonth(template.getId(), month)
+                .ifPresent(transactionRepository::delete);
+    }
+
+    private void upsertTemplateTransaction(FixedExpenseTemplate template, LocalDate month) {
+        Transaction transaction = transactionRepository
+                .findByFixedExpenseTemplateIdAndReferenceMonth(template.getId(), month)
+                .orElseGet(() -> materializeTransaction(template, month));
+        applyTemplateValues(transaction, template, month);
         transactionRepository.save(transaction);
+    }
+
+    private void deleteBeyondHorizon(FixedExpenseTemplate template, LocalDate horizon) {
+        List<Transaction> futureTransactions =
+                transactionRepository.findByFixedExpenseTemplateIdAndReferenceMonthGreaterThan(
+                        template.getId(), horizon);
+        for (Transaction transaction : futureTransactions) {
+            transactionRepository.delete(transaction);
+        }
     }
 
     private Set<UUID> materializedTemplateIds(List<Transaction> transactions) {
@@ -111,41 +135,6 @@ public class EffectiveMonthlyTransactionService {
             }
         }
         return templateIds;
-    }
-
-    private boolean matchesFilters(
-            Transaction transaction,
-            TransactionType type,
-            OwnershipType ownershipType,
-            UUID accountId,
-            List<UUID> categoryIds,
-            UUID memberId) {
-        if (type != null && transaction.getType() != type) {
-            return false;
-        }
-        if (ownershipType != null && transaction.getOwnershipType() != ownershipType) {
-            return false;
-        }
-        if (accountId != null && !transaction.getAccount().getId().equals(accountId)) {
-            return false;
-        }
-        if (categoryIds != null
-                && !categoryIds.isEmpty()
-                && !categoryIds.contains(transaction.getCategory().getId())) {
-            return false;
-        }
-        if (memberId != null) {
-            return transaction.getMember() != null
-                    && transaction.getMember().getId().equals(memberId);
-        }
-        return true;
-    }
-
-    private Transaction projectTransaction(FixedExpenseTemplate template, LocalDate referenceMonth) {
-        Transaction transaction = new Transaction();
-        transaction.setId(projectedTransactionId(template.getId(), referenceMonth));
-        applyTemplateValues(transaction, template, referenceMonth);
-        return transaction;
     }
 
     private Transaction materializeTransaction(FixedExpenseTemplate template, LocalDate referenceMonth) {
@@ -159,17 +148,12 @@ public class EffectiveMonthlyTransactionService {
         transaction.setOwnershipType(OwnershipType.SHARED);
         transaction.setSourceType(TransactionSourceType.FIXED_EXPENSE);
         transaction.setDescription(template.getName());
-        if (template.getCurrency() == CurrencyType.USD) {
-            BigDecimal rate = exchangeRateRepository
-                    .findFirstByCurrencyOrderByFetchedAtDesc("USD")
-                    .map(ExchangeRate::getRate)
-                    .orElse(BigDecimal.ONE);
-            transaction.setOriginalAmount(template.getAmount());
-            transaction.setCurrency("USD");
-            transaction.setAmount(template.getAmount().multiply(rate));
-        } else {
-            transaction.setAmount(template.getAmount());
-        }
+        transaction.setAmount(template.getAmount());
+        CurrencyConversionService.ConvertedAmount converted =
+                currencyConversionService.convert(template.getAmount(), template.getCurrency(), false);
+        transaction.setCurrency(converted.currency());
+        transaction.setConvertedAmount(converted.convertedAmount());
+        transaction.setExchangeRate(converted.exchangeRate());
         transaction.setTransactionDate(resolveTransactionDate(referenceMonth, template.getDueDay()));
         transaction.setReferenceMonth(referenceMonth);
         transaction.setAccount(template.getAccount());
@@ -190,17 +174,14 @@ public class EffectiveMonthlyTransactionService {
     }
 
     private LocalDate resolveTransactionDate(LocalDate referenceMonth, Short dueDay) {
+        DayValidator.requireDueDay(dueDay);
         YearMonth yearMonth = YearMonth.from(referenceMonth);
         int day = Math.min(dueDay.intValue(), yearMonth.lengthOfMonth());
         return yearMonth.atDay(day);
     }
 
-    private UUID projectedTransactionId(UUID templateId, LocalDate referenceMonth) {
-        return UUID.nameUUIDFromBytes((templateId + ":" + referenceMonth).getBytes(StandardCharsets.UTF_8));
-    }
-
-    private LocalDate currentReferenceMonth() {
-        return YearMonth.now().atDay(1);
+    private LocalDate horizonMonth() {
+        return dateProvider.currentReferenceMonth().plusMonths(FUTURE_MATERIALIZATION_MONTHS);
     }
 
     public static final class EffectiveTransaction {

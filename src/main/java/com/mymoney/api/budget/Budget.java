@@ -32,7 +32,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class BudgetModel {
+public class Budget {
 
     @Id
     private UUID id;

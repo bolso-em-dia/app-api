@@ -20,6 +20,9 @@ public interface FixedExpenseTemplateRepository extends JpaRepository<FixedExpen
                 t.name,
                 t.type,
                 t.amount,
+                t.convertedAmount,
+                t.exchangeRate,
+                cast(t.currency as string),
                 c.id,
                 c.name,
                 a.id,
@@ -34,7 +37,7 @@ public interface FixedExpenseTemplateRepository extends JpaRepository<FixedExpen
             from FixedExpenseTemplate t
             join t.category c
             join t.account a
-            where (:search = '' or lower(t.name) like concat('%', lower(:search), '%'))
+            where (:search = '' or f_unaccent_lower(t.name) like concat('%', f_unaccent_lower(:search), '%'))
               and (
                 :status = 'ALL'
                 or (:status = 'ACTIVE' and t.archivedFromMonth is null)
@@ -50,6 +53,9 @@ public interface FixedExpenseTemplateRepository extends JpaRepository<FixedExpen
                 t.name,
                 t.type,
                 t.amount,
+                t.convertedAmount,
+                t.exchangeRate,
+                cast(t.currency as string),
                 c.id,
                 c.name,
                 a.id,
@@ -77,4 +83,19 @@ public interface FixedExpenseTemplateRepository extends JpaRepository<FixedExpen
               and (t.archivedFromMonth is null or t.archivedFromMonth > :referenceMonth)
             """)
     List<FixedExpenseTemplate> findActiveForMonth(LocalDate referenceMonth);
+
+    @EntityGraph(attributePaths = {"category", "account"})
+    @Query(
+            """
+            select t
+            from FixedExpenseTemplate t
+            where t.createdInMonth <= :referenceMonth
+              and (t.archivedFromMonth is null or t.archivedFromMonth > :referenceMonth)
+              and not exists (
+                  select 1 from Transaction tr
+                  where tr.fixedExpenseTemplate.id = t.id
+                    and tr.referenceMonth = :referenceMonth
+              )
+            """)
+    List<FixedExpenseTemplate> findActiveNotMaterializedForMonth(LocalDate referenceMonth);
 }

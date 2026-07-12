@@ -11,15 +11,15 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
-public interface BudgetModelRepository extends JpaRepository<BudgetModel, UUID> {
+public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 
     @Query(
             value =
                     """
                     select e.id
-                    from BudgetModel e
+                    from Budget e
                     where e.createdInMonth <= :referenceMonth
-                      and (:search = '' or lower(e.name) like concat('%', lower(:search), '%'))
+                      and (:search = '' or f_unaccent_lower(e.name) like concat('%', f_unaccent_lower(:search), '%'))
                       and (
                         :status = 'ALL'
                         or (:status = 'ACTIVE'
@@ -33,9 +33,9 @@ public interface BudgetModelRepository extends JpaRepository<BudgetModel, UUID> 
             countQuery =
                     """
                     select count(e)
-                    from BudgetModel e
+                    from Budget e
                     where e.createdInMonth <= :referenceMonth
-                      and (:search = '' or lower(e.name) like concat('%', lower(:search), '%'))
+                      and (:search = '' or f_unaccent_lower(e.name) like concat('%', f_unaccent_lower(:search), '%'))
                       and (
                         :status = 'ALL'
                         or (:status = 'ACTIVE'
@@ -50,23 +50,22 @@ public interface BudgetModelRepository extends JpaRepository<BudgetModel, UUID> 
             LocalDate referenceMonth, String search, String status, BudgetType type, Pageable pageable);
 
     @EntityGraph(attributePaths = {"categories", "ownerMember"})
-    @Query(
-            """
+    @Query("""
             select distinct e
-            from BudgetModel e
+            from Budget e
             where e.id in :ids
             """)
-    List<BudgetModel> findAllWithAssociationsByIdIn(Collection<UUID> ids);
+    List<Budget> findAllWithAssociationsByIdIn(Collection<UUID> ids);
 
     @Query(
             """
             select distinct e
-            from BudgetModel e
+            from Budget e
             left join fetch e.categories
             left join fetch e.ownerMember
             where e.id = :id
             """)
-    Optional<BudgetModel> findWithAssociationsById(UUID id);
+    Optional<Budget> findWithAssociationsById(UUID id);
 
     boolean existsByOwnerMemberIdAndType(UUID ownerMemberId, BudgetType type);
 }

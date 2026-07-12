@@ -372,7 +372,7 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
     @Test
     void futureMonthListIncludesProjectedFixedTransaction() throws Exception {
         LocalDate currentReferenceMonth = YearMonth.now().atDay(1);
-        LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(1);
+        LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(4);
 
         FixedExpenseTemplate template = new FixedExpenseTemplate();
         template.setName("Projected Rent");
@@ -385,6 +385,12 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
         template.setActive(true);
         template = fixedExpenseTemplateRepository.save(template);
 
+        // Materialize transactions for the future month
+        mockMvc.perform(post("/api/transactions/materialize")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", futureReferenceMonth.toString()))
+                .andExpect(status().isNoContent());
+
         mockMvc.perform(get("/api/transactions")
                         .header("Authorization", "Bearer " + adminToken)
                         .param("referenceMonth", futureReferenceMonth.toString()))
@@ -393,7 +399,7 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                 .andExpect(jsonPath("$.items[0].sourceType").value("FIXED_EXPENSE"))
                 .andExpect(jsonPath("$.items[0].fixedExpenseTemplateId")
                         .value(template.getId().toString()))
-                .andExpect(jsonPath("$.items[0].projected").value(true))
+                .andExpect(jsonPath("$.items[0].projected").value(false))
                 .andExpect(jsonPath("$.items[0].transactionDate")
                         .value(futureReferenceMonth.withDayOfMonth(12).toString()));
     }
@@ -423,6 +429,16 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
     }
 
     @Test
+    void descriptionSuggestionsRejectNegativeLimit() throws Exception {
+        mockMvc.perform(get("/api/transactions/descriptions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("query", "Suggestion")
+                        .param("limit", "-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Limit must be positive."));
+    }
+
+    @Test
     void installmentAmountDistributionPreservesTotalForUnevenDivision() throws Exception {
         mockMvc.perform(post("/api/transactions")
                         .header("Authorization", "Bearer " + adminToken)
@@ -446,6 +462,29 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                 .andExpect(jsonPath("$[0].amount").value(333.34))
                 .andExpect(jsonPath("$[1].amount").value(333.33))
                 .andExpect(jsonPath("$[2].amount").value(333.33));
+    }
+
+    @Test
+    void createTransactionRejectsInstallmentPlanBeyondTwoYears() throws Exception {
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Long plan",
+                                  "amount": 100.00,
+                                  "transactionDate": "%s",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "installmentCount": 26
+                                }
+                                """
+                                        .formatted(YearMonth.now().atDay(10), account.getId(), category.getId())))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("Installment plan cannot exceed 2 years."));
     }
 
     @Test
@@ -807,8 +846,9 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                                 """
                                         .formatted(usdAccount.getId(), category.getId())))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$[0].amount").value(510.00))
-                .andExpect(jsonPath("$[0].originalAmount").value(100.00))
+                .andExpect(jsonPath("$[0].amount").value(100.00))
+                .andExpect(jsonPath("$[0].convertedAmount").value(510.00))
+                .andExpect(jsonPath("$[0].exchangeRate").value(5.10))
                 .andExpect(jsonPath("$[0].currency").value("USD"));
     }
 
@@ -826,7 +866,9 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                                         .formatted(account.getId(), category.getId())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$[0].amount").value(150.00))
-                .andExpect(jsonPath("$[0].originalAmount").doesNotExist());
+                .andExpect(jsonPath("$[0].convertedAmount").value(150.00))
+                .andExpect(jsonPath("$[0].exchangeRate").doesNotExist())
+                .andExpect(jsonPath("$[0].currency").value("BRL"));
     }
 
     @Test
@@ -849,8 +891,9 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
         usdTx.setOwnershipType(OwnershipType.SHARED);
         usdTx.setSourceType(TransactionSourceType.MANUAL);
         usdTx.setDescription("USD Tx");
-        usdTx.setAmount(new BigDecimal("510.00"));
-        usdTx.setOriginalAmount(new BigDecimal("100.00"));
+        usdTx.setAmount(new BigDecimal("100.00"));
+        usdTx.setConvertedAmount(new BigDecimal("510.00"));
+        usdTx.setExchangeRate(new BigDecimal("5.10"));
         usdTx.setCurrency("USD");
         usdTx.setTransactionDate(LocalDate.of(2026, 6, 10));
         usdTx.setReferenceMonth(LocalDate.of(2026, 6, 1));
@@ -860,7 +903,44 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
 
         mockMvc.perform(get("/api/transactions/" + usdTx.getId()).header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.originalAmount").value(100.00))
+                .andExpect(jsonPath("$.amount").value(100.00))
+                .andExpect(jsonPath("$.convertedAmount").value(510.00))
+                .andExpect(jsonPath("$.exchangeRate").value(5.10))
                 .andExpect(jsonPath("$.currency").value("USD"));
+    }
+
+    @Test
+    void searchByDescriptionFiltersCorrectly() throws Exception {
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01")
+                        .param("search", "Market"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].description").value("Market"))
+                .andExpect(jsonPath("$.totalItems").value(1));
+    }
+
+    @Test
+    void searchByDescriptionCaseInsensitive() throws Exception {
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01")
+                        .param("search", "market"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].description").value("Market"))
+                .andExpect(jsonPath("$.totalItems").value(1));
+    }
+
+    @Test
+    void searchByDescriptionNoMatchReturnsEmpty() throws Exception {
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01")
+                        .param("search", "nonexistent"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.totalItems").value(0));
     }
 }

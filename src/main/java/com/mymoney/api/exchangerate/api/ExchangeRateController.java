@@ -1,7 +1,7 @@
 package com.mymoney.api.exchangerate.api;
 
-import com.mymoney.api.exchangerate.ExchangeRateResponse;
 import com.mymoney.api.exchangerate.ExchangeRateService;
+import com.mymoney.api.exchangerate.api.response.ExchangeRateResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;

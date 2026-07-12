@@ -1,7 +1,7 @@
 package com.mymoney.api.budget.mapper;
 
+import com.mymoney.api.budget.Budget;
 import com.mymoney.api.budget.BudgetCategoryBreakdownItem;
-import com.mymoney.api.budget.BudgetModel;
 import com.mymoney.api.budget.BudgetView;
 import com.mymoney.api.budget.api.response.BudgetCategoryBreakdownResponse;
 import com.mymoney.api.budget.api.response.BudgetCategoryResponse;
@@ -21,7 +21,7 @@ public class BudgetMapper {
     }
 
     public BudgetResponse toResponse(BudgetView view, List<TransactionResponse> transactions) {
-        BudgetModel budget = view.budgetModel();
+        Budget budget = view.budget();
         return new BudgetResponse(
                 budget.getId().toString(),
                 budget.getName(),

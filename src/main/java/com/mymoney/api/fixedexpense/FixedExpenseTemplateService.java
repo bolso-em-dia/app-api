@@ -7,11 +7,17 @@ import com.mymoney.api.category.CategoryService;
 import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.UpdateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.response.FixedExpenseTemplateResponse;
+import com.mymoney.api.shared.DateProvider;
+import com.mymoney.api.shared.DayValidator;
+import com.mymoney.api.shared.EntityResolver;
+import com.mymoney.api.shared.ErrorMessage;
+import com.mymoney.api.shared.InputNormalizer;
+import com.mymoney.api.transaction.CurrencyConversionService;
 import com.mymoney.api.transaction.EffectiveMonthlyTransactionService;
 import com.mymoney.api.transaction.TransactionRepository;
 import com.mymoney.api.transaction.TransactionType;
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,6 +36,8 @@ public class FixedExpenseTemplateService {
     private final AccountService accountService;
     private final EffectiveMonthlyTransactionService effectiveMonthlyTransactionService;
     private final TransactionRepository transactionRepository;
+    private final CurrencyConversionService currencyConversionService;
+    private final DateProvider dateProvider;
 
     @Transactional(readOnly = true)
     public Page<FixedExpenseTemplateResponse> listAllResponses(
@@ -41,16 +49,15 @@ public class FixedExpenseTemplateService {
     public FixedExpenseTemplateResponse getResponseById(UUID id) {
         return fixedExpenseTemplateRepository
                 .findResponseById(id)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Fixed expense template was not found."));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, ErrorMessage.FIXED_EXPENSE_TEMPLATE_NOT_FOUND.message()));
     }
 
     @Transactional(readOnly = true)
     public FixedExpenseTemplate getById(UUID id) {
-        return fixedExpenseTemplateRepository
-                .findById(id)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Fixed expense template was not found."));
+        return EntityResolver.resolveOrThrow(
+                () -> fixedExpenseTemplateRepository.findById(id),
+                ErrorMessage.FIXED_EXPENSE_TEMPLATE_NOT_FOUND.message());
     }
 
     @Transactional
@@ -64,7 +71,7 @@ public class FixedExpenseTemplateService {
                 request.categoryId(),
                 request.accountId(),
                 request.dueDay());
-        template.setCreatedInMonth(currentReferenceMonth());
+        template.setCreatedInMonth(dateProvider.currentReferenceMonth());
         template.setActive(true);
         FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
         effectiveMonthlyTransactionService.syncCurrentMonthTransaction(saved);
@@ -90,7 +97,7 @@ public class FixedExpenseTemplateService {
     @Transactional
     public void delete(UUID id) {
         FixedExpenseTemplate template = getById(id);
-        LocalDate currentMonth = currentReferenceMonth();
+        LocalDate currentMonth = dateProvider.currentReferenceMonth();
         transactionRepository.detachFixedExpenseTemplateBeforeMonth(template, currentMonth);
         transactionRepository.deleteByFixedExpenseTemplateIdAndReferenceMonthGreaterThanEqual(
                 template.getId(), currentMonth);
@@ -101,36 +108,28 @@ public class FixedExpenseTemplateService {
             FixedExpenseTemplate template,
             String name,
             TransactionType type,
-            java.math.BigDecimal amount,
+            BigDecimal amount,
             UUID categoryId,
             UUID accountId,
             Integer dueDay) {
-        validateDueDay(dueDay);
+        DayValidator.validateDayRange(dueDay, "Due day");
         Category category = categoryService.getById(categoryId);
         Account account = accountService.getById(accountId);
+        CurrencyConversionService.ConvertedAmount converted =
+                currencyConversionService.convert(amount, account.getCurrency(), false);
 
-        template.setName(name.trim());
+        template.setName(InputNormalizer.requireNonBlank(name, "Name"));
         template.setType(type);
         template.setAmount(amount);
         template.setCategory(category);
         template.setAccount(account);
         template.setDueDay(dueDay.shortValue());
-    }
-
-    private void validateDueDay(Integer dueDay) {
-        if (dueDay == null || dueDay < 1 || dueDay > 31) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Due day must be between 1 and 31.");
-        }
-    }
-
-    private LocalDate currentReferenceMonth() {
-        return YearMonth.now().atDay(1);
+        template.setCurrency(account.getCurrency());
+        template.setConvertedAmount(converted.convertedAmount());
+        template.setExchangeRate(converted.exchangeRate());
     }
 
     private String normalizeSearch(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.trim();
+        return InputNormalizer.normalizeSearch(value);
     }
 }

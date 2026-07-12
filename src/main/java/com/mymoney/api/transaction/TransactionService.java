@@ -2,13 +2,14 @@ package com.mymoney.api.transaction;
 
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountService;
-import com.mymoney.api.account.CurrencyType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryService;
-import com.mymoney.api.exchangerate.ExchangeRate;
-import com.mymoney.api.exchangerate.ExchangeRateRepository;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
+import com.mymoney.api.shared.DateProvider;
+import com.mymoney.api.shared.EntityResolver;
+import com.mymoney.api.shared.ErrorMessage;
+import com.mymoney.api.shared.InputNormalizer;
 import com.mymoney.api.transaction.api.request.CreateTransactionRequest;
 import com.mymoney.api.transaction.api.request.UpdateTransactionRequest;
 import com.mymoney.api.transaction.api.response.TransactionResponse;
@@ -35,13 +36,15 @@ public class TransactionService {
 
     private static final int DEFAULT_DESCRIPTION_SUGGESTION_LIMIT = 8;
     private static final int MAX_DESCRIPTION_SUGGESTION_LIMIT = 12;
+    private static final int MAX_INSTALLMENT_YEARS = 2;
 
     private final TransactionRepository transactionRepository;
     private final EffectiveMonthlyTransactionService effectiveMonthlyTransactionService;
     private final CategoryService categoryService;
     private final AccountService accountService;
     private final FamilyMemberRepository familyMemberRepository;
-    private final ExchangeRateRepository exchangeRateRepository;
+    private final CurrencyConversionService currencyConversionService;
+    private final DateProvider dateProvider;
     private final com.mymoney.api.transaction.mapper.TransactionMapper transactionMapper;
 
     @Transactional
@@ -52,10 +55,11 @@ public class TransactionService {
             UUID accountId,
             List<UUID> categoryIds,
             UUID memberId,
+            String search,
             Pageable pageable) {
         List<EffectiveMonthlyTransactionService.EffectiveTransaction> effectiveTransactions =
                 effectiveMonthlyTransactionService.listEffectiveTransactions(
-                        referenceMonth, type, ownershipType, accountId, categoryIds, memberId);
+                        referenceMonth, type, ownershipType, accountId, categoryIds, memberId, search);
 
         int start = Math.toIntExact(pageable.getOffset());
         if (start >= effectiveTransactions.size()) {
@@ -71,35 +75,19 @@ public class TransactionService {
 
     @Transactional(readOnly = true)
     public List<String> listDescriptionSuggestions(String query, Integer limit) {
-        String normalizedQuery = query == null ? "" : query.trim();
+        String normalizedQuery = InputNormalizer.normalizeSearch(query);
         int normalizedLimit;
         if (limit == null) {
             normalizedLimit = DEFAULT_DESCRIPTION_SUGGESTION_LIMIT;
         } else {
+            if (limit < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Limit must be positive.");
+            }
             normalizedLimit = Math.max(1, Math.min(limit, MAX_DESCRIPTION_SUGGESTION_LIMIT));
         }
-        LocalDate since = YearMonth.now().minusMonths(12).atDay(1);
+        LocalDate since = dateProvider.currentReferenceMonth().minusMonths(12);
         return transactionRepository.findDescriptionSuggestions(
                 normalizedQuery, since, PageRequest.of(0, normalizedLimit));
-    }
-
-    @Transactional
-    public Page<Transaction> listByFilters(
-            LocalDate referenceMonth,
-            TransactionType type,
-            OwnershipType ownershipType,
-            UUID accountId,
-            List<UUID> categoryIds,
-            UUID memberId,
-            Pageable pageable) {
-        List<Transaction> filteredTransactions =
-                listByFilters(referenceMonth, type, ownershipType, accountId, categoryIds, memberId);
-        int start = Math.toIntExact(pageable.getOffset());
-        if (start >= filteredTransactions.size()) {
-            return new PageImpl<>(List.of(), pageable, filteredTransactions.size());
-        }
-        int end = Math.min(start + pageable.getPageSize(), filteredTransactions.size());
-        return new PageImpl<>(filteredTransactions.subList(start, end), pageable, filteredTransactions.size());
     }
 
     @Transactional
@@ -111,7 +99,7 @@ public class TransactionService {
             List<UUID> categoryIds,
             UUID memberId) {
         return effectiveMonthlyTransactionService
-                .listEffectiveTransactions(referenceMonth, type, ownershipType, accountId, categoryIds, memberId)
+                .listEffectiveTransactions(referenceMonth, type, ownershipType, accountId, categoryIds, memberId, null)
                 .stream()
                 .map(EffectiveMonthlyTransactionService.EffectiveTransaction::transaction)
                 .toList();
@@ -121,14 +109,21 @@ public class TransactionService {
     public TransactionResponse getResponseById(UUID id) {
         return transactionRepository
                 .findResponseById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction was not found."));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, ErrorMessage.TRANSACTION_NOT_FOUND.message()));
+    }
+
+    @Transactional
+    public void materializeMonth(LocalDate referenceMonth) {
+        effectiveMonthlyTransactionService.materializeMonth(referenceMonth);
     }
 
     @Transactional(readOnly = true)
     public Transaction getById(UUID id) {
         return transactionRepository
                 .findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction was not found."));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, ErrorMessage.TRANSACTION_NOT_FOUND.message()));
     }
 
     @Transactional
@@ -139,18 +134,9 @@ public class TransactionService {
         FamilyMember member = resolveMember(request.ownershipType(), request.memberId());
 
         int installmentCount = request.installmentCount() == null ? 1 : request.installmentCount();
+        validateInstallmentHorizon(request.transactionDate(), installmentCount);
         UUID installmentGroupId = installmentCount > 1 ? UUID.randomUUID() : null;
         List<BigDecimal> installmentAmounts = calculateInstallmentAmounts(request.amount(), installmentCount);
-
-        BigDecimal rate = null;
-        boolean isForeignCurrency = account.getCurrency() == CurrencyType.USD;
-        if (isForeignCurrency) {
-            rate = exchangeRateRepository
-                    .findFirstByCurrencyOrderByFetchedAtDesc("USD")
-                    .map(ExchangeRate::getRate)
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.UNPROCESSABLE_ENTITY, "Exchange rate not available."));
-        }
 
         List<TransactionResponse> created = new ArrayList<>();
         for (int i = 0; i < installmentCount; i++) {
@@ -160,15 +146,10 @@ public class TransactionService {
             transaction.setOwnershipType(request.ownershipType());
             transaction.setSourceType(
                     installmentCount > 1 ? TransactionSourceType.INSTALLMENT : TransactionSourceType.MANUAL);
-            transaction.setDescription(request.description().trim());
+            transaction.setDescription(InputNormalizer.requireNonBlank(request.description(), "Description"));
             BigDecimal rawAmount = installmentAmounts.get(i);
-            if (isForeignCurrency) {
-                transaction.setOriginalAmount(rawAmount);
-                transaction.setCurrency("USD");
-                transaction.setAmount(rawAmount.multiply(rate));
-            } else {
-                transaction.setAmount(rawAmount);
-            }
+            transaction.setAmount(rawAmount);
+            applyCurrency(transaction, account, rawAmount, true);
             transaction.setTransactionDate(transactionDate);
             transaction.setReferenceMonth(referenceMonthFromDate(transactionDate));
             transaction.setAccount(account);
@@ -192,21 +173,9 @@ public class TransactionService {
 
         transaction.setType(request.type());
         transaction.setOwnershipType(request.ownershipType());
-        transaction.setDescription(request.description().trim());
-        if (account.getCurrency() == CurrencyType.USD) {
-            BigDecimal rate = exchangeRateRepository
-                    .findFirstByCurrencyOrderByFetchedAtDesc("USD")
-                    .map(ExchangeRate::getRate)
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.UNPROCESSABLE_ENTITY, "Exchange rate not available."));
-            transaction.setOriginalAmount(request.amount());
-            transaction.setCurrency("USD");
-            transaction.setAmount(request.amount().multiply(rate));
-        } else {
-            transaction.setOriginalAmount(null);
-            transaction.setCurrency(null);
-            transaction.setAmount(request.amount());
-        }
+        transaction.setDescription(InputNormalizer.requireNonBlank(request.description(), "Description"));
+        transaction.setAmount(request.amount());
+        applyCurrency(transaction, account, request.amount(), true);
         transaction.setTransactionDate(request.transactionDate());
         transaction.setReferenceMonth(referenceMonthFromDate(request.transactionDate()));
         transaction.setCategory(category);
@@ -244,10 +213,9 @@ public class TransactionService {
                     "Individual transactions require a member with allowance enabled.");
         }
 
-        FamilyMember member = familyMemberRepository
-                .findById(memberId)
-                .filter(FamilyMember::isActive)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family member was not found."));
+        FamilyMember member = EntityResolver.resolveOrThrow(
+                () -> familyMemberRepository.findById(memberId).filter(FamilyMember::isActive),
+                ErrorMessage.FAMILY_MEMBER_NOT_FOUND.message());
 
         if (!member.isAllowanceEnabled()) {
             throw new ResponseStatusException(
@@ -277,6 +245,14 @@ public class TransactionService {
         return installmentAmounts;
     }
 
+    private void applyCurrency(Transaction transaction, Account account, BigDecimal amount, boolean throwIfMissing) {
+        CurrencyConversionService.ConvertedAmount converted =
+                currencyConversionService.convert(amount, account.getCurrency(), throwIfMissing);
+        transaction.setCurrency(converted.currency());
+        transaction.setConvertedAmount(converted.convertedAmount());
+        transaction.setExchangeRate(converted.exchangeRate());
+    }
+
     private void validateInstallmentCount(Integer installmentCount) {
         if (installmentCount == null) {
             return;
@@ -284,6 +260,15 @@ public class TransactionService {
         if (installmentCount < 1 || installmentCount > 120) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "Installment count must be between 1 and 120.");
+        }
+    }
+
+    private void validateInstallmentHorizon(LocalDate transactionDate, int installmentCount) {
+        LocalDate lastReferenceMonth = referenceMonthFromDate(transactionDate.plusMonths(installmentCount - 1L));
+        LocalDate maxReferenceMonth = dateProvider.currentReferenceMonth().plusYears(MAX_INSTALLMENT_YEARS);
+        if (lastReferenceMonth.isAfter(maxReferenceMonth)) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, "Installment plan cannot exceed 2 years.");
         }
     }
 

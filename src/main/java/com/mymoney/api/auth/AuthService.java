@@ -1,9 +1,9 @@
 package com.mymoney.api.auth;
 
-import com.mymoney.api.auth.api.AuthResponse;
-import com.mymoney.api.auth.api.AuthUserResponse;
-import com.mymoney.api.auth.api.ChangePasswordRequest;
-import com.mymoney.api.auth.api.LoginRequest;
+import com.mymoney.api.auth.api.request.ChangePasswordRequest;
+import com.mymoney.api.auth.api.request.LoginRequest;
+import com.mymoney.api.auth.api.response.AuthResponse;
+import com.mymoney.api.auth.api.response.AuthUserResponse;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.preference.UserPreferencesService;

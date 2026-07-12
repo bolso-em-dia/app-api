@@ -1,4 +1,4 @@
-package com.mymoney.api.auth.api;
+package com.mymoney.api.auth.api.response;
 
 import com.mymoney.api.preference.api.response.UserPreferencesResponse;
 

@@ -6,18 +6,21 @@ import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryService;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
+import com.mymoney.api.shared.DateProvider;
+import com.mymoney.api.shared.EntityResolver;
+import com.mymoney.api.shared.ErrorMessage;
+import com.mymoney.api.shared.InputNormalizer;
 import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.Transaction;
+import com.mymoney.api.transaction.TransactionCategoryAnalyzer;
 import com.mymoney.api.transaction.TransactionService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -33,16 +36,18 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class BudgetService {
 
-    private final BudgetModelRepository budgetModelRepository;
+    private final BudgetRepository budgetRepository;
     private final CategoryService categoryService;
     private final FamilyMemberRepository familyMemberRepository;
     private final TransactionService transactionService;
+    private final TransactionCategoryAnalyzer transactionCategoryAnalyzer;
+    private final DateProvider dateProvider;
 
     @Transactional
     public Page<BudgetView> listForMonth(
             LocalDate referenceMonth, String search, BudgetListStatus status, BudgetType type, Pageable pageable) {
-        Page<UUID> idPage = budgetModelRepository.findIdsForMonth(
-                referenceMonth, normalizeSearch(search), status.name(), type, pageable);
+        Page<UUID> idPage = budgetRepository.findIdsForMonth(
+                referenceMonth, InputNormalizer.normalizeSearch(search), status.name(), type, pageable);
         List<BudgetView> views = loadByIds(idPage.getContent()).stream()
                 .map(budget -> toView(budget, referenceMonth))
                 .toList();
@@ -51,7 +56,7 @@ public class BudgetService {
 
     @Transactional
     public List<BudgetView> listForMonth(LocalDate referenceMonth) {
-        return loadByIds(budgetModelRepository
+        return loadByIds(budgetRepository
                         .findIdsForMonth(referenceMonth, "", BudgetListStatus.ACTIVE.name(), null, Pageable.unpaged())
                         .getContent())
                 .stream()
@@ -65,15 +70,16 @@ public class BudgetService {
     }
 
     @Transactional(readOnly = true)
-    public BudgetModel getById(UUID id) {
-        return budgetModelRepository
+    public Budget getById(UUID id) {
+        return budgetRepository
                 .findWithAssociationsById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Budget was not found."));
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, ErrorMessage.BUDGET_NOT_FOUND.message()));
     }
 
     @Transactional
-    public BudgetModel create(CreateBudgetRequest request) {
-        BudgetModel budget = new BudgetModel();
+    public Budget create(CreateBudgetRequest request) {
+        Budget budget = new Budget();
         apply(
                 budget,
                 request.name(),
@@ -81,14 +87,14 @@ public class BudgetService {
                 request.ownerMemberId(),
                 request.categoryIds(),
                 request.monthlyLimit());
-        budget.setCreatedInMonth(currentReferenceMonth());
+        budget.setCreatedInMonth(dateProvider.currentReferenceMonth());
         budget.setActive(true);
-        return budgetModelRepository.save(budget);
+        return budgetRepository.save(budget);
     }
 
     @Transactional
-    public BudgetModel update(UUID id, UpdateBudgetRequest request) {
-        BudgetModel budget = getById(id);
+    public Budget update(UUID id, UpdateBudgetRequest request) {
+        Budget budget = getById(id);
         apply(
                 budget,
                 request.name(),
@@ -96,19 +102,19 @@ public class BudgetService {
                 request.ownerMemberId(),
                 request.categoryIds(),
                 request.monthlyLimit());
-        return budgetModelRepository.save(budget);
+        return budgetRepository.save(budget);
     }
 
     @Transactional
-    public BudgetModel archive(UUID id, LocalDate referenceMonth) {
-        BudgetModel budget = getById(id);
+    public Budget archive(UUID id, LocalDate referenceMonth) {
+        Budget budget = getById(id);
         if (referenceMonth.isBefore(budget.getCreatedInMonth())) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "Archive month cannot be before the budget creation month.");
         }
         budget.setArchivedFromMonth(referenceMonth);
         budget.setActive(false);
-        return budgetModelRepository.save(budget);
+        return budgetRepository.save(budget);
     }
 
     @Transactional
@@ -119,100 +125,103 @@ public class BudgetService {
     @Transactional
     public List<BudgetCategoryBreakdownItem> categoryBreakdown(UUID id, LocalDate referenceMonth) {
         List<Transaction> transactions = filterTransactions(getById(id), referenceMonth);
-        return transactions.stream()
-                .collect(Collectors.groupingBy(
-                        transaction -> transaction.getCategory().getId()))
-                .entrySet()
+        return transactionCategoryAnalyzer
+                .analyzeByCategory(
+                        transactions,
+                        Transaction::getAmount,
+                        Comparator.comparing(
+                                TransactionCategoryAnalyzer.CategoryAmount::categoryName,
+                                String.CASE_INSENSITIVE_ORDER))
                 .stream()
-                .map(entry -> {
-                    List<Transaction> items = entry.getValue();
-                    BigDecimal total =
-                            items.stream().map(Transaction::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-                    String categoryName = items.get(0).getCategory().getName();
-                    return new BudgetCategoryBreakdownItem(entry.getKey().toString(), categoryName, total);
-                })
-                .sorted(Comparator.comparing(BudgetCategoryBreakdownItem::categoryName, String.CASE_INSENSITIVE_ORDER))
+                .map(item -> new BudgetCategoryBreakdownItem(item.categoryId(), item.categoryName(), item.amount()))
                 .toList();
     }
 
-    private List<BudgetModel> loadByIds(List<UUID> ids) {
+    private List<Budget> loadByIds(List<UUID> ids) {
         if (ids.isEmpty()) {
             return List.of();
         }
 
-        Map<UUID, BudgetModel> budgetsById = budgetModelRepository.findAllWithAssociationsByIdIn(ids).stream()
-                .collect(Collectors.toMap(
-                        BudgetModel::getId, budget -> budget, (left, right) -> left, LinkedHashMap::new));
+        Map<UUID, Budget> budgetsById = budgetRepository.findAllWithAssociationsByIdIn(ids).stream()
+                .collect(Collectors.toMap(Budget::getId, budget -> budget, (left, right) -> left, LinkedHashMap::new));
 
         return ids.stream().map(budgetsById::get).toList();
     }
 
-    private BudgetView toView(BudgetModel budget, LocalDate referenceMonth) {
+    private BudgetView toView(Budget budget, LocalDate referenceMonth) {
         BigDecimal consumedAmount = filterTransactions(budget, referenceMonth).stream()
-                .map(Transaction::getAmount)
+                .map(Transaction::getConvertedAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new BudgetView(budget, consumedAmount, budget.getMonthlyLimit().subtract(consumedAmount));
     }
 
-    private List<Transaction> filterTransactions(BudgetModel budget, LocalDate referenceMonth) {
-        List<Transaction> monthlyTransactions =
-                transactionService.listByFilters(referenceMonth, null, null, null, null, null);
-
+    private List<Transaction> filterTransactions(Budget budget, LocalDate referenceMonth) {
         if (budget.getType() == BudgetType.ALLOWANCE) {
             UUID ownerId = budget.getOwnerMember() == null
                     ? null
                     : budget.getOwnerMember().getId();
-            return monthlyTransactions.stream()
-                    .filter(transaction -> transaction.getOwnershipType() == OwnershipType.INDIVIDUAL)
-                    .filter(transaction -> transaction.getMember() != null)
-                    .filter(transaction -> transaction.getMember().getId().equals(ownerId))
-                    .toList();
+            return transactionService.listByFilters(
+                    referenceMonth,
+                    null, // type — budget não filtra income/expense
+                    OwnershipType.INDIVIDUAL,
+                    null, // accountId
+                    null, // categoryIds
+                    ownerId);
         }
 
-        Set<UUID> categoryIds =
-                budget.getCategories().stream().map(Category::getId).collect(Collectors.toSet());
-        return monthlyTransactions.stream()
-                .filter(transaction -> transaction.getOwnershipType() == OwnershipType.SHARED)
-                .filter(transaction ->
-                        categoryIds.contains(transaction.getCategory().getId()))
-                .toList();
+        // GLOBAL budget — filtra por ownershipType e categoryIds no banco
+        List<UUID> categoryIds =
+                budget.getCategories().stream().map(Category::getId).toList();
+        return transactionService.listByFilters(
+                referenceMonth,
+                null, // type
+                OwnershipType.SHARED,
+                null, // accountId
+                categoryIds,
+                null); // memberId
     }
 
     private void apply(
-            BudgetModel budget,
+            Budget budget,
             String name,
             BudgetType type,
             UUID ownerMemberId,
             List<UUID> categoryIds,
             BigDecimal monthlyLimit) {
-        budget.setName(name.trim());
+        budget.setName(InputNormalizer.requireNonBlank(name, "Name"));
         budget.setType(type);
         budget.setMonthlyLimit(monthlyLimit);
 
         if (type == BudgetType.ALLOWANCE) {
-            if (ownerMemberId == null) {
-                throw new ResponseStatusException(
-                        HttpStatus.UNPROCESSABLE_ENTITY, "Allowance budgets require an owner member.");
-            }
-            FamilyMember owner = familyMemberRepository
-                    .findById(ownerMemberId)
-                    .filter(FamilyMember::isActive)
-                    .orElseThrow(
-                            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family member was not found."));
-            if (!owner.isAllowanceEnabled()) {
-                throw new ResponseStatusException(
-                        HttpStatus.UNPROCESSABLE_ENTITY, "Allowance budgets require a member with allowance enabled.");
-            }
-            if (budget.getId() == null
-                    && budgetModelRepository.existsByOwnerMemberIdAndType(owner.getId(), BudgetType.ALLOWANCE)) {
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT, "An allowance budget already exists for this member.");
-            }
-            budget.setOwnerMember(owner);
-            budget.setCategories(new LinkedHashSet<>());
+            applyAllowanceBudget(budget, ownerMemberId);
             return;
         }
 
+        applyGlobalBudget(budget, categoryIds);
+    }
+
+    private void applyAllowanceBudget(Budget budget, UUID ownerMemberId) {
+        if (ownerMemberId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, "Allowance budgets require an owner member.");
+        }
+        FamilyMember owner = EntityResolver.resolveOrThrow(
+                () -> familyMemberRepository.findById(ownerMemberId).filter(FamilyMember::isActive),
+                ErrorMessage.FAMILY_MEMBER_NOT_FOUND.message());
+        if (!owner.isAllowanceEnabled()) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, "Allowance budgets require a member with allowance enabled.");
+        }
+        if (budget.getId() == null
+                && budgetRepository.existsByOwnerMemberIdAndType(owner.getId(), BudgetType.ALLOWANCE)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "An allowance budget already exists for this member.");
+        }
+        budget.setOwnerMember(owner);
+        budget.setCategories(new LinkedHashSet<>());
+    }
+
+    private void applyGlobalBudget(Budget budget, List<UUID> categoryIds) {
         if (categoryIds == null || categoryIds.isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "Global budgets require at least one category.");
@@ -222,16 +231,5 @@ public class BudgetService {
         budget.setCategories(categoryIds.stream()
                 .map(categoryService::getById)
                 .collect(Collectors.toCollection(LinkedHashSet::new)));
-    }
-
-    private LocalDate currentReferenceMonth() {
-        return YearMonth.now().atDay(1);
-    }
-
-    private String normalizeSearch(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.trim();
     }
 }

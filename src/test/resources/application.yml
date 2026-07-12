@@ -1,7 +1,16 @@
 spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bolso_em_dia_test
+    username: bolso_em_dia
+    password: bolso_em_dia
   jpa:
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        metadata_builder_contributor: com.mymoney.api.config.UnaccentContributor
+        query.plan_cache_max_size: 128
+        format_sql: false
 
 app:
   security:
@@ -16,5 +25,5 @@ app:
     email: admin@bolso-em-dia.local
     password: admin123456
   exchange-rate:
-    enabled: true
-  version: "1.0.19"
+    enabled: false
+  version: "1.0.22"

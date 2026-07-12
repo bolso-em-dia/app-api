@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -125,6 +126,22 @@ public class ApiExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiErrorResponse.from(HttpStatus.BAD_REQUEST, message, request.getRequestURI()));
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiErrorResponse> handleOptimisticLock(
+            ObjectOptimisticLockingFailureException exception, HttpServletRequest request) {
+        String message = "Resource was modified by another user.";
+        log.warn(
+                "Optimistic lock failure on {} {} by user={} status={} message={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                currentUser(),
+                HttpStatus.CONFLICT.value(),
+                message);
+
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorResponse.from(HttpStatus.CONFLICT, message, request.getRequestURI()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

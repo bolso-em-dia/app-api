@@ -1,6 +1,7 @@
 package com.mymoney.api.dashboard.api;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -8,8 +9,8 @@ import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
-import com.mymoney.api.budget.BudgetModel;
-import com.mymoney.api.budget.BudgetModelRepository;
+import com.mymoney.api.budget.Budget;
+import com.mymoney.api.budget.BudgetRepository;
 import com.mymoney.api.budget.BudgetType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
@@ -56,7 +57,7 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
     private TransactionRepository transactionRepository;
 
     @Autowired
-    private BudgetModelRepository budgetModelRepository;
+    private BudgetRepository budgetRepository;
 
     @Autowired
     private FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
@@ -107,23 +108,23 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
         account.setCreatedInMonth(LocalDate.of(2026, 6, 1));
         account = accountRepository.save(account);
 
-        BudgetModel familyBudget = new BudgetModel();
+        Budget familyBudget = new Budget();
         familyBudget.setName("Family Essentials");
         familyBudget.setType(BudgetType.GLOBAL);
         familyBudget.setMonthlyLimit(new BigDecimal("1000.00"));
         familyBudget.setCreatedInMonth(LocalDate.of(2026, 6, 1));
         familyBudget.setActive(true);
         familyBudget.setCategories(new LinkedHashSet<>(java.util.List.of(groceries, transport)));
-        budgetModelRepository.save(familyBudget);
+        budgetRepository.save(familyBudget);
 
-        BudgetModel allowanceBudget = new BudgetModel();
+        Budget allowanceBudget = new Budget();
         allowanceBudget.setName("Karol Allowance");
         allowanceBudget.setType(BudgetType.ALLOWANCE);
         allowanceBudget.setOwnerMember(allowanceMember);
         allowanceBudget.setMonthlyLimit(new BigDecimal("400.00"));
         allowanceBudget.setCreatedInMonth(LocalDate.of(2026, 6, 1));
         allowanceBudget.setActive(true);
-        budgetModelRepository.save(allowanceBudget);
+        budgetRepository.save(allowanceBudget);
 
         transactionRepository.save(createTransaction(
                 TransactionType.INCOME,
@@ -204,7 +205,7 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
     @Test
     void futureMonthDashboardIncludesProjectedFixedTransactions() throws Exception {
         LocalDate currentReferenceMonth = YearMonth.now().atDay(1);
-        LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(1);
+        LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(4);
 
         Category groceries =
                 categoryRepository.findByNormalizedName("groceries").orElseThrow();
@@ -234,6 +235,12 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
         projectedIncome.setActive(true);
         fixedExpenseTemplateRepository.save(projectedIncome);
 
+        // Materialize transactions for the future month
+        mockMvc.perform(post("/api/transactions/materialize")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", futureReferenceMonth.toString()))
+                .andExpect(status().isNoContent());
+
         mockMvc.perform(get("/api/dashboard")
                         .header("Authorization", "Bearer " + adminToken)
                         .param("referenceMonth", futureReferenceMonth.toString()))
@@ -241,7 +248,7 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
                 .andExpect(jsonPath("$.summary.totalIncome").value(1000.0))
                 .andExpect(jsonPath("$.summary.totalExpense").value(200.0))
                 .andExpect(jsonPath("$.summary.balance").value(800.0))
-                .andExpect(jsonPath("$.recentTransactions[0].projected").value(true));
+                .andExpect(jsonPath("$.recentTransactions[0].projected").value(false));
     }
 
     @Test
@@ -260,7 +267,7 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
 
     @Test
     void dashboardIncludesProjectedFlagInRecentTransactions() throws Exception {
-        LocalDate futureReferenceMonth = YearMonth.now().atDay(1).plusMonths(1);
+        LocalDate futureReferenceMonth = YearMonth.now().atDay(1).plusMonths(4);
 
         Category groceries =
                 categoryRepository.findByNormalizedName("groceries").orElseThrow();
@@ -278,11 +285,17 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
         projectedExpense.setActive(true);
         fixedExpenseTemplateRepository.save(projectedExpense);
 
+        // Materialize transactions for the future month
+        mockMvc.perform(post("/api/transactions/materialize")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", futureReferenceMonth.toString()))
+                .andExpect(status().isNoContent());
+
         mockMvc.perform(get("/api/dashboard")
                         .header("Authorization", "Bearer " + adminToken)
                         .param("referenceMonth", futureReferenceMonth.toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.recentTransactions[0].projected").value(true));
+                .andExpect(jsonPath("$.recentTransactions[0].projected").value(false));
     }
 
     @Test
@@ -330,6 +343,8 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
         transaction.setSourceType(TransactionSourceType.MANUAL);
         transaction.setDescription(description);
         transaction.setAmount(amount);
+        transaction.setConvertedAmount(amount);
+        transaction.setCurrency("BRL");
         transaction.setTransactionDate(transactionDate);
         transaction.setReferenceMonth(referenceMonth);
         transaction.setAccount(account);

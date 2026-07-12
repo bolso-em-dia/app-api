@@ -1,4 +1,4 @@
-package com.mymoney.api.auth.api;
+package com.mymoney.api.auth.api.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

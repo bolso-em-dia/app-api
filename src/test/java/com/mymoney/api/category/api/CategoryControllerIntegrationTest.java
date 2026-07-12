@@ -177,6 +177,25 @@ class CategoryControllerIntegrationTest extends AuthenticatedIntegrationTestSupp
     }
 
     @Test
+    void archiveCategoryRejectsArchivedReplacementCategory() throws Exception {
+        categoryB.setArchivedFromMonth(currentReferenceMonth());
+        categoryRepository.save(categoryB);
+
+        mockMvc.perform(patch("/api/categories/" + categoryA.getId() + "/archive")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "replacementCategoryId": "%s"
+                                }
+                                """
+                                        .formatted(categoryB.getId())))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("Replacement category must be active."));
+    }
+
+    @Test
     void optionsEndpointRespectsReferenceMonth() throws Exception {
         categoryA.setArchivedFromMonth(LocalDate.of(2026, 8, 1));
         categoryA.setReplacementCategory(categoryB);

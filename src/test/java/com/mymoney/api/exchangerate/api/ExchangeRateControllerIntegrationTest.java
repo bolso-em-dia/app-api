@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.exchangerate.ExchangeRate;
+import com.mymoney.api.exchangerate.ExchangeRateClient;
 import com.mymoney.api.exchangerate.ExchangeRateRepository;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -15,15 +16,19 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.exchange-rate.enabled=true")
 @AutoConfigureMockMvc
 @Transactional
 class ExchangeRateControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
 
     @Autowired
     private ExchangeRateRepository exchangeRateRepository;
+
+    @MockitoBean
+    private ExchangeRateClient exchangeRateClient;
 
     private String adminToken;
 

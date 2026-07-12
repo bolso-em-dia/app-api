@@ -12,6 +12,8 @@ import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
+import com.mymoney.api.shared.DateProvider;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,11 +32,16 @@ class BasicReferenceDataSeedRunnerTest {
     @Mock
     private AccountRepository accountRepository;
 
+    @Mock
+    private DateProvider dateProvider;
+
     private BasicReferenceDataSeedRunner basicReferenceDataSeedRunner;
 
     @BeforeEach
     void setUp() {
-        basicReferenceDataSeedRunner = new BasicReferenceDataSeedRunner(categoryRepository, accountRepository);
+        when(dateProvider.currentReferenceMonth()).thenReturn(LocalDate.of(2026, 7, 1));
+        basicReferenceDataSeedRunner =
+                new BasicReferenceDataSeedRunner(categoryRepository, accountRepository, dateProvider);
     }
 
     @Test
