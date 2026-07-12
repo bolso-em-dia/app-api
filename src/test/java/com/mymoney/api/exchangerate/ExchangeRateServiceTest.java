@@ -9,8 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mymoney.api.config.AppExchangeRateProperties;
+import com.mymoney.api.exchangerate.api.response.ExchangeRateResponse;
+import com.mymoney.api.shared.DateProvider;
 import com.mymoney.api.transaction.TransactionRepository;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +36,12 @@ class ExchangeRateServiceTest {
 
     @Mock
     private AppExchangeRateProperties properties;
+
+    @Mock
+    private ExchangeRateClient exchangeRateClient;
+
+    @Mock
+    private DateProvider dateProvider;
 
     @InjectMocks
     private ExchangeRateService exchangeRateService;
@@ -134,18 +143,17 @@ class ExchangeRateServiceTest {
                 .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
-    // BT08: refreshManually when enabled attempts API call
     @Test
-    void refreshManually_whenEnabled_attemptsCall() {
+    void refreshManually_whenEnabled_savesRateAndUpdatesTransactions() throws Exception {
         when(properties.enabled()).thenReturn(true);
+        when(exchangeRateClient.fetchUsdBrlRate()).thenReturn(new BigDecimal("5.25"));
+        when(exchangeRateRepository.save(any(ExchangeRate.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(dateProvider.currentReferenceMonth()).thenReturn(LocalDate.of(2026, 6, 1));
 
-        // May succeed (real API) or throw (no network) — both are valid
-        try {
-            ExchangeRateResponse response = exchangeRateService.refreshManually();
-            assertThat(response.rate()).isNotNull();
-        } catch (ResponseStatusException e) {
-            assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
-        }
+        ExchangeRateResponse response = exchangeRateService.refreshManually();
+
+        assertThat(response.rate()).isEqualByComparingTo("5.25");
+        verify(transactionRepository).updateAmountsForCurrency("USD", new BigDecimal("5.25"), LocalDate.of(2026, 6, 1));
     }
 
     // BT09
@@ -172,13 +180,17 @@ class ExchangeRateServiceTest {
         verify(transactionRepository, never()).updateAmountsForCurrency(anyString(), any(), any());
     }
 
-    // BT11: fetchAndUpdateRates runs without throwing
     @Test
-    void fetchAndUpdateRates_runsWithoutThrowing() {
+    void fetchAndUpdateRates_validRate_savesAndUpdatesTransactions() throws Exception {
         when(properties.enabled()).thenReturn(true);
+        when(exchangeRateClient.fetchUsdBrlRate()).thenReturn(new BigDecimal("5.30"));
+        when(exchangeRateRepository.save(any(ExchangeRate.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(dateProvider.currentReferenceMonth()).thenReturn(LocalDate.of(2026, 6, 1));
 
-        // Should not throw regardless of whether API is reachable
         exchangeRateService.fetchAndUpdateRates();
+
+        verify(exchangeRateRepository).save(any(ExchangeRate.class));
+        verify(transactionRepository).updateAmountsForCurrency("USD", new BigDecimal("5.30"), LocalDate.of(2026, 6, 1));
     }
 
     // BT12

@@ -41,6 +41,12 @@ public class FixedExpenseTemplate {
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal amount;
 
+    @Column(name = "converted_amount", precision = 14, scale = 2)
+    private BigDecimal convertedAmount;
+
+    @Column(name = "exchange_rate", precision = 14, scale = 6)
+    private BigDecimal exchangeRate;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private TransactionType type;

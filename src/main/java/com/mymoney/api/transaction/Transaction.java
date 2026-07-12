@@ -53,8 +53,11 @@ public class Transaction {
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal amount;
 
-    @Column(name = "original_amount", precision = 14, scale = 2)
-    private BigDecimal originalAmount;
+    @Column(name = "converted_amount", precision = 14, scale = 2)
+    private BigDecimal convertedAmount;
+
+    @Column(name = "exchange_rate", precision = 14, scale = 6)
+    private BigDecimal exchangeRate;
 
     @Column(length = 3)
     private String currency;

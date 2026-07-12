@@ -1,6 +1,10 @@
 package com.mymoney.api.auth.api;
 
 import com.mymoney.api.auth.AuthService;
+import com.mymoney.api.auth.api.request.ChangePasswordRequest;
+import com.mymoney.api.auth.api.request.LoginRequest;
+import com.mymoney.api.auth.api.response.AuthResponse;
+import com.mymoney.api.auth.api.response.AuthUserResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;

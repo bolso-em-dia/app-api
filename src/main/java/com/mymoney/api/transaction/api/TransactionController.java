@@ -47,6 +47,7 @@ public class TransactionController {
             @RequestParam(required = false) List<UUID> categoryIds,
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) UUID memberId,
+            @RequestParam(required = false) String search,
             @PageableDefault(size = 20)
                     @SortDefault.SortDefaults({@SortDefault(sort = "transactionDate"), @SortDefault(sort = "createdAt")
                     })
@@ -58,7 +59,15 @@ public class TransactionController {
                 accountId,
                 normalizeCategoryIds(categoryIds, categoryId),
                 memberId,
+                search,
                 pageable)));
+    }
+
+    @PostMapping("/materialize")
+    public ResponseEntity<Void> materializeMonth(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate referenceMonth) {
+        transactionService.materializeMonth(referenceMonth);
+        return ResponseEntity.noContent().build();
     }
 
     private List<UUID> normalizeCategoryIds(List<UUID> categoryIds, UUID categoryId) {

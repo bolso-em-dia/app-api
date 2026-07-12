@@ -2,8 +2,12 @@ package com.mymoney.api.account;
 
 import com.mymoney.api.account.api.request.CreateAccountRequest;
 import com.mymoney.api.account.api.request.UpdateAccountRequest;
+import com.mymoney.api.shared.DateProvider;
+import com.mymoney.api.shared.DayValidator;
+import com.mymoney.api.shared.EntityResolver;
+import com.mymoney.api.shared.ErrorMessage;
+import com.mymoney.api.shared.InputNormalizer;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -19,17 +23,16 @@ import org.springframework.web.server.ResponseStatusException;
 public class AccountService {
 
     private final AccountRepository accountRepository;
+    private final DateProvider dateProvider;
 
     @Transactional(readOnly = true)
     public Page<Account> listAll(String search, AccountListStatus status, AccountType type, Pageable pageable) {
-        return accountRepository.findByFilters(normalizeSearch(search), status.name(), type, pageable);
+        return accountRepository.findByFilters(InputNormalizer.normalizeSearch(search), status.name(), type, pageable);
     }
 
     @Transactional(readOnly = true)
     public Account getById(UUID id) {
-        return accountRepository
-                .findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account was not found."));
+        return resolveAccount(id);
     }
 
     @Transactional
@@ -44,7 +47,7 @@ public class AccountService {
                 request.color(),
                 request.closingDay(),
                 request.dueDay());
-        account.setCreatedInMonth(currentReferenceMonth());
+        account.setCreatedInMonth(dateProvider.currentReferenceMonth());
         return accountRepository.save(account);
     }
 
@@ -66,7 +69,7 @@ public class AccountService {
     @Transactional
     public Account archive(UUID id) {
         Account account = getById(id);
-        LocalDate archivedFromMonth = currentReferenceMonth();
+        LocalDate archivedFromMonth = dateProvider.currentReferenceMonth();
         if (archivedFromMonth.isBefore(account.getCreatedInMonth())) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "Archive month cannot be before the account creation month.");
@@ -90,13 +93,13 @@ public class AccountService {
             Integer closingDay,
             Integer dueDay) {
         validateTypeFields(type, closingDay, dueDay);
-        account.setName(name.trim());
+        account.setName(InputNormalizer.requireNonBlank(name, "Name"));
         account.setType(type);
         account.setCurrency(currency != null ? currency : CurrencyType.BRL);
-        account.setColor(normalizeNullable(color));
+        account.setColor(InputNormalizer.normalizeNullable(color));
 
         if (type == AccountType.CREDIT_CARD) {
-            account.setBrand(normalizeNullable(brand));
+            account.setBrand(InputNormalizer.normalizeNullable(brand));
             account.setClosingDay(closingDay.shortValue());
             account.setDueDay(dueDay.shortValue());
         } else {
@@ -112,8 +115,8 @@ public class AccountService {
                 throw new ResponseStatusException(
                         HttpStatus.UNPROCESSABLE_ENTITY, "Credit cards require both closing day and due day.");
             }
-            validateDayRange("Closing day", closingDay);
-            validateDayRange("Due day", dueDay);
+            DayValidator.validateDayRange(closingDay, "Closing day");
+            DayValidator.validateDayRange(dueDay, "Due day");
             return;
         }
 
@@ -123,29 +126,8 @@ public class AccountService {
         }
     }
 
-    private void validateDayRange(String fieldName, Integer day) {
-        if (day < 1 || day > 31) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, fieldName + " must be between 1 and 31.");
-        }
-    }
-
-    private LocalDate currentReferenceMonth() {
-        return YearMonth.now().atDay(1);
-    }
-
-    private String normalizeNullable(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private String normalizeSearch(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.trim();
+    private Account resolveAccount(UUID id) {
+        return EntityResolver.resolveOrThrow(
+                () -> accountRepository.findById(id), ErrorMessage.ACCOUNT_NOT_FOUND.message());
     }
 }

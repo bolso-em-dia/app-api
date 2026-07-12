@@ -6,8 +6,9 @@ import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.preference.api.request.UpdateUserPreferencesRequest;
 import com.mymoney.api.preference.api.response.UserPreferencesResponse;
+import com.mymoney.api.shared.DateProvider;
+import com.mymoney.api.shared.ErrorMessage;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class UserPreferencesService {
     private final MemberPreferencesRepository memberPreferencesRepository;
     private final FamilyMemberRepository familyMemberRepository;
     private final AccountRepository accountRepository;
+    private final DateProvider dateProvider;
 
     @Transactional(readOnly = true)
     public UserPreferencesResponse getCurrentUserPreferences() {
@@ -94,14 +96,10 @@ public class UserPreferencesService {
 
         Account account = accountRepository
                 .findById(defaultAccountId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account was not found."));
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, ErrorMessage.ACCOUNT_NOT_FOUND.message()));
 
-        LocalDate currentReferenceMonth = currentReferenceMonth();
-        boolean activeForCurrentMonth = !account.getCreatedInMonth().isAfter(currentReferenceMonth)
-                && (account.getArchivedFromMonth() == null
-                        || account.getArchivedFromMonth().isAfter(currentReferenceMonth));
-
-        if (!activeForCurrentMonth) {
+        if (!isAccountActiveInMonth(account, dateProvider.currentReferenceMonth())) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "Default account must be active for the current month.");
         }
@@ -121,7 +119,9 @@ public class UserPreferencesService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User was not found."));
     }
 
-    private LocalDate currentReferenceMonth() {
-        return YearMonth.now().atDay(1);
+    private boolean isAccountActiveInMonth(Account account, LocalDate referenceMonth) {
+        return !account.getCreatedInMonth().isAfter(referenceMonth)
+                && (account.getArchivedFromMonth() == null
+                        || account.getArchivedFromMonth().isAfter(referenceMonth));
     }
 }

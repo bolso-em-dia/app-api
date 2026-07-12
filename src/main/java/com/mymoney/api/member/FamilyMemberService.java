@@ -2,6 +2,9 @@ package com.mymoney.api.member;
 
 import com.mymoney.api.member.api.request.CreateFamilyMemberRequest;
 import com.mymoney.api.member.api.request.UpdateFamilyMemberRequest;
+import com.mymoney.api.shared.EntityResolver;
+import com.mymoney.api.shared.ErrorMessage;
+import com.mymoney.api.shared.InputNormalizer;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -21,14 +24,13 @@ public class FamilyMemberService {
 
     @Transactional(readOnly = true)
     public Page<FamilyMember> listAll(String search, FamilyMemberListStatus status, Pageable pageable) {
-        return familyMemberRepository.findByFilters(normalizeSearch(search), status.name(), pageable);
+        return familyMemberRepository.findByFilters(InputNormalizer.normalizeSearch(search), status.name(), pageable);
     }
 
     @Transactional(readOnly = true)
     public FamilyMember getById(UUID id) {
-        return familyMemberRepository
-                .findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Family member was not found."));
+        return EntityResolver.resolveOrThrow(
+                () -> familyMemberRepository.findById(id), ErrorMessage.FAMILY_MEMBER_NOT_FOUND.message());
     }
 
     @Transactional
@@ -36,7 +38,7 @@ public class FamilyMemberService {
         assertEmailAvailable(request.email(), null);
 
         FamilyMember member = new FamilyMember();
-        member.setName(request.name().trim());
+        member.setName(InputNormalizer.requireNonBlank(request.name(), "Name"));
         member.setEmail(normalizeEmail(request.email()));
         member.setPasswordHash(passwordEncoder.encode(request.password()));
         member.setRole(request.role());
@@ -51,7 +53,7 @@ public class FamilyMemberService {
         FamilyMember member = getById(id);
         assertEmailAvailable(request.email(), member.getId());
 
-        member.setName(request.name().trim());
+        member.setName(InputNormalizer.requireNonBlank(request.name(), "Name"));
         member.setEmail(normalizeEmail(request.email()));
         member.setRole(request.role());
         member.setAllowanceEnabled(request.allowanceEnabled());
@@ -82,18 +84,11 @@ public class FamilyMemberService {
                 .findByEmailIgnoreCase(normalizedEmail)
                 .filter(existing -> !existing.getId().equals(currentId))
                 .ifPresent(existing -> {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already in use.");
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, ErrorMessage.EMAIL_ALREADY_IN_USE.message());
                 });
     }
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase();
-    }
-
-    private String normalizeSearch(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.trim();
     }
 }

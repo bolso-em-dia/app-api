@@ -1,18 +1,12 @@
 package com.mymoney.api.exchangerate;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mymoney.api.config.AppExchangeRateProperties;
+import com.mymoney.api.exchangerate.api.response.ExchangeRateResponse;
+import com.mymoney.api.shared.DateProvider;
 import com.mymoney.api.transaction.TransactionRepository;
 import java.math.BigDecimal;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.YearMonth;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -28,17 +22,13 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class ExchangeRateService {
 
-    private static final String API_URL = "https://economia.awesomeapi.com.br/json/last/USD-BRL";
-    private static final String CURRENCY_PAIR = "USDBRL";
     private static final String CURRENCY = "USD";
-    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
 
     private final ExchangeRateRepository exchangeRateRepository;
     private final TransactionRepository transactionRepository;
     private final AppExchangeRateProperties properties;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient =
-            HttpClient.newBuilder().connectTimeout(REQUEST_TIMEOUT).build();
+    private final ExchangeRateClient exchangeRateClient;
+    private final DateProvider dateProvider;
 
     @Scheduled(cron = "0 0 * * * *")
     @Transactional
@@ -48,22 +38,12 @@ public class ExchangeRateService {
         }
 
         try {
-            BigDecimal rate = fetchRateFromApi();
+            BigDecimal rate = exchangeRateClient.fetchUsdBrlRate();
             if (!isValidRate(rate)) {
                 log.warn("Invalid exchange rate received: {}", rate);
                 return;
             }
-
-            ExchangeRate exchangeRate = new ExchangeRate();
-            exchangeRate.setCurrency(CURRENCY);
-            exchangeRate.setRate(rate);
-            exchangeRate.setFetchedAt(OffsetDateTime.now());
-            exchangeRateRepository.save(exchangeRate);
-
-            LocalDate currentMonth = YearMonth.now().atDay(1);
-            transactionRepository.updateAmountsForCurrency(CURRENCY, rate, currentMonth);
-
-            log.info("Exchange rate updated: USD 1 = BRL {}", rate);
+            saveRateAndUpdateTransactions(rate);
         } catch (Exception e) {
             log.warn("Failed to fetch exchange rate, keeping last saved value.", e);
         }
@@ -90,21 +70,12 @@ public class ExchangeRateService {
         }
 
         try {
-            BigDecimal rate = fetchRateFromApi();
+            BigDecimal rate = exchangeRateClient.fetchUsdBrlRate();
             if (!isValidRate(rate)) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_GATEWAY, "Exchange rate API returned an invalid rate.");
             }
-
-            ExchangeRate exchangeRate = new ExchangeRate();
-            exchangeRate.setCurrency(CURRENCY);
-            exchangeRate.setRate(rate);
-            exchangeRate.setFetchedAt(OffsetDateTime.now());
-            exchangeRateRepository.save(exchangeRate);
-
-            LocalDate currentMonth = YearMonth.now().atDay(1);
-            transactionRepository.updateAmountsForCurrency(CURRENCY, rate, currentMonth);
-
+            ExchangeRate exchangeRate = saveRateAndUpdateTransactions(rate);
             return new ExchangeRateResponse(rate, exchangeRate.getFetchedAt(), false);
         } catch (ResponseStatusException e) {
             throw e;
@@ -149,26 +120,18 @@ public class ExchangeRateService {
         log.info("Month {} closed: USD transactions frozen at rate {}.", referenceMonth, latest.getRate());
     }
 
-    private BigDecimal fetchRateFromApi() throws Exception {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(API_URL))
-                .timeout(REQUEST_TIMEOUT)
-                .GET()
-                .build();
+    private ExchangeRate saveRateAndUpdateTransactions(BigDecimal rate) {
+        ExchangeRate exchangeRate = new ExchangeRate();
+        exchangeRate.setCurrency(CURRENCY);
+        exchangeRate.setRate(rate);
+        exchangeRate.setFetchedAt(OffsetDateTime.now());
+        ExchangeRate saved = exchangeRateRepository.save(exchangeRate);
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        LocalDate currentMonth = dateProvider.currentReferenceMonth();
+        transactionRepository.updateAmountsForCurrency(CURRENCY, rate, currentMonth);
 
-        if (response.statusCode() != 200) {
-            throw new RuntimeException("API returned HTTP " + response.statusCode());
-        }
-
-        JsonNode root = objectMapper.readTree(response.body());
-        JsonNode pair = root.get(CURRENCY_PAIR);
-        if (pair == null || !pair.has("bid")) {
-            throw new RuntimeException("API response missing USDBRL.bid field.");
-        }
-
-        return new BigDecimal(pair.get("bid").asText());
+        log.info("Exchange rate updated: USD 1 = BRL {}", rate);
+        return saved;
     }
 
     private boolean isValidRate(BigDecimal rate) {

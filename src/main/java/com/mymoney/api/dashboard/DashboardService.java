@@ -3,13 +3,13 @@ package com.mymoney.api.dashboard;
 import com.mymoney.api.budget.BudgetService;
 import com.mymoney.api.budget.BudgetView;
 import com.mymoney.api.transaction.Transaction;
+import com.mymoney.api.transaction.TransactionCategoryAnalyzer;
 import com.mymoney.api.transaction.TransactionService;
 import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +20,7 @@ public class DashboardService {
 
     private final TransactionService transactionService;
     private final BudgetService budgetService;
+    private final TransactionCategoryAnalyzer transactionCategoryAnalyzer;
 
     @Transactional
     public DashboardView getDashboard(LocalDate referenceMonth) {
@@ -42,21 +43,17 @@ public class DashboardService {
                 .limit(10)
                 .toList();
 
-        List<DashboardCategoryBreakdownItem> categoryBreakdown = transactions.stream()
+        List<Transaction> expenseTransactions = transactions.stream()
                 .filter(transaction -> transaction.getType() == TransactionType.EXPENSE)
-                .collect(Collectors.groupingBy(
-                        transaction -> transaction.getCategory().getId()))
-                .entrySet()
+                .toList();
+        List<DashboardCategoryBreakdownItem> analyzedCategoryBreakdown = transactionCategoryAnalyzer
+                .analyzeByCategory(
+                        expenseTransactions,
+                        Transaction::getConvertedAmount,
+                        Comparator.comparing(TransactionCategoryAnalyzer.CategoryAmount::amount)
+                                .reversed())
                 .stream()
-                .map(entry -> {
-                    List<Transaction> items = entry.getValue();
-                    BigDecimal total =
-                            items.stream().map(Transaction::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-                    String categoryName = items.get(0).getCategory().getName();
-                    return new DashboardCategoryBreakdownItem(entry.getKey().toString(), categoryName, total);
-                })
-                .sorted(Comparator.comparing(DashboardCategoryBreakdownItem::amount)
-                        .reversed())
+                .map(item -> new DashboardCategoryBreakdownItem(item.categoryId(), item.categoryName(), item.amount()))
                 .toList();
 
         return new DashboardView(
@@ -68,13 +65,13 @@ public class DashboardService {
                 reservedBudgetAmount,
                 budgets,
                 recentTransactions,
-                categoryBreakdown);
+                analyzedCategoryBreakdown);
     }
 
     private BigDecimal sumByType(List<Transaction> transactions, TransactionType type) {
         return transactions.stream()
                 .filter(transaction -> transaction.getType() == type)
-                .map(Transaction::getAmount)
+                .map(Transaction::getConvertedAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

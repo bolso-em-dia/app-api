@@ -15,8 +15,8 @@ public interface FamilyMemberRepository extends JpaRepository<FamilyMember, UUID
             from FamilyMember m
             where (
                 :search = ''
-                or lower(m.name) like concat('%', lower(:search), '%')
-                or lower(m.email) like concat('%', lower(:search), '%')
+                or f_unaccent_lower(m.name) like concat('%', f_unaccent_lower(:search), '%')
+                or f_unaccent_lower(m.email) like concat('%', f_unaccent_lower(:search), '%')
               )
               and (
                 :status = 'ALL'

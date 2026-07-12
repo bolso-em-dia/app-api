@@ -25,7 +25,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
                 t.sourceType,
                 t.description,
                 t.amount,
-                t.originalAmount,
+                t.convertedAmount,
+                t.exchangeRate,
                 t.currency,
                 t.transactionDate,
                 t.referenceMonth,
@@ -54,6 +55,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
               and (:accountId is null or t.account.id = :accountId)
               and (:categoryIds is null or t.category.id in :categoryIds)
               and (:memberId is null or t.member.id = :memberId)
+              and (:search is null or :search = '' or f_unaccent_lower(t.description) like concat('%', f_unaccent_lower(:search), '%'))
             """)
     Page<TransactionResponse> findResponseByFilters(
             LocalDate referenceMonth,
@@ -62,6 +64,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             UUID accountId,
             List<UUID> categoryIds,
             UUID memberId,
+            String search,
             Pageable pageable);
 
     @Query(
@@ -73,7 +76,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
                 t.sourceType,
                 t.description,
                 t.amount,
-                t.originalAmount,
+                t.convertedAmount,
+                t.exchangeRate,
                 t.currency,
                 t.transactionDate,
                 t.referenceMonth,
@@ -105,10 +109,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             select t.description
             from Transaction t
             where t.referenceMonth >= :since
-              and (:query = '' or lower(t.description) like concat('%', lower(:query), '%'))
+              and (:query = '' or f_unaccent_lower(t.description) like concat('%', f_unaccent_lower(:query), '%'))
             group by t.description
             order by
-                case when :query <> '' and lower(t.description) like concat(lower(:query), '%') then 0 else 1 end,
+                case when :query <> '' and f_unaccent_lower(t.description) like concat(f_unaccent_lower(:query), '%') then 0 else 1 end,
                 count(t) desc,
                 max(t.updatedAt) desc
             """)
@@ -125,6 +129,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
               and (:accountId is null or t.account.id = :accountId)
               and (:categoryIds is null or t.category.id in :categoryIds)
               and (:memberId is null or t.member.id = :memberId)
+              and (:search is null or :search = '' or f_unaccent_lower(t.description) like concat('%', f_unaccent_lower(:search), '%'))
             """)
     Page<Transaction> findByFilters(
             LocalDate referenceMonth,
@@ -133,6 +138,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             UUID accountId,
             List<UUID> categoryIds,
             UUID memberId,
+            String search,
             Pageable pageable);
 
     @EntityGraph(attributePaths = {"account", "category", "member"})
@@ -146,6 +152,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
               and (:accountId is null or t.account.id = :accountId)
               and (:categoryIds is null or t.category.id in :categoryIds)
               and (:memberId is null or t.member.id = :memberId)
+              and (:search is null or :search = '' or lower(t.description) like concat('%', lower(:search), '%'))
             order by t.transactionDate, t.createdAt
             """)
     List<Transaction> findByFilters(
@@ -154,7 +161,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             OwnershipType ownershipType,
             UUID accountId,
             List<UUID> categoryIds,
-            UUID memberId);
+            UUID memberId,
+            String search);
 
     @EntityGraph(attributePaths = {"account", "category", "member", "fixedExpenseTemplate"})
     List<Transaction> findByReferenceMonthOrderByTransactionDateAscCreatedAtAsc(LocalDate referenceMonth);
@@ -162,6 +170,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     boolean existsByFixedExpenseTemplateIdAndReferenceMonth(UUID fixedExpenseTemplateId, LocalDate referenceMonth);
 
     Optional<Transaction> findByFixedExpenseTemplateIdAndReferenceMonth(
+            UUID fixedExpenseTemplateId, LocalDate referenceMonth);
+
+    List<Transaction> findByFixedExpenseTemplateIdAndReferenceMonthGreaterThan(
             UUID fixedExpenseTemplateId, LocalDate referenceMonth);
 
     void deleteByFixedExpenseTemplateIdAndReferenceMonthGreaterThanEqual(
@@ -183,10 +194,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     @Query(
             """
             update Transaction t
-            set t.amount = t.originalAmount * :rate
+            set t.convertedAmount = t.amount * :rate,
+                t.exchangeRate = :rate
             where t.currency = :currency
               and t.referenceMonth >= :since
-              and t.originalAmount is not null
             """)
     void updateAmountsForCurrency(String currency, BigDecimal rate, LocalDate since);
 
@@ -194,10 +205,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     @Query(
             """
             update Transaction t
-            set t.amount = t.originalAmount * :rate
+            set t.convertedAmount = t.amount * :rate,
+                t.exchangeRate = :rate
             where t.currency = :currency
               and t.referenceMonth = :referenceMonth
-              and t.originalAmount is not null
             """)
     void freezeAmountsForMonth(String currency, BigDecimal rate, LocalDate referenceMonth);
 }

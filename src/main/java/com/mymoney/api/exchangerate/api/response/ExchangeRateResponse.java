@@ -1,4 +1,4 @@
-package com.mymoney.api.exchangerate;
+package com.mymoney.api.exchangerate.api.response;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;

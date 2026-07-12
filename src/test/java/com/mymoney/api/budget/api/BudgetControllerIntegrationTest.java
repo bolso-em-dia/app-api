@@ -13,8 +13,8 @@ import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
 import com.mymoney.api.auth.api.JsonTestUtils;
-import com.mymoney.api.budget.BudgetModel;
-import com.mymoney.api.budget.BudgetModelRepository;
+import com.mymoney.api.budget.Budget;
+import com.mymoney.api.budget.BudgetRepository;
 import com.mymoney.api.budget.BudgetType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
@@ -63,7 +63,7 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
     private TransactionRepository transactionRepository;
 
     @Autowired
-    private BudgetModelRepository budgetModelRepository;
+    private BudgetRepository budgetRepository;
 
     @Autowired
     private FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
@@ -75,8 +75,8 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
     private Category groceries;
     private Category transport;
     private Account account;
-    private BudgetModel globalBudget;
-    private BudgetModel allowanceBudget;
+    private Budget globalBudget;
+    private Budget allowanceBudget;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -116,23 +116,23 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
         account.setCreatedInMonth(LocalDate.of(2026, 6, 1));
         account = accountRepository.save(account);
 
-        globalBudget = new BudgetModel();
+        globalBudget = new Budget();
         globalBudget.setName("Family Essentials");
         globalBudget.setType(BudgetType.GLOBAL);
         globalBudget.setMonthlyLimit(new BigDecimal("1000.00"));
         globalBudget.setCreatedInMonth(LocalDate.of(2026, 6, 1));
         globalBudget.setActive(true);
         globalBudget.setCategories(new LinkedHashSet<>(java.util.List.of(groceries, transport)));
-        globalBudget = budgetModelRepository.save(globalBudget);
+        globalBudget = budgetRepository.save(globalBudget);
 
-        allowanceBudget = new BudgetModel();
+        allowanceBudget = new Budget();
         allowanceBudget.setName("Karol Allowance");
         allowanceBudget.setType(BudgetType.ALLOWANCE);
         allowanceBudget.setOwnerMember(allowanceMember);
         allowanceBudget.setMonthlyLimit(new BigDecimal("400.00"));
         allowanceBudget.setCreatedInMonth(LocalDate.of(2026, 6, 1));
         allowanceBudget.setActive(true);
-        allowanceBudget = budgetModelRepository.save(allowanceBudget);
+        allowanceBudget = budgetRepository.save(allowanceBudget);
 
         Transaction sharedGroceries = new Transaction();
         sharedGroceries.setType(TransactionType.EXPENSE);
@@ -140,6 +140,8 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
         sharedGroceries.setSourceType(TransactionSourceType.MANUAL);
         sharedGroceries.setDescription("Market");
         sharedGroceries.setAmount(new BigDecimal("150.00"));
+        sharedGroceries.setConvertedAmount(new BigDecimal("150.00"));
+        sharedGroceries.setCurrency("BRL");
         sharedGroceries.setTransactionDate(LocalDate.of(2026, 6, 10));
         sharedGroceries.setReferenceMonth(LocalDate.of(2026, 6, 1));
         sharedGroceries.setAccount(account);
@@ -152,6 +154,8 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
         individualTransport.setSourceType(TransactionSourceType.MANUAL);
         individualTransport.setDescription("Ride app");
         individualTransport.setAmount(new BigDecimal("45.00"));
+        individualTransport.setConvertedAmount(new BigDecimal("45.00"));
+        individualTransport.setCurrency("BRL");
         individualTransport.setTransactionDate(LocalDate.of(2026, 6, 11));
         individualTransport.setReferenceMonth(LocalDate.of(2026, 6, 1));
         individualTransport.setAccount(account);
@@ -356,18 +360,26 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
     @Test
     void futureMonthBudgetConsumesProjectedFixedExpense() throws Exception {
         LocalDate currentReferenceMonth = YearMonth.now().atDay(1);
-        LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(1);
+        LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(4);
 
         FixedExpenseTemplate projectedExpense = new FixedExpenseTemplate();
         projectedExpense.setName("Projected Market");
         projectedExpense.setType(TransactionType.EXPENSE);
         projectedExpense.setAmount(new BigDecimal("210.00"));
+        projectedExpense.setConvertedAmount(new BigDecimal("210.00"));
+        projectedExpense.setCurrency(com.mymoney.api.account.CurrencyType.BRL);
         projectedExpense.setCategory(groceries);
         projectedExpense.setAccount(account);
         projectedExpense.setDueDay((short) 14);
         projectedExpense.setCreatedInMonth(currentReferenceMonth.minusMonths(1));
         projectedExpense.setActive(true);
         fixedExpenseTemplateRepository.save(projectedExpense);
+
+        // Materialize transactions for the future month
+        mockMvc.perform(post("/api/transactions/materialize")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", futureReferenceMonth.toString()))
+                .andExpect(status().isNoContent());
 
         mockMvc.perform(get("/api/budgets/" + globalBudget.getId())
                         .header("Authorization", "Bearer " + adminToken)
@@ -376,7 +388,7 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
                 .andExpect(jsonPath("$.consumedAmount").value(210.0))
                 .andExpect(jsonPath("$.transactions.length()").value(1))
                 .andExpect(jsonPath("$.transactions[0].sourceType").value("FIXED_EXPENSE"))
-                .andExpect(jsonPath("$.transactions[0].projected").value(true));
+                .andExpect(jsonPath("$.transactions[0].projected").value(false));
     }
 
     @Test

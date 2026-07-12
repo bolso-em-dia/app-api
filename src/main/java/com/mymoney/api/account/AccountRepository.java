@@ -15,7 +15,7 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
             """
             select a
             from Account a
-            where lower(trim(a.name)) = lower(trim(:name))
+            where f_unaccent_lower(trim(a.name)) = f_unaccent_lower(trim(:name))
             """)
     Optional<Account> findByNormalizedName(String name);
 
@@ -23,7 +23,7 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
             """
             select a
             from Account a
-            where (:search = '' or lower(a.name) like concat('%', lower(:search), '%'))
+            where (:search = '' or f_unaccent_lower(a.name) like concat('%', f_unaccent_lower(:search), '%'))
               and (
                 :status = 'ALL'
                 or (:status = 'ACTIVE' and a.archivedFromMonth is null)
@@ -39,7 +39,7 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
             from Account a
             where a.createdInMonth <= :referenceMonth
               and (a.archivedFromMonth is null or a.archivedFromMonth > :referenceMonth)
-            order by lower(a.name)
+            order by f_unaccent_lower(a.name)
             """)
     List<Account> findAvailableForMonth(LocalDate referenceMonth);
 }

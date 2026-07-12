@@ -4,8 +4,11 @@ import com.mymoney.api.category.api.request.ArchiveCategoryRequest;
 import com.mymoney.api.category.api.request.CreateCategoryRequest;
 import com.mymoney.api.category.api.request.UpdateCategoryRequest;
 import com.mymoney.api.category.api.response.CategoryResponse;
+import com.mymoney.api.shared.DateProvider;
+import com.mymoney.api.shared.EntityResolver;
+import com.mymoney.api.shared.ErrorMessage;
+import com.mymoney.api.shared.InputNormalizer;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -21,10 +24,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final DateProvider dateProvider;
 
     @Transactional(readOnly = true)
     public Page<CategoryResponse> listAllResponses(String search, CategoryListStatus status, Pageable pageable) {
-        String normalizedSearch = normalizeSearch(search);
+        String normalizedSearch = InputNormalizer.normalizeSearch(search);
         return categoryRepository.findResponseByFilters(normalizedSearch, status.name(), pageable);
     }
 
@@ -32,23 +36,23 @@ public class CategoryService {
     public CategoryResponse getResponseById(UUID id) {
         return categoryRepository
                 .findResponseById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category was not found."));
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, ErrorMessage.CATEGORY_NOT_FOUND.message()));
     }
 
     @Transactional(readOnly = true)
     public Category getById(UUID id) {
-        return categoryRepository
-                .findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category was not found."));
+        return EntityResolver.resolveOrThrow(
+                () -> categoryRepository.findById(id), ErrorMessage.CATEGORY_NOT_FOUND.message());
     }
 
     @Transactional
     public CategoryResponse create(CreateCategoryRequest request) {
         Category category = new Category();
-        category.setName(request.name().trim());
-        category.setIcon(normalizeNullable(request.icon()));
-        category.setColor(normalizeNullable(request.color()));
-        category.setCreatedInMonth(currentReferenceMonth());
+        category.setName(InputNormalizer.requireNonBlank(request.name(), "Name"));
+        category.setIcon(InputNormalizer.normalizeNullable(request.icon()));
+        category.setColor(InputNormalizer.normalizeNullable(request.color()));
+        category.setCreatedInMonth(dateProvider.currentReferenceMonth());
         Category saved = categoryRepository.save(category);
         return getResponseById(saved.getId());
     }
@@ -56,9 +60,9 @@ public class CategoryService {
     @Transactional
     public CategoryResponse update(UUID id, UpdateCategoryRequest request) {
         Category category = getById(id);
-        category.setName(request.name().trim());
-        category.setIcon(normalizeNullable(request.icon()));
-        category.setColor(normalizeNullable(request.color()));
+        category.setName(InputNormalizer.requireNonBlank(request.name(), "Name"));
+        category.setIcon(InputNormalizer.normalizeNullable(request.icon()));
+        category.setColor(InputNormalizer.normalizeNullable(request.color()));
         Category saved = categoryRepository.save(category);
         return getResponseById(saved.getId());
     }
@@ -67,11 +71,15 @@ public class CategoryService {
     public CategoryResponse archive(UUID id, ArchiveCategoryRequest request) {
         Category category = getById(id);
         Category replacementCategory = getById(request.replacementCategoryId());
-        LocalDate archivedFromMonth = currentReferenceMonth();
+        LocalDate archivedFromMonth = dateProvider.currentReferenceMonth();
 
         if (category.getId().equals(replacementCategory.getId())) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "Replacement category must be different from the archived one.");
+        }
+
+        if (replacementCategory.getArchivedFromMonth() != null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Replacement category must be active.");
         }
 
         if (archivedFromMonth.isBefore(category.getCreatedInMonth())) {
@@ -88,24 +96,5 @@ public class CategoryService {
     @Transactional(readOnly = true)
     public List<Category> listOptions(LocalDate referenceMonth) {
         return categoryRepository.findAvailableForMonth(referenceMonth);
-    }
-
-    private LocalDate currentReferenceMonth() {
-        return YearMonth.now().atDay(1);
-    }
-
-    private String normalizeNullable(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private String normalizeSearch(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.trim();
     }
 }

@@ -5,8 +5,8 @@ import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
+import com.mymoney.api.shared.DateProvider;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
@@ -37,11 +37,12 @@ public class BasicReferenceDataSeedRunner implements CommandLineRunner {
 
     private final CategoryRepository categoryRepository;
     private final AccountRepository accountRepository;
+    private final DateProvider dateProvider;
 
     @Override
     @Transactional
     public void run(String... args) {
-        LocalDate referenceMonth = currentReferenceMonth();
+        LocalDate referenceMonth = dateProvider.currentReferenceMonth();
         seedCategories(referenceMonth);
         seedPixAccount(referenceMonth);
     }
@@ -92,10 +93,6 @@ public class BasicReferenceDataSeedRunner implements CommandLineRunner {
         account.setDueDay(null);
         account.setCreatedInMonth(referenceMonth);
         accountRepository.save(account);
-    }
-
-    private LocalDate currentReferenceMonth() {
-        return YearMonth.now().atDay(1);
     }
 
     private boolean isBlank(String value) {
