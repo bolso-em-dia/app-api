@@ -14,16 +14,26 @@ public class TransactionCategoryAnalyzer {
             List<Transaction> transactions,
             Function<Transaction, BigDecimal> amountExtractor,
             Comparator<CategoryAmount> order) {
-        return transactions.stream()
-                .collect(Collectors.groupingBy(
-                        transaction -> transaction.getCategory().getId()))
-                .entrySet()
-                .stream()
+        return analyzeByCategory(
+                transactions,
+                transaction -> transaction.getCategory().getId().toString(),
+                transaction -> transaction.getCategory().getName(),
+                amountExtractor,
+                order);
+    }
+
+    public <T> List<CategoryAmount> analyzeByCategory(
+            List<T> items,
+            Function<T, String> categoryIdExtractor,
+            Function<T, String> categoryNameExtractor,
+            Function<T, BigDecimal> amountExtractor,
+            Comparator<CategoryAmount> order) {
+        return items.stream().collect(Collectors.groupingBy(categoryIdExtractor)).entrySet().stream()
                 .map(entry -> {
-                    List<Transaction> items = entry.getValue();
-                    BigDecimal total = items.stream().map(amountExtractor).reduce(BigDecimal.ZERO, BigDecimal::add);
-                    String categoryName = items.get(0).getCategory().getName();
-                    return new CategoryAmount(entry.getKey().toString(), categoryName, total);
+                    var groupedItems = entry.getValue();
+                    var total = groupedItems.stream().map(amountExtractor).reduce(BigDecimal.ZERO, BigDecimal::add);
+                    var categoryName = categoryNameExtractor.apply(groupedItems.get(0));
+                    return new CategoryAmount(entry.getKey(), categoryName, total);
                 })
                 .sorted(order)
                 .toList();

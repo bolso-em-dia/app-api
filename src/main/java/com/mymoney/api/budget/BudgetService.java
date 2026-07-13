@@ -11,9 +11,9 @@ import com.mymoney.api.shared.EntityResolver;
 import com.mymoney.api.shared.ErrorMessage;
 import com.mymoney.api.shared.InputNormalizer;
 import com.mymoney.api.transaction.OwnershipType;
-import com.mymoney.api.transaction.Transaction;
 import com.mymoney.api.transaction.TransactionCategoryAnalyzer;
 import com.mymoney.api.transaction.TransactionService;
+import com.mymoney.api.transaction.api.response.TransactionResponse;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
@@ -43,7 +43,7 @@ public class BudgetService {
     private final TransactionCategoryAnalyzer transactionCategoryAnalyzer;
     private final DateProvider dateProvider;
 
-    @Transactional
+    @Transactional(readOnly = true)
     public Page<BudgetView> listForMonth(
             LocalDate referenceMonth, String search, BudgetListStatus status, BudgetType type, Pageable pageable) {
         Page<UUID> idPage = budgetRepository.findIdsForMonth(
@@ -54,7 +54,7 @@ public class BudgetService {
         return new PageImpl<>(views, pageable, idPage.getTotalElements());
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<BudgetView> listForMonth(LocalDate referenceMonth) {
         return loadByIds(budgetRepository
                         .findIdsForMonth(referenceMonth, "", BudgetListStatus.ACTIVE.name(), null, Pageable.unpaged())
@@ -64,7 +64,7 @@ public class BudgetService {
                 .toList();
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public BudgetView getViewById(UUID id, LocalDate referenceMonth) {
         return toView(getById(id), referenceMonth);
     }
@@ -117,18 +117,20 @@ public class BudgetService {
         return budgetRepository.save(budget);
     }
 
-    @Transactional
-    public List<Transaction> listTransactions(UUID id, LocalDate referenceMonth) {
+    @Transactional(readOnly = true)
+    public List<TransactionResponse> listTransactions(UUID id, LocalDate referenceMonth) {
         return filterTransactions(getById(id), referenceMonth);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<BudgetCategoryBreakdownItem> categoryBreakdown(UUID id, LocalDate referenceMonth) {
-        List<Transaction> transactions = filterTransactions(getById(id), referenceMonth);
+        var transactions = filterTransactions(getById(id), referenceMonth);
         return transactionCategoryAnalyzer
                 .analyzeByCategory(
                         transactions,
-                        Transaction::getAmount,
+                        TransactionResponse::categoryId,
+                        TransactionResponse::categoryName,
+                        TransactionResponse::amount,
                         Comparator.comparing(
                                 TransactionCategoryAnalyzer.CategoryAmount::categoryName,
                                 String.CASE_INSENSITIVE_ORDER))
@@ -150,17 +152,17 @@ public class BudgetService {
 
     private BudgetView toView(Budget budget, LocalDate referenceMonth) {
         BigDecimal consumedAmount = filterTransactions(budget, referenceMonth).stream()
-                .map(Transaction::getConvertedAmount)
+                .map(TransactionResponse::convertedAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new BudgetView(budget, consumedAmount, budget.getMonthlyLimit().subtract(consumedAmount));
     }
 
-    private List<Transaction> filterTransactions(Budget budget, LocalDate referenceMonth) {
+    private List<TransactionResponse> filterTransactions(Budget budget, LocalDate referenceMonth) {
         if (budget.getType() == BudgetType.ALLOWANCE) {
-            UUID ownerId = budget.getOwnerMember() == null
+            var ownerId = budget.getOwnerMember() == null
                     ? null
                     : budget.getOwnerMember().getId();
-            return transactionService.listByFilters(
+            return transactionService.listResponsesByFilters(
                     referenceMonth,
                     null, // type — budget não filtra income/expense
                     OwnershipType.INDIVIDUAL,
@@ -172,7 +174,7 @@ public class BudgetService {
         // GLOBAL budget — filtra por ownershipType e categoryIds no banco
         List<UUID> categoryIds =
                 budget.getCategories().stream().map(Category::getId).toList();
-        return transactionService.listByFilters(
+        return transactionService.listResponsesByFilters(
                 referenceMonth,
                 null, // type
                 OwnershipType.SHARED,

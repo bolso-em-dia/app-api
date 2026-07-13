@@ -2,10 +2,10 @@ package com.mymoney.api.dashboard;
 
 import com.mymoney.api.budget.BudgetService;
 import com.mymoney.api.budget.BudgetView;
-import com.mymoney.api.transaction.Transaction;
 import com.mymoney.api.transaction.TransactionCategoryAnalyzer;
 import com.mymoney.api.transaction.TransactionService;
 import com.mymoney.api.transaction.TransactionType;
+import com.mymoney.api.transaction.api.response.TransactionResponse;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
@@ -22,34 +22,36 @@ public class DashboardService {
     private final BudgetService budgetService;
     private final TransactionCategoryAnalyzer transactionCategoryAnalyzer;
 
-    @Transactional
+    @Transactional(readOnly = true)
     public DashboardView getDashboard(LocalDate referenceMonth) {
-        List<Transaction> transactions = transactionService.listByFilters(referenceMonth, null, null, null, null, null);
-        List<BudgetView> budgets = budgetService.listForMonth(referenceMonth);
+        var transactions = transactionService.listResponsesByFilters(referenceMonth, null, null, null, null, null);
+        var budgets = budgetService.listForMonth(referenceMonth);
 
-        BigDecimal totalIncome = sumByType(transactions, TransactionType.INCOME);
-        BigDecimal totalExpense = sumByType(transactions, TransactionType.EXPENSE);
-        BigDecimal balance = totalIncome.subtract(totalExpense);
-        BigDecimal reservedBudgetAmount = budgets.stream()
+        var totalIncome = sumByType(transactions, TransactionType.INCOME.name());
+        var totalExpense = sumByType(transactions, TransactionType.EXPENSE.name());
+        var balance = totalIncome.subtract(totalExpense);
+        var reservedBudgetAmount = budgets.stream()
                 .map(BudgetView::remainingAmount)
                 .filter(remaining -> remaining.compareTo(BigDecimal.ZERO) > 0)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal availableBalance = balance.subtract(reservedBudgetAmount);
+        var availableBalance = balance.subtract(reservedBudgetAmount);
 
-        List<Transaction> recentTransactions = transactions.stream()
-                .sorted(Comparator.comparing(Transaction::getTransactionDate)
-                        .thenComparing(Transaction::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+        var recentTransactions = transactions.stream()
+                .sorted(Comparator.comparing(TransactionResponse::transactionDate)
+                        .thenComparing(TransactionResponse::createdAt, Comparator.nullsLast(Comparator.naturalOrder()))
                         .reversed())
                 .limit(10)
                 .toList();
 
-        List<Transaction> expenseTransactions = transactions.stream()
-                .filter(transaction -> transaction.getType() == TransactionType.EXPENSE)
+        var expenseTransactions = transactions.stream()
+                .filter(transaction -> transaction.type().equals(TransactionType.EXPENSE.name()))
                 .toList();
-        List<DashboardCategoryBreakdownItem> analyzedCategoryBreakdown = transactionCategoryAnalyzer
+        var analyzedCategoryBreakdown = transactionCategoryAnalyzer
                 .analyzeByCategory(
                         expenseTransactions,
-                        Transaction::getConvertedAmount,
+                        TransactionResponse::categoryId,
+                        TransactionResponse::categoryName,
+                        TransactionResponse::convertedAmount,
                         Comparator.comparing(TransactionCategoryAnalyzer.CategoryAmount::amount)
                                 .reversed())
                 .stream()
@@ -68,10 +70,10 @@ public class DashboardService {
                 analyzedCategoryBreakdown);
     }
 
-    private BigDecimal sumByType(List<Transaction> transactions, TransactionType type) {
+    private BigDecimal sumByType(List<TransactionResponse> transactions, String type) {
         return transactions.stream()
-                .filter(transaction -> transaction.getType() == type)
-                .map(Transaction::getConvertedAmount)
+                .filter(transaction -> transaction.type().equals(type))
+                .map(TransactionResponse::convertedAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

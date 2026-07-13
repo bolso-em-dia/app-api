@@ -2,8 +2,8 @@ package com.mymoney.api.preference;
 
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
+import com.mymoney.api.auth.AuthenticatedMemberResolver;
 import com.mymoney.api.member.FamilyMember;
-import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.preference.api.request.UpdateUserPreferencesRequest;
 import com.mymoney.api.preference.api.response.UserPreferencesResponse;
 import com.mymoney.api.shared.DateProvider;
@@ -13,8 +13,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -29,13 +27,13 @@ public class UserPreferencesService {
     private static final Set<String> SUPPORTED_LOCALES = Set.of("pt-BR", "en-US");
 
     private final MemberPreferencesRepository memberPreferencesRepository;
-    private final FamilyMemberRepository familyMemberRepository;
     private final AccountRepository accountRepository;
     private final DateProvider dateProvider;
+    private final AuthenticatedMemberResolver authenticatedMemberResolver;
 
     @Transactional(readOnly = true)
     public UserPreferencesResponse getCurrentUserPreferences() {
-        return resolvePreferences(currentMember());
+        return resolvePreferences(authenticatedMemberResolver.resolve());
     }
 
     @Transactional(readOnly = true)
@@ -48,7 +46,7 @@ public class UserPreferencesService {
 
     @Transactional
     public UserPreferencesResponse updateCurrentUserPreferences(UpdateUserPreferencesRequest request) {
-        FamilyMember member = currentMember();
+        FamilyMember member = authenticatedMemberResolver.resolve();
         validateLocale(request.locale());
 
         MemberPreferences preferences = memberPreferencesRepository
@@ -105,18 +103,6 @@ public class UserPreferencesService {
         }
 
         return account;
-    }
-
-    private FamilyMember currentMember() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getName() == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User is not authenticated.");
-        }
-
-        return familyMemberRepository
-                .findByEmailIgnoreCase(authentication.getName())
-                .filter(FamilyMember::isActive)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User was not found."));
     }
 
     private boolean isAccountActiveInMonth(Account account, LocalDate referenceMonth) {
