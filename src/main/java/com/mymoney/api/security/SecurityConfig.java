@@ -34,7 +34,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(apiAuthenticationEntryPoint)
                         .accessDeniedHandler(apiAccessDeniedHandler))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/actuator/health", "/actuator/info")
+                        .requestMatchers("/actuator/health", "/actuator/info", "/api/version")
                         .permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/auth/logout")
                         .permitAll()
