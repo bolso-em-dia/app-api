@@ -37,4 +37,4 @@ app:
     password: ${APP_ADMIN_PASSWORD:admin123456}
   exchange-rate:
     enabled: false
-  version: "1.0.0"
+  version: "1.0.1"
