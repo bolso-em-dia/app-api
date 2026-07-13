@@ -67,7 +67,15 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.defaultAccountId").value(nullValue()))
                 .andExpect(jsonPath("$.locale").value("pt-BR"))
-                .andExpect(jsonPath("$.showBalanceWithBudgets").value(false));
+                .andExpect(jsonPath("$.showBalanceWithBudgets").value(false))
+                .andExpect(jsonPath("$.showForeignCurrency").value(false));
+    }
+
+    @Test
+    void getPreferences_defaultsShowForeignCurrencyFalse() throws Exception {
+        mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.showForeignCurrency").value(false));
     }
 
     @Test
@@ -80,7 +88,8 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                                 {
                                   "defaultAccountId": "%s",
                                   "locale": "en-US",
-                                  "showBalanceWithBudgets": true
+                                  "showBalanceWithBudgets": true,
+                                  "showForeignCurrency": false
                                 }
                                 """
                                         .formatted(activeAccount.getId())))
@@ -88,14 +97,78 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                 .andExpect(jsonPath("$.defaultAccountId")
                         .value(activeAccount.getId().toString()))
                 .andExpect(jsonPath("$.locale").value("en-US"))
-                .andExpect(jsonPath("$.showBalanceWithBudgets").value(true));
+                .andExpect(jsonPath("$.showBalanceWithBudgets").value(true))
+                .andExpect(jsonPath("$.showForeignCurrency").value(false));
 
         mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.defaultAccountId")
                         .value(activeAccount.getId().toString()))
                 .andExpect(jsonPath("$.locale").value("en-US"))
-                .andExpect(jsonPath("$.showBalanceWithBudgets").value(true));
+                .andExpect(jsonPath("$.showBalanceWithBudgets").value(true))
+                .andExpect(jsonPath("$.showForeignCurrency").value(false));
+    }
+
+    @Test
+    void updatePreferences_enablesForeignCurrency() throws Exception {
+        mockMvc.perform(
+                        put("/api/me/preferences")
+                                .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "defaultAccountId": null,
+                                  "locale": "pt-BR",
+                                  "showBalanceWithBudgets": false,
+                                  "showForeignCurrency": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.showForeignCurrency").value(true));
+
+        mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.showForeignCurrency").value(true));
+    }
+
+    @Test
+    void updatePreferences_disablesForeignCurrency() throws Exception {
+        mockMvc.perform(
+                        put("/api/me/preferences")
+                                .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "defaultAccountId": null,
+                                  "locale": "pt-BR",
+                                  "showBalanceWithBudgets": false,
+                                  "showForeignCurrency": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.showForeignCurrency").value(true));
+
+        mockMvc.perform(
+                        put("/api/me/preferences")
+                                .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "defaultAccountId": null,
+                                  "locale": "pt-BR",
+                                  "showBalanceWithBudgets": false,
+                                  "showForeignCurrency": false
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.showForeignCurrency").value(false));
+
+        mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.showForeignCurrency").value(false));
     }
 
     @Test
@@ -108,7 +181,8 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                                 {
                                   "defaultAccountId": "%s",
                                   "locale": "en-US",
-                                  "showBalanceWithBudgets": true
+                                  "showBalanceWithBudgets": true,
+                                  "showForeignCurrency": false
                                 }
                                 """
                                         .formatted(activeAccount.getId())))
@@ -125,13 +199,15 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                                 {
                                   "defaultAccountId": null,
                                   "locale": "pt-BR",
-                                  "showBalanceWithBudgets": false
+                                  "showBalanceWithBudgets": false,
+                                  "showForeignCurrency": false
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.defaultAccountId").value(nullValue()))
                 .andExpect(jsonPath("$.locale").value("pt-BR"))
-                .andExpect(jsonPath("$.showBalanceWithBudgets").value(false));
+                .andExpect(jsonPath("$.showBalanceWithBudgets").value(false))
+                .andExpect(jsonPath("$.showForeignCurrency").value(false));
     }
 
     @Test
@@ -145,7 +221,8 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                                 {
                                   "defaultAccountId": "11111111-1111-1111-1111-111111111111",
                                   "locale": "pt-BR",
-                                  "showBalanceWithBudgets": false
+                                  "showBalanceWithBudgets": false,
+                                  "showForeignCurrency": false
                                 }
                                 """))
                 .andExpect(status().isNotFound())
@@ -165,7 +242,8 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                                 {
                                   "defaultAccountId": "%s",
                                   "locale": "pt-BR",
-                                  "showBalanceWithBudgets": false
+                                  "showBalanceWithBudgets": false,
+                                  "showForeignCurrency": false
                                 }
                                 """
                                         .formatted(activeAccount.getId())))
@@ -186,7 +264,8 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                                 {
                                   "defaultAccountId": "%s",
                                   "locale": "pt-BR",
-                                  "showBalanceWithBudgets": false
+                                  "showBalanceWithBudgets": false,
+                                  "showForeignCurrency": false
                                 }
                                 """
                                         .formatted(activeAccount.getId())))
@@ -205,7 +284,8 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                                 {
                                   "defaultAccountId": null,
                                   "locale": "es-ES",
-                                  "showBalanceWithBudgets": false
+                                  "showBalanceWithBudgets": false,
+                                  "showForeignCurrency": false
                                 }
                                 """))
                 .andExpect(status().isUnprocessableEntity())

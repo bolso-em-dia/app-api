@@ -130,7 +130,7 @@ public class BudgetService {
                         transactions,
                         TransactionResponse::categoryId,
                         TransactionResponse::categoryName,
-                        TransactionResponse::amount,
+                        TransactionResponse::convertedAmount,
                         Comparator.comparing(
                                 TransactionCategoryAnalyzer.CategoryAmount::categoryName,
                                 String.CASE_INSENSITIVE_ORDER))

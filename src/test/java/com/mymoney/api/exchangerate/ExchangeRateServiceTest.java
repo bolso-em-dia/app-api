@@ -4,12 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mymoney.api.config.AppExchangeRateProperties;
 import com.mymoney.api.exchangerate.api.response.ExchangeRateResponse;
+import com.mymoney.api.preference.UserPreferencesService;
+import com.mymoney.api.preference.api.response.UserPreferencesResponse;
 import com.mymoney.api.shared.DateProvider;
 import com.mymoney.api.transaction.TransactionRepository;
 import java.math.BigDecimal;
@@ -43,6 +46,9 @@ class ExchangeRateServiceTest {
     @Mock
     private DateProvider dateProvider;
 
+    @Mock
+    private UserPreferencesService userPreferencesService;
+
     @InjectMocks
     private ExchangeRateService exchangeRateService;
 
@@ -54,6 +60,9 @@ class ExchangeRateServiceTest {
         savedRate.setCurrency("USD");
         savedRate.setRate(new BigDecimal("5.10"));
         savedRate.setFetchedAt(OffsetDateTime.now().minusMinutes(30));
+        lenient()
+                .when(userPreferencesService.getCurrentUserPreferences())
+                .thenReturn(new UserPreferencesResponse(null, "pt-BR", false, true));
     }
 
     // BT01

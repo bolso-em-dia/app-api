@@ -12,12 +12,15 @@ import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
+import com.mymoney.api.account.CurrencyType;
 import com.mymoney.api.auth.api.JsonTestUtils;
 import com.mymoney.api.budget.Budget;
 import com.mymoney.api.budget.BudgetRepository;
 import com.mymoney.api.budget.BudgetType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
+import com.mymoney.api.exchangerate.ExchangeRate;
+import com.mymoney.api.exchangerate.ExchangeRateRepository;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
@@ -34,6 +37,7 @@ import com.mymoney.api.transaction.TransactionSourceType;
 import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.util.LinkedHashSet;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,6 +75,9 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
 
     @Autowired
     private FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
+
+    @Autowired
+    private ExchangeRateRepository exchangeRateRepository;
 
     private String adminToken;
     private String userToken;
@@ -283,6 +290,49 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
                 .andExpect(jsonPath("$.ownerMemberId")
                         .value(allowanceMember.getId().toString()))
                 .andExpect(jsonPath("$.categories.length()").value(0));
+    }
+
+    @Test
+    void categoryBreakdownUsesConvertedAmountForUsdTransactions() throws Exception {
+        var usdRate = new ExchangeRate();
+        usdRate.setCurrency("USD");
+        usdRate.setRate(new BigDecimal("5.20"));
+        usdRate.setFetchedAt(OffsetDateTime.now());
+        exchangeRateRepository.save(usdRate);
+
+        var usdAccount = accountRepository.save(AccountTestFactory.create(created -> {
+            created.setName("USD Wallet");
+            created.setType(AccountType.CHECKING);
+            created.setCurrency(CurrencyType.USD);
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
+
+        transactionRepository.save(TransactionTestFactory.create(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("Imported groceries");
+            created.setAmount(new BigDecimal("100.00"));
+            created.setConvertedAmount(new BigDecimal("520.00"));
+            created.setExchangeRate(new BigDecimal("5.20"));
+            created.setCurrency("USD");
+            created.setTransactionDate(LocalDate.of(2026, 6, 15));
+            created.setReferenceMonth(LocalDate.of(2026, 6, 1));
+            created.setAccount(usdAccount);
+            created.setCategory(groceries);
+        }));
+
+        mockMvc.perform(get("/api/budgets/" + globalBudget.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.consumedAmount").value(670.0));
+
+        mockMvc.perform(get("/api/budgets/" + globalBudget.getId() + "/category-breakdown")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.categoryName=='Groceries')].amount").value(670.0));
     }
 
     @Test

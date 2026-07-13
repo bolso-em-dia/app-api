@@ -59,7 +59,7 @@ public class Transaction {
     @Column(name = "exchange_rate", precision = 14, scale = 6)
     private BigDecimal exchangeRate;
 
-    @Column(length = 3)
+    @Column(nullable = false, length = 3)
     private String currency;
 
     @Column(name = "transaction_date", nullable = false)
