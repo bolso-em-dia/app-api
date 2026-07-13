@@ -15,9 +15,8 @@ import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
-import com.mymoney.api.member.FamilyMember;
-import com.mymoney.api.member.FamilyMemberRepository;
-import com.mymoney.api.member.FamilyRole;
+import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateRequest;
+import com.mymoney.api.fixedexpense.api.request.UpdateFixedExpenseTemplateRequest;
 import com.mymoney.api.transaction.EffectiveMonthlyTransactionService;
 import com.mymoney.api.transaction.Transaction;
 import com.mymoney.api.transaction.TransactionRepository;
@@ -25,7 +24,6 @@ import com.mymoney.api.transaction.TransactionType;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,19 +31,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
 class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
-
-    @Autowired
-    private FamilyMemberRepository familyMemberRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private CategoryRepository categoryRepository;
@@ -73,38 +64,26 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
 
     @BeforeEach
     void setUp() throws Exception {
-        FamilyMember regularUser = familyMemberRepository
-                .findByEmailIgnoreCase("user@bolso-em-dia.local")
-                .orElseGet(FamilyMember::new);
-        regularUser.setName("Regular User");
-        regularUser.setEmail("user@bolso-em-dia.local");
-        regularUser.setPasswordHash(passwordEncoder.encode("user123456"));
-        regularUser.setRole(FamilyRole.USER);
-        regularUser.setActive(true);
-        regularUser.setAllowanceEnabled(false);
-        familyMemberRepository.save(regularUser);
-
-        category = new Category();
-        category.setName("Housing");
-        category.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        category = categoryRepository.save(category);
-
-        account = new Account();
-        account.setName("Main Checking");
-        account.setType(AccountType.CHECKING);
-        account.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        account = accountRepository.save(account);
-
-        template = new FixedExpenseTemplate();
-        template.setName("Rent");
-        template.setType(TransactionType.EXPENSE);
-        template.setAmount(new BigDecimal("1800.00"));
-        template.setCategory(category);
-        template.setAccount(account);
-        template.setDueDay((short) 5);
-        template.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        template.setActive(true);
-        template = fixedExpenseTemplateRepository.save(template);
+        fixtures().ensureRegularUser();
+        category = fixtures().persistCategory(created -> {
+            created.setName("Housing");
+            created.setCreatedInMonth(currentReferenceMonth());
+        });
+        account = fixtures().persistAccount(created -> {
+            created.setName("Main Checking");
+            created.setType(AccountType.CHECKING);
+            created.setCreatedInMonth(currentReferenceMonth());
+        });
+        template = fixtures().persistFixedExpenseTemplate(created -> {
+            created.setName("Rent");
+            created.setType(TransactionType.EXPENSE);
+            created.setAmount(new BigDecimal("1800.00"));
+            created.setCategory(category);
+            created.setAccount(account);
+            created.setDueDay((short) 5);
+            created.setCreatedInMonth(currentReferenceMonth());
+            created.setActive(true);
+        });
 
         adminToken = loginAsAdmin();
         userToken = loginAsUser();
@@ -138,18 +117,13 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
         mockMvc.perform(post("/api/fixed-transactions")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                """
-                                {
-                                  "name": "Internet",
-                                  "type": "INCOME",
-                                  "amount": 120.50,
-                                  "categoryId": "%s",
-                                  "accountId": "%s",
-                                  "dueDay": 12
-                                }
-                                """
-                                        .formatted(category.getId(), account.getId())))
+                        .content(toJson(new CreateFixedExpenseTemplateRequest(
+                                "Internet",
+                                TransactionType.INCOME,
+                                new BigDecimal("120.50"),
+                                category.getId(),
+                                account.getId(),
+                                12))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Internet"))
                 .andExpect(jsonPath("$.type").value("INCOME"))
@@ -165,18 +139,13 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
         mockMvc.perform(put("/api/fixed-transactions/" + template.getId())
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                """
-                                {
-                                  "name": "Rent Updated",
-                                  "type": "EXPENSE",
-                                  "amount": 1850.00,
-                                  "categoryId": "%s",
-                                  "accountId": "%s",
-                                  "dueDay": 7
-                                }
-                                """
-                                        .formatted(category.getId(), account.getId())))
+                        .content(toJson(new UpdateFixedExpenseTemplateRequest(
+                                "Rent Updated",
+                                TransactionType.EXPENSE,
+                                new BigDecimal("1850.00"),
+                                category.getId(),
+                                account.getId(),
+                                7))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Rent Updated"))
                 .andExpect(jsonPath("$.amount").value(1850.0))
@@ -185,7 +154,7 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
 
     @Test
     void updateSynchronizesCurrentMonthMaterializedTransaction() throws Exception {
-        LocalDate currentReferenceMonth = YearMonth.now().atDay(1);
+        LocalDate currentReferenceMonth = currentReferenceMonth();
         LocalDate previousReferenceMonth = currentReferenceMonth.minusMonths(1);
 
         template.setCreatedInMonth(previousReferenceMonth);
@@ -194,18 +163,13 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
         mockMvc.perform(put("/api/fixed-transactions/" + template.getId())
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                """
-                                {
-                                  "name": "Rent August",
-                                  "type": "INCOME",
-                                  "amount": 2450.00,
-                                  "categoryId": "%s",
-                                  "accountId": "%s",
-                                  "dueDay": 9
-                                }
-                                """
-                                        .formatted(category.getId(), account.getId())))
+                        .content(toJson(new UpdateFixedExpenseTemplateRequest(
+                                "Rent August",
+                                TransactionType.INCOME,
+                                new BigDecimal("2450.00"),
+                                category.getId(),
+                                account.getId(),
+                                9))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Rent August"))
                 .andExpect(jsonPath("$.type").value("INCOME"))
@@ -227,7 +191,7 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
 
     @Test
     void deleteRemovesTemplateAndCurrentMonthTransactions() throws Exception {
-        LocalDate currentMonth = YearMonth.now().atDay(1);
+        LocalDate currentMonth = currentReferenceMonth();
         LocalDate pastMonth = currentMonth.minusMonths(1);
 
         template.setCreatedInMonth(pastMonth);
@@ -251,9 +215,9 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
 
     @Test
     void deleteDetachesPastTransactionsAndRemovesCurrentAndFuture() throws Exception {
-        LocalDate twoMonthsAgo = YearMonth.now().minusMonths(2).atDay(1);
-        LocalDate pastMonth = YearMonth.now().minusMonths(1).atDay(1);
-        LocalDate currentMonth = YearMonth.now().atDay(1);
+        LocalDate twoMonthsAgo = currentReferenceMonth().minusMonths(2);
+        LocalDate pastMonth = currentReferenceMonth().minusMonths(1);
+        LocalDate currentMonth = currentReferenceMonth();
 
         template.setCreatedInMonth(twoMonthsAgo);
         FixedExpenseTemplate saved = fixedExpenseTemplateRepository.save(template);
@@ -404,5 +368,9 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
                                 """
                                         .formatted(category.getId(), account.getId())))
                 .andExpect(status().isBadRequest());
+    }
+
+    private String toJson(Object value) throws Exception {
+        return fixtures().writeJson(value);
     }
 }

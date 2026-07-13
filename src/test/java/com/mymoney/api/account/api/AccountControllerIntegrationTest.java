@@ -11,9 +11,9 @@ import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
-import com.mymoney.api.member.FamilyMember;
-import com.mymoney.api.member.FamilyMemberRepository;
-import com.mymoney.api.member.FamilyRole;
+import com.mymoney.api.account.CurrencyType;
+import com.mymoney.api.account.api.request.CreateAccountRequest;
+import com.mymoney.api.account.api.request.UpdateAccountRequest;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,19 +21,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
 class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
-
-    @Autowired
-    private FamilyMemberRepository familyMemberRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private AccountRepository accountRepository;
@@ -45,32 +38,21 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
 
     @BeforeEach
     void setUp() throws Exception {
-        FamilyMember regularUser = familyMemberRepository
-                .findByEmailIgnoreCase("user@bolso-em-dia.local")
-                .orElseGet(FamilyMember::new);
-        regularUser.setName("Regular User");
-        regularUser.setEmail("user@bolso-em-dia.local");
-        regularUser.setPasswordHash(passwordEncoder.encode("user123456"));
-        regularUser.setRole(FamilyRole.USER);
-        regularUser.setActive(true);
-        regularUser.setAllowanceEnabled(false);
-        familyMemberRepository.save(regularUser);
-
-        accountA = new Account();
-        accountA.setName("Main Checking");
-        accountA.setType(AccountType.CHECKING);
-        accountA.setColor("#2266aa");
-        accountA.setCreatedInMonth(LocalDate.of(2026, 5, 1));
-        accountA = accountRepository.save(accountA);
-
-        accountB = new Account();
-        accountB.setName("Visa Platinum");
-        accountB.setType(AccountType.CREDIT_CARD);
-        accountB.setBrand("Visa");
-        accountB.setClosingDay((short) 10);
-        accountB.setDueDay((short) 17);
-        accountB.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        accountB = accountRepository.save(accountB);
+        fixtures().ensureRegularUser();
+        accountA = fixtures().persistAccount(created -> {
+            created.setName("Main Checking");
+            created.setType(AccountType.CHECKING);
+            created.setColor("#2266aa");
+            created.setCreatedInMonth(LocalDate.of(2026, 5, 1));
+        });
+        accountB = fixtures().persistAccount(created -> {
+            created.setName("Visa Platinum");
+            created.setType(AccountType.CREDIT_CARD);
+            created.setBrand("Visa");
+            created.setClosingDay((short) 10);
+            created.setDueDay((short) 17);
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        });
 
         adminToken = loginAsAdmin();
         userToken = loginAsUser();
@@ -79,7 +61,7 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
     @Test
     void adminCanListCreateGetAndUpdateAccounts() throws Exception {
         mockMvc.perform(get("/api/accounts")
-                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Authorization", bearerToken(adminToken))
                         .param("search", "visa")
                         .param("status", "ACTIVE")
                         .param("type", "CREDIT_CARD")
@@ -91,45 +73,25 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
                 .andExpect(jsonPath("$.totalItems").value(1))
                 .andExpect(jsonPath("$.totalPages").value(1));
 
-        mockMvc.perform(
-                        post("/api/accounts")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "name": "Nubank",
-                                  "type": "CREDIT_CARD",
-                                  "brand": "Mastercard",
-                                  "color": "#7d2bd9",
-                                  "closingDay": 8,
-                                  "dueDay": 15
-                                }
-                                """))
+        mockMvc.perform(post("/api/accounts")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new CreateAccountRequest(
+                                "Nubank", AccountType.CREDIT_CARD, null, "Mastercard", "#7d2bd9", 8, 15))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Nubank"))
                 .andExpect(jsonPath("$.type").value("CREDIT_CARD"))
                 .andExpect(jsonPath("$.brand").value("Mastercard"));
 
-        mockMvc.perform(get("/api/accounts/" + accountA.getId()).header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(get("/api/accounts/" + accountA.getId()).header("Authorization", bearerToken(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Main Checking"));
 
-        mockMvc.perform(
-                        put("/api/accounts/" + accountB.getId())
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "name": "Visa Infinite",
-                                  "type": "CREDIT_CARD",
-                                  "brand": "Visa",
-                                  "color": "#111111",
-                                  "closingDay": 12,
-                                  "dueDay": 20
-                                }
-                                """))
+        mockMvc.perform(put("/api/accounts/" + accountB.getId())
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateAccountRequest(
+                                "Visa Infinite", AccountType.CREDIT_CARD, null, "Visa", "#111111", 12, 20))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Visa Infinite"))
                 .andExpect(jsonPath("$.closingDay").value(12))
@@ -138,46 +100,32 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
 
     @Test
     void accountValidationAndOptionsWork() throws Exception {
-        mockMvc.perform(
-                        post("/api/accounts")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "name": "Checking With Card Fields",
-                                  "type": "CHECKING",
-                                  "closingDay": 5,
-                                  "dueDay": 10
-                                }
-                                """))
+        mockMvc.perform(post("/api/accounts")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new CreateAccountRequest(
+                                "Checking With Card Fields", AccountType.CHECKING, null, null, null, 5, 10))))
                 .andExpect(status().isUnprocessableEntity());
 
-        mockMvc.perform(
-                        post("/api/accounts")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "name": "Card Missing Days",
-                                  "type": "CREDIT_CARD"
-                                }
-                                """))
+        mockMvc.perform(post("/api/accounts")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new CreateAccountRequest(
+                                "Card Missing Days", AccountType.CREDIT_CARD, null, null, null, null, null))))
                 .andExpect(status().isUnprocessableEntity());
 
         accountA.setArchivedFromMonth(LocalDate.of(2026, 8, 1));
         accountRepository.save(accountA);
 
         mockMvc.perform(get("/api/accounts/options")
-                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Authorization", bearerToken(adminToken))
                         .param("referenceMonth", "2026-07-01"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.name=='Main Checking')]").isNotEmpty())
                 .andExpect(jsonPath("$[?(@.name=='Visa Platinum')]").isNotEmpty());
 
         mockMvc.perform(get("/api/accounts/options")
-                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Authorization", bearerToken(adminToken))
                         .param("referenceMonth", "2026-08-01"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.name=='Main Checking')]").isEmpty())
@@ -188,7 +136,7 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
     void adminCanArchiveAndUserCannotAccessAccountsApi() throws Exception {
         mockMvc.perform(
                         patch("/api/accounts/" + accountA.getId() + "/archive")
-                                .header("Authorization", "Bearer " + adminToken)
+                                .header("Authorization", bearerToken(adminToken))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -197,15 +145,16 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.archivedFromMonth").value("2026-07-01"));
+                .andExpect(jsonPath("$.archivedFromMonth")
+                        .value(currentReferenceMonth().toString()));
 
         mockMvc.perform(get("/api/accounts")
-                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Authorization", bearerToken(adminToken))
                         .param("status", "ARCHIVED"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].name").value("Main Checking"));
 
-        mockMvc.perform(get("/api/accounts").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/accounts").header("Authorization", bearerToken(userToken)))
                 .andExpect(status().isForbidden());
     }
 
@@ -228,41 +177,35 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
 
     @Test
     void createAccountAsUserIsForbidden() throws Exception {
-        mockMvc.perform(
-                        post("/api/accounts")
-                                .header("Authorization", "Bearer " + userToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {"name": "Test", "type": "CHECKING"}
-                                """))
+        mockMvc.perform(post("/api/accounts")
+                        .header("Authorization", bearerToken(userToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(
+                                new CreateAccountRequest("Test", AccountType.CHECKING, null, null, null, null, null))))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void getAccountReturns404ForNonExistentId() throws Exception {
         mockMvc.perform(get("/api/accounts/00000000-0000-0000-0000-000000000000")
-                        .header("Authorization", "Bearer " + adminToken))
+                        .header("Authorization", bearerToken(adminToken)))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void updateAccountReturns404ForNonExistentId() throws Exception {
-        mockMvc.perform(
-                        put("/api/accounts/00000000-0000-0000-0000-000000000000")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {"name": "Updated", "type": "CHECKING"}
-                                """))
+        mockMvc.perform(put("/api/accounts/00000000-0000-0000-0000-000000000000")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateAccountRequest(
+                                "Updated", AccountType.CHECKING, null, null, null, null, null))))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void archiveAccountReturns404ForNonExistentId() throws Exception {
         mockMvc.perform(patch("/api/accounts/00000000-0000-0000-0000-000000000000/archive")
-                        .header("Authorization", "Bearer " + adminToken))
+                        .header("Authorization", bearerToken(adminToken)))
                 .andExpect(status().isNotFound());
     }
 
@@ -274,7 +217,7 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
     @Test
     void archiveAccountAsUserIsForbidden() throws Exception {
         mockMvc.perform(patch("/api/accounts/" + accountA.getId() + "/archive")
-                        .header("Authorization", "Bearer " + userToken))
+                        .header("Authorization", bearerToken(userToken)))
                 .andExpect(status().isForbidden());
     }
 
@@ -282,7 +225,7 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
     void createAccountWithEmptyNameReturns400() throws Exception {
         mockMvc.perform(
                         post("/api/accounts")
-                                .header("Authorization", "Bearer " + adminToken)
+                                .header("Authorization", bearerToken(adminToken))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -295,7 +238,7 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
     void createAccountWithNullTypeReturns400() throws Exception {
         mockMvc.perform(
                         post("/api/accounts")
-                                .header("Authorization", "Bearer " + adminToken)
+                                .header("Authorization", bearerToken(adminToken))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -306,50 +249,45 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
 
     @Test
     void createAccountWithCurrencyUSD() throws Exception {
-        mockMvc.perform(
-                        post("/api/accounts")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {"name": "US Account", "type": "CHECKING", "currency": "USD"}
-                                """))
+        mockMvc.perform(post("/api/accounts")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new CreateAccountRequest(
+                                "US Account", AccountType.CHECKING, CurrencyType.USD, null, null, null, null))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.currency").value("USD"));
     }
 
     @Test
     void createAccountDefaultsToBRL() throws Exception {
-        mockMvc.perform(
-                        post("/api/accounts")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {"name": "BR Account", "type": "CHECKING"}
-                                """))
+        mockMvc.perform(post("/api/accounts")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new CreateAccountRequest(
+                                "BR Account", AccountType.CHECKING, null, null, null, null, null))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.currency").value("BRL"));
     }
 
     @Test
     void updateAccountChangesCurrency() throws Exception {
-        mockMvc.perform(
-                        put("/api/accounts/" + accountA.getId())
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {"name": "Updated", "type": "CHECKING", "currency": "USD"}
-                                """))
+        mockMvc.perform(put("/api/accounts/" + accountA.getId())
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateAccountRequest(
+                                "Updated", AccountType.CHECKING, CurrencyType.USD, null, null, null, null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.currency").value("USD"));
     }
 
     @Test
     void listAccountsShowsCurrencyField() throws Exception {
-        mockMvc.perform(get("/api/accounts").header("Authorization", "Bearer " + adminToken))
+        mockMvc.perform(get("/api/accounts").header("Authorization", bearerToken(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].currency").value("BRL"));
+    }
+
+    private String toJson(Object value) throws Exception {
+        return fixtures().writeJson(value);
     }
 }

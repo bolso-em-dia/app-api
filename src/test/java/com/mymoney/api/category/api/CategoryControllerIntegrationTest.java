@@ -10,30 +10,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
-import com.mymoney.api.member.FamilyMember;
-import com.mymoney.api.member.FamilyMemberRepository;
-import com.mymoney.api.member.FamilyRole;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
 class CategoryControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
-
-    @Autowired
-    private FamilyMemberRepository familyMemberRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private CategoryRepository categoryRepository;
@@ -45,28 +34,17 @@ class CategoryControllerIntegrationTest extends AuthenticatedIntegrationTestSupp
 
     @BeforeEach
     void setUp() throws Exception {
-        FamilyMember regularUser = familyMemberRepository
-                .findByEmailIgnoreCase("user@bolso-em-dia.local")
-                .orElseGet(FamilyMember::new);
-        regularUser.setName("Regular User");
-        regularUser.setEmail("user@bolso-em-dia.local");
-        regularUser.setPasswordHash(passwordEncoder.encode("user123456"));
-        regularUser.setRole(FamilyRole.USER);
-        regularUser.setActive(true);
-        regularUser.setAllowanceEnabled(false);
-        familyMemberRepository.save(regularUser);
-
-        categoryA = new Category();
-        categoryA.setName("Alpha Integration Category");
-        categoryA.setIcon("shopping-cart");
-        categoryA.setColor("#22aa66");
-        categoryA.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        categoryA = categoryRepository.save(categoryA);
-
-        categoryB = new Category();
-        categoryB.setName("Beta Integration Category");
-        categoryB.setCreatedInMonth(LocalDate.of(2026, 5, 1));
-        categoryB = categoryRepository.save(categoryB);
+        fixtures().ensureRegularUser();
+        categoryA = fixtures().persistCategory(created -> {
+            created.setName("Alpha Integration Category");
+            created.setIcon("shopping-cart");
+            created.setColor("#22aa66");
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        });
+        categoryB = fixtures().persistCategory(created -> {
+            created.setName("Beta Integration Category");
+            created.setCreatedInMonth(LocalDate.of(2026, 5, 1));
+        });
 
         adminToken = loginAsAdmin();
         userToken = loginAsUser();
@@ -330,9 +308,5 @@ class CategoryControllerIntegrationTest extends AuthenticatedIntegrationTestSupp
                                 """
                                         .formatted(longName)))
                 .andExpect(status().isBadRequest());
-    }
-
-    private LocalDate currentReferenceMonth() {
-        return YearMonth.now().atDay(1);
     }
 }

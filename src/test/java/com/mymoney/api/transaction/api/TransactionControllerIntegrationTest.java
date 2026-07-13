@@ -23,10 +23,8 @@ import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
-import com.mymoney.api.member.FamilyRole;
 import com.mymoney.api.support.AccountTestFactory;
-import com.mymoney.api.support.CategoryTestFactory;
-import com.mymoney.api.support.FamilyMemberTestFactory;
+import com.mymoney.api.support.IntegrationTestFixtureSupport.TransactionScenario;
 import com.mymoney.api.support.TransactionTestFactory;
 import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.Transaction;
@@ -36,7 +34,6 @@ import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.YearMonth;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -86,65 +83,12 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
 
     @BeforeEach
     void setUp() throws Exception {
-        var regularUser = familyMemberRepository
-                .findByEmailIgnoreCase("user@bolso-em-dia.local")
-                .orElseGet(() -> FamilyMemberTestFactory.create(member -> {
-                    member.setName("Regular User");
-                    member.setEmail("user@bolso-em-dia.local");
-                }));
-        regularUser.setPasswordHash(passwordEncoder.encode("user123456"));
-        regularUser.setRole(FamilyRole.USER);
-        familyMemberRepository.save(regularUser);
-
-        allowanceMember = familyMemberRepository.save(FamilyMemberTestFactory.create(member -> {
-            member.setName("Karol");
-            member.setEmail("karol@bolso-em-dia.local");
-            member.setPasswordHash(passwordEncoder.encode("karol123456"));
-            member.setRole(FamilyRole.USER);
-            member.setAllowanceEnabled(true);
-        }));
-
-        category = categoryRepository.save(CategoryTestFactory.create(created -> {
-            created.setName("Groceries");
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        }));
-
-        transportCategory = categoryRepository.save(CategoryTestFactory.create(created -> {
-            created.setName("Transport");
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        }));
-
-        account = accountRepository.save(AccountTestFactory.create(created -> {
-            created.setName("Main Checking");
-            created.setType(AccountType.CHECKING);
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        }));
-
-        sharedTransaction = transactionRepository.save(TransactionTestFactory.create(created -> {
-            created.setType(TransactionType.EXPENSE);
-            created.setOwnershipType(OwnershipType.SHARED);
-            created.setSourceType(TransactionSourceType.MANUAL);
-            created.setDescription("Market");
-            created.setAmount(new BigDecimal("150.00"));
-            created.setConvertedAmount(new BigDecimal("150.00"));
-            created.setTransactionDate(LocalDate.of(2026, 6, 10));
-            created.setReferenceMonth(LocalDate.of(2026, 6, 1));
-            created.setCategory(category);
-            created.setAccount(account);
-        }));
-
-        transactionRepository.save(TransactionTestFactory.create(created -> {
-            created.setType(TransactionType.EXPENSE);
-            created.setOwnershipType(OwnershipType.SHARED);
-            created.setSourceType(TransactionSourceType.MANUAL);
-            created.setDescription("Taxi");
-            created.setAmount(new BigDecimal("45.00"));
-            created.setConvertedAmount(new BigDecimal("45.00"));
-            created.setTransactionDate(LocalDate.of(2026, 6, 11));
-            created.setReferenceMonth(LocalDate.of(2026, 6, 1));
-            created.setCategory(transportCategory);
-            created.setAccount(account);
-        }));
+        TransactionScenario scenario = fixtures().createTransactionScenario();
+        allowanceMember = scenario.allowanceMember();
+        category = scenario.groceries();
+        transportCategory = scenario.transport();
+        account = scenario.account();
+        sharedTransaction = scenario.sharedTransaction();
 
         adminToken = loginAsAdmin();
         userToken = loginAsUser();
@@ -376,7 +320,7 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
 
     @Test
     void futureMonthListIncludesProjectedFixedTransaction() throws Exception {
-        LocalDate currentReferenceMonth = YearMonth.now().atDay(1);
+        LocalDate currentReferenceMonth = currentReferenceMonth();
         LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(4);
 
         FixedExpenseTemplate template = new FixedExpenseTemplate();
@@ -488,7 +432,10 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                                   "installmentCount": 26
                                 }
                                 """
-                                        .formatted(YearMonth.now().atDay(10), account.getId(), category.getId())))
+                                        .formatted(
+                                                currentReferenceMonth().withDayOfMonth(10),
+                                                account.getId(),
+                                                category.getId())))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message").value("Installment plan cannot exceed 2 years."));
     }
@@ -936,8 +883,8 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("USD groceries updated"))
                 .andExpect(jsonPath("$.amount").value(120.0))
-                .andExpect(jsonPath("$.convertedAmount").value(630.0))
-                .andExpect(jsonPath("$.exchangeRate").value(5.25))
+                .andExpect(jsonPath("$.convertedAmount").value(612.0))
+                .andExpect(jsonPath("$.exchangeRate").value(5.10))
                 .andExpect(jsonPath("$.currency").value("USD"))
                 .andExpect(jsonPath("$.categoryName").value("Transport"))
                 .andExpect(jsonPath("$.referenceMonth").value("2026-07-01"));
@@ -1091,7 +1038,7 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
         var rate = new ExchangeRate();
         rate.setCurrency("USD");
         rate.setRate(new BigDecimal(rateValue));
-        rate.setFetchedAt(OffsetDateTime.now());
+        rate.setFetchedAt(OffsetDateTime.parse("2026-06-15T12:00:00Z"));
         exchangeRateRepository.save(rate);
     }
 }
