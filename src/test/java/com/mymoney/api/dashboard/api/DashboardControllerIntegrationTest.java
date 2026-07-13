@@ -8,20 +8,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
-import com.mymoney.api.account.AccountType;
 import com.mymoney.api.budget.BudgetRepository;
-import com.mymoney.api.budget.BudgetType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
-import com.mymoney.api.member.FamilyRole;
-import com.mymoney.api.support.AccountTestFactory;
-import com.mymoney.api.support.BudgetTestFactory;
-import com.mymoney.api.support.CategoryTestFactory;
-import com.mymoney.api.support.FamilyMemberTestFactory;
+import com.mymoney.api.support.IntegrationTestFixtureSupport.DashboardScenario;
 import com.mymoney.api.support.TransactionTestFactory;
 import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.Transaction;
@@ -30,8 +24,6 @@ import com.mymoney.api.transaction.TransactionSourceType;
 import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.util.LinkedHashSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,93 +63,7 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
 
     @BeforeEach
     void setUp() throws Exception {
-        var regularUser = familyMemberRepository
-                .findByEmailIgnoreCase("user@bolso-em-dia.local")
-                .orElseGet(() -> FamilyMemberTestFactory.create(member -> {
-                    member.setName("Regular User");
-                    member.setEmail("user@bolso-em-dia.local");
-                }));
-        regularUser.setPasswordHash(passwordEncoder.encode("user123456"));
-        regularUser.setRole(FamilyRole.USER);
-        familyMemberRepository.save(regularUser);
-
-        FamilyMember allowanceMember = familyMemberRepository.save(FamilyMemberTestFactory.create(member -> {
-            member.setName("Karol");
-            member.setEmail("karol-dashboard@bolso-em-dia.local");
-            member.setPasswordHash(passwordEncoder.encode("karol123456"));
-            member.setRole(FamilyRole.USER);
-            member.setAllowanceEnabled(true);
-        }));
-
-        Category groceries = categoryRepository.save(CategoryTestFactory.create(created -> {
-            created.setName("Groceries");
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        }));
-
-        Category salary = categoryRepository.save(CategoryTestFactory.create(created -> {
-            created.setName("Salary");
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        }));
-
-        Category transport = categoryRepository.save(CategoryTestFactory.create(created -> {
-            created.setName("Transport");
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        }));
-
-        Account account = accountRepository.save(AccountTestFactory.create(created -> {
-            created.setName("Main Checking");
-            created.setType(AccountType.CHECKING);
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        }));
-
-        budgetRepository.save(BudgetTestFactory.create(created -> {
-            created.setName("Family Essentials");
-            created.setType(BudgetType.GLOBAL);
-            created.setMonthlyLimit(new BigDecimal("1000.00"));
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-            created.setActive(true);
-            created.setCategories(new LinkedHashSet<>(java.util.List.of(groceries, transport)));
-        }));
-
-        budgetRepository.save(BudgetTestFactory.create(created -> {
-            created.setName("Karol Allowance");
-            created.setType(BudgetType.ALLOWANCE);
-            created.setOwnerMember(allowanceMember);
-            created.setMonthlyLimit(new BigDecimal("400.00"));
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-            created.setActive(true);
-        }));
-
-        transactionRepository.save(createTransaction(
-                TransactionType.INCOME,
-                OwnershipType.SHARED,
-                "June salary",
-                new BigDecimal("5000.00"),
-                LocalDate.of(2026, 6, 5),
-                LocalDate.of(2026, 6, 1),
-                account,
-                salary,
-                null));
-        transactionRepository.save(createTransaction(
-                TransactionType.EXPENSE,
-                OwnershipType.SHARED,
-                "Market",
-                new BigDecimal("150.00"),
-                LocalDate.of(2026, 6, 10),
-                LocalDate.of(2026, 6, 1),
-                account,
-                groceries,
-                null));
-        transactionRepository.save(createTransaction(
-                TransactionType.EXPENSE,
-                OwnershipType.INDIVIDUAL,
-                "Ride app",
-                new BigDecimal("45.00"),
-                LocalDate.of(2026, 6, 11),
-                LocalDate.of(2026, 6, 1),
-                account,
-                transport,
-                allowanceMember));
+        DashboardScenario scenario = fixtures().createDashboardScenario();
 
         adminToken = loginAsAdmin();
         userToken = loginAsUser();
@@ -206,7 +112,7 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
 
     @Test
     void futureMonthDashboardIncludesProjectedFixedTransactions() throws Exception {
-        LocalDate currentReferenceMonth = YearMonth.now().atDay(1);
+        LocalDate currentReferenceMonth = currentReferenceMonth();
         LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(4);
 
         Category groceries =
@@ -269,7 +175,7 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
 
     @Test
     void dashboardIncludesProjectedFlagInRecentTransactions() throws Exception {
-        LocalDate futureReferenceMonth = YearMonth.now().atDay(1).plusMonths(4);
+        LocalDate futureReferenceMonth = currentReferenceMonth().plusMonths(4);
 
         Category groceries =
                 categoryRepository.findByNormalizedName("groceries").orElseThrow();
@@ -283,7 +189,7 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
         projectedExpense.setCategory(groceries);
         projectedExpense.setAccount(account);
         projectedExpense.setDueDay((short) 8);
-        projectedExpense.setCreatedInMonth(YearMonth.now().atDay(1).minusMonths(1));
+        projectedExpense.setCreatedInMonth(currentReferenceMonth().minusMonths(1));
         projectedExpense.setActive(true);
         fixedExpenseTemplateRepository.save(projectedExpense);
 

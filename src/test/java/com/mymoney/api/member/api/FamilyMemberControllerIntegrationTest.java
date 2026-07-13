@@ -9,15 +9,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.member.FamilyMember;
-import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
+import com.mymoney.api.member.api.request.CreateFamilyMemberRequest;
+import com.mymoney.api.member.api.request.UpdateFamilyMemberRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -25,29 +24,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
 
-    @Autowired
-    private FamilyMemberRepository familyMemberRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
     private String adminToken;
     private String userToken;
     private FamilyMember regularUser;
 
     @BeforeEach
     void setUp() throws Exception {
-        regularUser = familyMemberRepository
-                .findByEmailIgnoreCase("user@bolso-em-dia.local")
-                .orElseGet(FamilyMember::new);
-        regularUser.setName("Regular User");
-        regularUser.setEmail("user@bolso-em-dia.local");
-        regularUser.setPasswordHash(passwordEncoder.encode("user123456"));
-        regularUser.setRole(FamilyRole.USER);
-        regularUser.setActive(true);
-        regularUser.setAllowanceEnabled(false);
-        regularUser = familyMemberRepository.save(regularUser);
-
+        regularUser = fixtures().ensureRegularUser();
         adminToken = loginAsAdmin();
         userToken = loginAsUser();
     }
@@ -55,7 +38,7 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
     @Test
     void adminCanListFamilyMembers() throws Exception {
         mockMvc.perform(get("/api/family-members")
-                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Authorization", bearerToken(adminToken))
                         .param("search", "user")
                         .param("status", "ACTIVE")
                         .param("size", "1"))
@@ -69,20 +52,11 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
 
     @Test
     void adminCanCreateFamilyMember() throws Exception {
-        mockMvc.perform(
-                        post("/api/family-members")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "name": "Karol",
-                                  "email": "karol@bolso-em-dia.local",
-                                  "password": "karol123456",
-                                  "role": "USER",
-                                  "allowanceEnabled": true
-                                }
-                                """))
+        mockMvc.perform(post("/api/family-members")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new CreateFamilyMemberRequest(
+                                "Karol", "karol@bolso-em-dia.local", "karol123456", FamilyRole.USER, true))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Karol"))
                 .andExpect(jsonPath("$.email").value("karol@bolso-em-dia.local"))
@@ -93,75 +67,57 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
     @Test
     void adminCanGetUpdateArchiveAndRestoreFamilyMember() throws Exception {
         mockMvc.perform(get("/api/family-members/" + regularUser.getId())
-                        .header("Authorization", "Bearer " + adminToken))
+                        .header("Authorization", bearerToken(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("user@bolso-em-dia.local"));
 
-        mockMvc.perform(
-                        put("/api/family-members/" + regularUser.getId())
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "name": "Updated User",
-                                  "email": "user@bolso-em-dia.local",
-                                  "password": "updated123456",
-                                  "role": "USER",
-                                  "allowanceEnabled": true
-                                }
-                                """))
+        mockMvc.perform(put("/api/family-members/" + regularUser.getId())
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateFamilyMemberRequest(
+                                "Updated User", "user@bolso-em-dia.local", "updated123456", FamilyRole.USER, true))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Updated User"))
                 .andExpect(jsonPath("$.allowanceEnabled").value(true));
 
         mockMvc.perform(patch("/api/family-members/" + regularUser.getId() + "/archive")
-                        .header("Authorization", "Bearer " + adminToken))
+                        .header("Authorization", bearerToken(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false))
                 .andExpect(jsonPath("$.allowanceEnabled").value(false));
 
         mockMvc.perform(get("/api/family-members")
-                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Authorization", bearerToken(adminToken))
                         .param("status", "ARCHIVED"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].email").value("user@bolso-em-dia.local"));
 
         mockMvc.perform(patch("/api/family-members/" + regularUser.getId() + "/restore")
-                        .header("Authorization", "Bearer " + adminToken))
+                        .header("Authorization", bearerToken(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(true));
     }
 
     @Test
     void validationErrorsReturnBadRequest() throws Exception {
-        mockMvc.perform(
-                        post("/api/family-members")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "name": "",
-                                  "email": "invalid-email",
-                                  "password": "123",
-                                  "role": "USER",
-                                  "allowanceEnabled": false
-                                }
-                                """))
+        mockMvc.perform(post("/api/family-members")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(
+                                new CreateFamilyMemberRequest("", "invalid-email", "123", FamilyRole.USER, false))))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void userCannotAccessFamilyMembersApi() throws Exception {
-        mockMvc.perform(get("/api/family-members").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/family-members").header("Authorization", bearerToken(userToken)))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void archivedMemberCannotAuthenticate() throws Exception {
         mockMvc.perform(patch("/api/family-members/" + regularUser.getId() + "/archive")
-                        .header("Authorization", "Bearer " + adminToken))
+                        .header("Authorization", bearerToken(adminToken)))
                 .andExpect(status().isOk());
 
         mockMvc.perform(
@@ -197,7 +153,7 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
     @Test
     void getFamilyMemberReturns404ForNonExistentId() throws Exception {
         mockMvc.perform(get("/api/family-members/00000000-0000-0000-0000-000000000000")
-                        .header("Authorization", "Bearer " + adminToken))
+                        .header("Authorization", bearerToken(adminToken)))
                 .andExpect(status().isNotFound());
     }
 
@@ -205,26 +161,24 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
     void updateFamilyMemberReturns404ForNonExistentId() throws Exception {
         mockMvc.perform(
                         put("/api/family-members/00000000-0000-0000-0000-000000000000")
-                                .header("Authorization", "Bearer " + adminToken)
+                                .header("Authorization", bearerToken(adminToken))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
-                                        """
-                                {"name": "Updated", "email": "updated@bolso-em-dia.local", "role": "USER"}
-                                """))
+                                        "{\"name\": \"Updated\", \"email\": \"updated@bolso-em-dia.local\", \"role\": \"USER\"}"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void archiveFamilyMemberReturns404ForNonExistentId() throws Exception {
         mockMvc.perform(patch("/api/family-members/00000000-0000-0000-0000-000000000000/archive")
-                        .header("Authorization", "Bearer " + adminToken))
+                        .header("Authorization", bearerToken(adminToken)))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void restoreFamilyMemberReturns404ForNonExistentId() throws Exception {
         mockMvc.perform(patch("/api/family-members/00000000-0000-0000-0000-000000000000/restore")
-                        .header("Authorization", "Bearer " + adminToken))
+                        .header("Authorization", bearerToken(adminToken)))
                 .andExpect(status().isNotFound());
     }
 
@@ -236,40 +190,35 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
 
     @Test
     void createFamilyMemberWithEmptyNameReturns400() throws Exception {
-        mockMvc.perform(
-                        post("/api/family-members")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {"name": "", "email": "test@bolso-em-dia.local", "role": "USER", "password": "test123456"}
-                                """))
+        mockMvc.perform(post("/api/family-members")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new CreateFamilyMemberRequest(
+                                "", "test@bolso-em-dia.local", "test123456", FamilyRole.USER, false))))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void createFamilyMemberWithInvalidEmailReturns400() throws Exception {
-        mockMvc.perform(
-                        post("/api/family-members")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {"name": "Test", "email": "not-an-email", "role": "USER", "password": "test123456"}
-                                """))
+        mockMvc.perform(post("/api/family-members")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new CreateFamilyMemberRequest(
+                                "Test", "not-an-email", "test123456", FamilyRole.USER, false))))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void createFamilyMemberWithShortPasswordReturns400() throws Exception {
-        mockMvc.perform(
-                        post("/api/family-members")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {"name": "Test", "email": "test@bolso-em-dia.local", "role": "USER", "password": "123"}
-                                """))
+        mockMvc.perform(post("/api/family-members")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new CreateFamilyMemberRequest(
+                                "Test", "test@bolso-em-dia.local", "123", FamilyRole.USER, false))))
                 .andExpect(status().isBadRequest());
+    }
+
+    private String toJson(Object value) throws Exception {
+        return fixtures().writeJson(value);
     }
 }

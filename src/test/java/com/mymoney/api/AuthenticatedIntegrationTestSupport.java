@@ -5,6 +5,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.mymoney.api.auth.api.JsonTestUtils;
+import com.mymoney.api.support.IntegrationTestFixtureSupport;
+import java.time.LocalDate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -12,24 +14,22 @@ import org.springframework.test.web.servlet.MvcResult;
 
 public abstract class AuthenticatedIntegrationTestSupport extends PostgresIntegrationTestSupport {
 
-    private static final String ADMIN_EMAIL = "admin@bolso-em-dia.local";
-    private static final String ADMIN_PASSWORD = "admin123456";
-    private static final String ADMIN_TEMPORARY_PASSWORD = "admin12345678";
-    private static final String USER_EMAIL = "user@bolso-em-dia.local";
-    private static final String USER_PASSWORD = "user123456";
     private static final String REFRESH_COOKIE_NAME = "bolso_em_dia_refresh_token";
 
     @Autowired
     protected MockMvc mockMvc;
 
+    @Autowired
+    private IntegrationTestFixtureSupport fixtureSupport;
+
     protected String loginAsAdmin() throws Exception {
-        String token = login(ADMIN_EMAIL, ADMIN_PASSWORD);
-        clearForcedPasswordChangeForSeededAdmin(token);
-        return token;
+        fixtureSupport.ensureAdminCanUseProtectedApis();
+        return login(IntegrationTestFixtureSupport.ADMIN_EMAIL, IntegrationTestFixtureSupport.ADMIN_PASSWORD);
     }
 
     protected String loginAsUser() throws Exception {
-        return login(USER_EMAIL, USER_PASSWORD);
+        fixtureSupport.ensureRegularUser();
+        return login(IntegrationTestFixtureSupport.USER_EMAIL, IntegrationTestFixtureSupport.USER_PASSWORD);
     }
 
     protected String login(String email, String password) throws Exception {
@@ -50,24 +50,19 @@ public abstract class AuthenticatedIntegrationTestSupport extends PostgresIntegr
         return JsonTestUtils.extractJsonValue(result.getResponse().getContentAsString(), "accessToken");
     }
 
-    private void clearForcedPasswordChangeForSeededAdmin(String token) throws Exception {
-        changePassword(token, ADMIN_PASSWORD, ADMIN_TEMPORARY_PASSWORD);
-        changePassword(token, ADMIN_TEMPORARY_PASSWORD, ADMIN_PASSWORD);
+    protected IntegrationTestFixtureSupport fixtures() {
+        return fixtureSupport;
     }
 
-    private void changePassword(String token, String currentPassword, String newPassword) throws Exception {
-        mockMvc.perform(post("/api/auth/change-password")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                """
-                                {
-                                  "currentPassword": "%s",
-                                  "newPassword": "%s",
-                                  "confirmPassword": "%s"
-                                }
-                                """
-                                        .formatted(currentPassword, newPassword, newPassword)))
-                .andExpect(status().isOk());
+    protected String bearerToken(String token) {
+        return "Bearer " + token;
+    }
+
+    protected LocalDate currentReferenceMonth() {
+        return fixtureSupport.currentReferenceMonth();
+    }
+
+    protected LocalDate today() {
+        return fixtureSupport.today();
     }
 }

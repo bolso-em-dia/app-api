@@ -11,8 +11,8 @@ import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
+import com.mymoney.api.preference.api.request.UpdateUserPreferencesRequest;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,11 +35,11 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
 
     @BeforeEach
     void setUp() throws Exception {
-        activeAccount = new Account();
-        activeAccount.setName("Everyday Checking");
-        activeAccount.setType(AccountType.CHECKING);
-        activeAccount.setCreatedInMonth(LocalDate.of(2026, 1, 1));
-        activeAccount = accountRepository.save(activeAccount);
+        activeAccount = fixtures().persistAccount(created -> {
+            created.setName("Everyday Checking");
+            created.setType(AccountType.CHECKING);
+            created.setCreatedInMonth(LocalDate.of(2026, 1, 1));
+        });
         adminToken = loginAsAdmin();
     }
 
@@ -47,23 +47,15 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
     void preferencesEndpointsRequireAuthentication() throws Exception {
         mockMvc.perform(get("/api/me/preferences")).andExpect(status().isUnauthorized());
 
-        mockMvc.perform(
-                        put("/api/me/preferences")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "defaultAccountId": null,
-                                  "locale": "pt-BR",
-                                  "showBalanceWithBudgets": false
-                                }
-                                """))
+        mockMvc.perform(put("/api/me/preferences")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateUserPreferencesRequest(null, "pt-BR", false, false))))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void returnsDefaultsWhenPreferencesWereNotSavedYet() throws Exception {
-        mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken()))
+        mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.defaultAccountId").value(nullValue()))
                 .andExpect(jsonPath("$.locale").value("pt-BR"))
@@ -73,7 +65,7 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
 
     @Test
     void getPreferences_defaultsShowForeignCurrencyFalse() throws Exception {
-        mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken()))
+        mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.showForeignCurrency").value(false));
     }
@@ -81,18 +73,9 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
     @Test
     void savesPreferencesLazily() throws Exception {
         mockMvc.perform(put("/api/me/preferences")
-                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                """
-                                {
-                                  "defaultAccountId": "%s",
-                                  "locale": "en-US",
-                                  "showBalanceWithBudgets": true,
-                                  "showForeignCurrency": false
-                                }
-                                """
-                                        .formatted(activeAccount.getId())))
+                        .content(toJson(new UpdateUserPreferencesRequest(activeAccount.getId(), "en-US", true, false))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.defaultAccountId")
                         .value(activeAccount.getId().toString()))
@@ -100,7 +83,7 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                 .andExpect(jsonPath("$.showBalanceWithBudgets").value(true))
                 .andExpect(jsonPath("$.showForeignCurrency").value(false));
 
-        mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken()))
+        mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.defaultAccountId")
                         .value(activeAccount.getId().toString()))
@@ -111,62 +94,35 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
 
     @Test
     void updatePreferences_enablesForeignCurrency() throws Exception {
-        mockMvc.perform(
-                        put("/api/me/preferences")
-                                .header(HttpHeaders.AUTHORIZATION, bearerToken())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "defaultAccountId": null,
-                                  "locale": "pt-BR",
-                                  "showBalanceWithBudgets": false,
-                                  "showForeignCurrency": true
-                                }
-                                """))
+        mockMvc.perform(put("/api/me/preferences")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateUserPreferencesRequest(null, "pt-BR", false, true))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.showForeignCurrency").value(true));
 
-        mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken()))
+        mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.showForeignCurrency").value(true));
     }
 
     @Test
     void updatePreferences_disablesForeignCurrency() throws Exception {
-        mockMvc.perform(
-                        put("/api/me/preferences")
-                                .header(HttpHeaders.AUTHORIZATION, bearerToken())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "defaultAccountId": null,
-                                  "locale": "pt-BR",
-                                  "showBalanceWithBudgets": false,
-                                  "showForeignCurrency": true
-                                }
-                                """))
+        mockMvc.perform(put("/api/me/preferences")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateUserPreferencesRequest(null, "pt-BR", false, true))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.showForeignCurrency").value(true));
 
-        mockMvc.perform(
-                        put("/api/me/preferences")
-                                .header(HttpHeaders.AUTHORIZATION, bearerToken())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "defaultAccountId": null,
-                                  "locale": "pt-BR",
-                                  "showBalanceWithBudgets": false,
-                                  "showForeignCurrency": false
-                                }
-                                """))
+        mockMvc.perform(put("/api/me/preferences")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateUserPreferencesRequest(null, "pt-BR", false, false))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.showForeignCurrency").value(false));
 
-        mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken()))
+        mockMvc.perform(get("/api/me/preferences").header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.showForeignCurrency").value(false));
     }
@@ -174,35 +130,17 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
     @Test
     void allowsClearingDefaultAccountAfterSaving() throws Exception {
         mockMvc.perform(put("/api/me/preferences")
-                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                """
-                                {
-                                  "defaultAccountId": "%s",
-                                  "locale": "en-US",
-                                  "showBalanceWithBudgets": true,
-                                  "showForeignCurrency": false
-                                }
-                                """
-                                        .formatted(activeAccount.getId())))
+                        .content(toJson(new UpdateUserPreferencesRequest(activeAccount.getId(), "en-US", true, false))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.defaultAccountId")
                         .value(activeAccount.getId().toString()));
 
-        mockMvc.perform(
-                        put("/api/me/preferences")
-                                .header(HttpHeaders.AUTHORIZATION, bearerToken())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "defaultAccountId": null,
-                                  "locale": "pt-BR",
-                                  "showBalanceWithBudgets": false,
-                                  "showForeignCurrency": false
-                                }
-                                """))
+        mockMvc.perform(put("/api/me/preferences")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateUserPreferencesRequest(null, "pt-BR", false, false))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.defaultAccountId").value(nullValue()))
                 .andExpect(jsonPath("$.locale").value("pt-BR"))
@@ -212,82 +150,52 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
 
     @Test
     void rejectsUnknownDefaultAccount() throws Exception {
-        mockMvc.perform(
-                        put("/api/me/preferences")
-                                .header(HttpHeaders.AUTHORIZATION, bearerToken())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "defaultAccountId": "11111111-1111-1111-1111-111111111111",
-                                  "locale": "pt-BR",
-                                  "showBalanceWithBudgets": false,
-                                  "showForeignCurrency": false
-                                }
-                                """))
+        mockMvc.perform(put("/api/me/preferences")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateUserPreferencesRequest(
+                                java.util.UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                                "pt-BR",
+                                false,
+                                false))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Account was not found."));
     }
 
     @Test
     void rejectsDefaultAccountCreatedInFuture() throws Exception {
-        activeAccount.setCreatedInMonth(YearMonth.now().plusMonths(1).atDay(1));
+        activeAccount.setCreatedInMonth(currentReferenceMonth().plusMonths(1));
         accountRepository.save(activeAccount);
 
         mockMvc.perform(put("/api/me/preferences")
-                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
-                                """
-                                {
-                                  "defaultAccountId": "%s",
-                                  "locale": "pt-BR",
-                                  "showBalanceWithBudgets": false,
-                                  "showForeignCurrency": false
-                                }
-                                """
-                                        .formatted(activeAccount.getId())))
+                                toJson(new UpdateUserPreferencesRequest(activeAccount.getId(), "pt-BR", false, false))))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message").value("Default account must be active for the current month."));
     }
 
     @Test
     void rejectsDefaultAccountThatIsInactiveForCurrentMonth() throws Exception {
-        activeAccount.setArchivedFromMonth(YearMonth.now().atDay(1));
+        activeAccount.setArchivedFromMonth(currentReferenceMonth());
         accountRepository.save(activeAccount);
 
         mockMvc.perform(put("/api/me/preferences")
-                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
-                                """
-                                {
-                                  "defaultAccountId": "%s",
-                                  "locale": "pt-BR",
-                                  "showBalanceWithBudgets": false,
-                                  "showForeignCurrency": false
-                                }
-                                """
-                                        .formatted(activeAccount.getId())))
+                                toJson(new UpdateUserPreferencesRequest(activeAccount.getId(), "pt-BR", false, false))))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message").value("Default account must be active for the current month."));
     }
 
     @Test
     void rejectsUnsupportedLocale() throws Exception {
-        mockMvc.perform(
-                        put("/api/me/preferences")
-                                .header(HttpHeaders.AUTHORIZATION, bearerToken())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                {
-                                  "defaultAccountId": null,
-                                  "locale": "es-ES",
-                                  "showBalanceWithBudgets": false,
-                                  "showForeignCurrency": false
-                                }
-                                """))
+        mockMvc.perform(put("/api/me/preferences")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateUserPreferencesRequest(null, "es-ES", false, false))))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message").value("Locale is not supported."));
     }
@@ -296,7 +204,7 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
     void changesCurrentUserPasswordWhenCurrentPasswordMatches() throws Exception {
         mockMvc.perform(
                         post("/api/auth/change-password")
-                                .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                                .header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -310,7 +218,7 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                 .andExpect(jsonPath("$.mustChangePassword").value(false));
     }
 
-    private String bearerToken() {
-        return "Bearer " + adminToken;
+    private String toJson(Object value) throws Exception {
+        return fixtures().writeJson(value);
     }
 }

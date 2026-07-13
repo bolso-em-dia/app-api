@@ -16,7 +16,6 @@ import com.mymoney.api.account.CurrencyType;
 import com.mymoney.api.auth.api.JsonTestUtils;
 import com.mymoney.api.budget.Budget;
 import com.mymoney.api.budget.BudgetRepository;
-import com.mymoney.api.budget.BudgetType;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
 import com.mymoney.api.exchangerate.ExchangeRate;
@@ -25,11 +24,8 @@ import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
-import com.mymoney.api.member.FamilyRole;
 import com.mymoney.api.support.AccountTestFactory;
-import com.mymoney.api.support.BudgetTestFactory;
-import com.mymoney.api.support.CategoryTestFactory;
-import com.mymoney.api.support.FamilyMemberTestFactory;
+import com.mymoney.api.support.IntegrationTestFixtureSupport.BudgetScenario;
 import com.mymoney.api.support.TransactionTestFactory;
 import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.TransactionRepository;
@@ -38,8 +34,6 @@ import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.YearMonth;
-import java.util.LinkedHashSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,86 +85,14 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
 
     @BeforeEach
     void setUp() throws Exception {
-        regularUser = familyMemberRepository
-                .findByEmailIgnoreCase("user@bolso-em-dia.local")
-                .orElseGet(() -> FamilyMemberTestFactory.create(member -> {
-                    member.setName("Regular User");
-                    member.setEmail("user@bolso-em-dia.local");
-                }));
-        regularUser.setPasswordHash(passwordEncoder.encode("user123456"));
-        regularUser.setRole(FamilyRole.USER);
-        regularUser = familyMemberRepository.save(regularUser);
-
-        allowanceMember = familyMemberRepository.save(FamilyMemberTestFactory.create(member -> {
-            member.setName("Karol");
-            member.setEmail("karol-budget@bolso-em-dia.local");
-            member.setPasswordHash(passwordEncoder.encode("karol123456"));
-            member.setRole(FamilyRole.USER);
-            member.setAllowanceEnabled(true);
-        }));
-
-        groceries = categoryRepository.save(CategoryTestFactory.create(created -> {
-            created.setName("Groceries");
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        }));
-
-        transport = categoryRepository.save(CategoryTestFactory.create(created -> {
-            created.setName("Transport");
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        }));
-
-        account = accountRepository.save(AccountTestFactory.create(created -> {
-            created.setName("Main Checking");
-            created.setType(AccountType.CHECKING);
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        }));
-
-        globalBudget = budgetRepository.save(BudgetTestFactory.create(created -> {
-            created.setName("Family Essentials");
-            created.setType(BudgetType.GLOBAL);
-            created.setMonthlyLimit(new BigDecimal("1000.00"));
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-            created.setActive(true);
-            created.setCategories(new LinkedHashSet<>(java.util.List.of(groceries, transport)));
-        }));
-
-        allowanceBudget = budgetRepository.save(BudgetTestFactory.create(created -> {
-            created.setName("Karol Allowance");
-            created.setType(BudgetType.ALLOWANCE);
-            created.setOwnerMember(allowanceMember);
-            created.setMonthlyLimit(new BigDecimal("400.00"));
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-            created.setActive(true);
-        }));
-
-        transactionRepository.save(TransactionTestFactory.create(created -> {
-            created.setType(TransactionType.EXPENSE);
-            created.setOwnershipType(OwnershipType.SHARED);
-            created.setSourceType(TransactionSourceType.MANUAL);
-            created.setDescription("Market");
-            created.setAmount(new BigDecimal("150.00"));
-            created.setConvertedAmount(new BigDecimal("150.00"));
-            created.setCurrency("BRL");
-            created.setTransactionDate(LocalDate.of(2026, 6, 10));
-            created.setReferenceMonth(LocalDate.of(2026, 6, 1));
-            created.setAccount(account);
-            created.setCategory(groceries);
-        }));
-
-        transactionRepository.save(TransactionTestFactory.create(created -> {
-            created.setType(TransactionType.EXPENSE);
-            created.setOwnershipType(OwnershipType.INDIVIDUAL);
-            created.setSourceType(TransactionSourceType.MANUAL);
-            created.setDescription("Ride app");
-            created.setAmount(new BigDecimal("45.00"));
-            created.setConvertedAmount(new BigDecimal("45.00"));
-            created.setCurrency("BRL");
-            created.setTransactionDate(LocalDate.of(2026, 6, 11));
-            created.setReferenceMonth(LocalDate.of(2026, 6, 1));
-            created.setAccount(account);
-            created.setCategory(transport);
-            created.setMember(allowanceMember);
-        }));
+        BudgetScenario scenario = fixtures().createBudgetScenario();
+        regularUser = scenario.regularUser();
+        allowanceMember = scenario.allowanceMember();
+        groceries = scenario.groceries();
+        transport = scenario.transport();
+        account = scenario.account();
+        globalBudget = scenario.globalBudget();
+        allowanceBudget = scenario.allowanceBudget();
 
         adminToken = loginAsAdmin();
         userToken = loginAsUser();
@@ -297,7 +219,7 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
         var usdRate = new ExchangeRate();
         usdRate.setCurrency("USD");
         usdRate.setRate(new BigDecimal("5.20"));
-        usdRate.setFetchedAt(OffsetDateTime.now());
+        usdRate.setFetchedAt(OffsetDateTime.parse("2026-06-15T12:00:00Z"));
         exchangeRateRepository.save(usdRate);
 
         var usdAccount = accountRepository.save(AccountTestFactory.create(created -> {
@@ -411,7 +333,7 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
 
     @Test
     void futureMonthBudgetConsumesProjectedFixedExpense() throws Exception {
-        LocalDate currentReferenceMonth = YearMonth.now().atDay(1);
+        LocalDate currentReferenceMonth = currentReferenceMonth();
         LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(4);
 
         FixedExpenseTemplate projectedExpense = new FixedExpenseTemplate();
