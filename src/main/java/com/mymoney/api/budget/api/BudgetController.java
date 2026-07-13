@@ -56,8 +56,7 @@ public class BudgetController {
             @PathVariable UUID id,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate referenceMonth) {
         return ResponseEntity.ok(budgetMapper.toResponse(
-                budgetService.getViewById(id, referenceMonth),
-                budgetMapper.toTransactionResponses(budgetService.listTransactions(id, referenceMonth))));
+                budgetService.getViewById(id, referenceMonth), budgetService.listTransactions(id, referenceMonth)));
     }
 
     @PostMapping
@@ -89,8 +88,7 @@ public class BudgetController {
     public ResponseEntity<List<com.mymoney.api.transaction.api.response.TransactionResponse>> transactions(
             @PathVariable UUID id,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate referenceMonth) {
-        return ResponseEntity.ok(
-                budgetMapper.toTransactionResponses(budgetService.listTransactions(id, referenceMonth)));
+        return ResponseEntity.ok(budgetService.listTransactions(id, referenceMonth));
     }
 
     @GetMapping("/{id}/category-breakdown")

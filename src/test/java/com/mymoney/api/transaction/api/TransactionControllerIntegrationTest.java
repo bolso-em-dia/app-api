@@ -23,6 +23,10 @@ import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
+import com.mymoney.api.support.AccountTestFactory;
+import com.mymoney.api.support.CategoryTestFactory;
+import com.mymoney.api.support.FamilyMemberTestFactory;
+import com.mymoney.api.support.TransactionTestFactory;
 import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.Transaction;
 import com.mymoney.api.transaction.TransactionRepository;
@@ -81,65 +85,65 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
 
     @BeforeEach
     void setUp() throws Exception {
-        FamilyMember regularUser = familyMemberRepository
+        var regularUser = familyMemberRepository
                 .findByEmailIgnoreCase("user@bolso-em-dia.local")
-                .orElseGet(FamilyMember::new);
-        regularUser.setName("Regular User");
-        regularUser.setEmail("user@bolso-em-dia.local");
+                .orElseGet(() -> FamilyMemberTestFactory.create(member -> {
+                    member.setName("Regular User");
+                    member.setEmail("user@bolso-em-dia.local");
+                }));
         regularUser.setPasswordHash(passwordEncoder.encode("user123456"));
         regularUser.setRole(FamilyRole.USER);
-        regularUser.setActive(true);
-        regularUser.setAllowanceEnabled(false);
         familyMemberRepository.save(regularUser);
 
-        allowanceMember = new FamilyMember();
-        allowanceMember.setName("Karol");
-        allowanceMember.setEmail("karol@bolso-em-dia.local");
-        allowanceMember.setPasswordHash(passwordEncoder.encode("karol123456"));
-        allowanceMember.setRole(FamilyRole.USER);
-        allowanceMember.setActive(true);
-        allowanceMember.setAllowanceEnabled(true);
-        allowanceMember = familyMemberRepository.save(allowanceMember);
+        allowanceMember = familyMemberRepository.save(FamilyMemberTestFactory.create(member -> {
+            member.setName("Karol");
+            member.setEmail("karol@bolso-em-dia.local");
+            member.setPasswordHash(passwordEncoder.encode("karol123456"));
+            member.setRole(FamilyRole.USER);
+            member.setAllowanceEnabled(true);
+        }));
 
-        category = new Category();
-        category.setName("Groceries");
-        category.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        category = categoryRepository.save(category);
+        category = categoryRepository.save(CategoryTestFactory.create(created -> {
+            created.setName("Groceries");
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
 
-        transportCategory = new Category();
-        transportCategory.setName("Transport");
-        transportCategory.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        transportCategory = categoryRepository.save(transportCategory);
+        transportCategory = categoryRepository.save(CategoryTestFactory.create(created -> {
+            created.setName("Transport");
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
 
-        account = new Account();
-        account.setName("Main Checking");
-        account.setType(AccountType.CHECKING);
-        account.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        account = accountRepository.save(account);
+        account = accountRepository.save(AccountTestFactory.create(created -> {
+            created.setName("Main Checking");
+            created.setType(AccountType.CHECKING);
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
 
-        sharedTransaction = new Transaction();
-        sharedTransaction.setType(TransactionType.EXPENSE);
-        sharedTransaction.setOwnershipType(OwnershipType.SHARED);
-        sharedTransaction.setSourceType(TransactionSourceType.MANUAL);
-        sharedTransaction.setDescription("Market");
-        sharedTransaction.setAmount(new BigDecimal("150.00"));
-        sharedTransaction.setTransactionDate(LocalDate.of(2026, 6, 10));
-        sharedTransaction.setReferenceMonth(LocalDate.of(2026, 6, 1));
-        sharedTransaction.setCategory(category);
-        sharedTransaction.setAccount(account);
-        sharedTransaction = transactionRepository.save(sharedTransaction);
+        sharedTransaction = transactionRepository.save(TransactionTestFactory.create(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("Market");
+            created.setAmount(new BigDecimal("150.00"));
+            created.setConvertedAmount(new BigDecimal("150.00"));
+            created.setTransactionDate(LocalDate.of(2026, 6, 10));
+            created.setReferenceMonth(LocalDate.of(2026, 6, 1));
+            created.setCategory(category);
+            created.setAccount(account);
+        }));
 
-        Transaction transportTransaction = new Transaction();
-        transportTransaction.setType(TransactionType.EXPENSE);
-        transportTransaction.setOwnershipType(OwnershipType.SHARED);
-        transportTransaction.setSourceType(TransactionSourceType.MANUAL);
-        transportTransaction.setDescription("Taxi");
-        transportTransaction.setAmount(new BigDecimal("45.00"));
-        transportTransaction.setTransactionDate(LocalDate.of(2026, 6, 11));
-        transportTransaction.setReferenceMonth(LocalDate.of(2026, 6, 1));
-        transportTransaction.setCategory(transportCategory);
-        transportTransaction.setAccount(account);
-        transactionRepository.save(transportTransaction);
+        transactionRepository.save(TransactionTestFactory.create(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("Taxi");
+            created.setAmount(new BigDecimal("45.00"));
+            created.setConvertedAmount(new BigDecimal("45.00"));
+            created.setTransactionDate(LocalDate.of(2026, 6, 11));
+            created.setReferenceMonth(LocalDate.of(2026, 6, 1));
+            created.setCategory(transportCategory);
+            created.setAccount(account);
+        }));
 
         adminToken = loginAsAdmin();
         userToken = loginAsUser();
@@ -407,17 +411,18 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
     @Test
     void descriptionSuggestionsClampTheRequestedLimit() throws Exception {
         IntStream.range(0, 15).forEach(index -> {
-            Transaction transaction = new Transaction();
-            transaction.setType(TransactionType.EXPENSE);
-            transaction.setOwnershipType(OwnershipType.SHARED);
-            transaction.setSourceType(TransactionSourceType.MANUAL);
-            transaction.setDescription("Suggestion " + index);
-            transaction.setAmount(new BigDecimal("10.00"));
-            transaction.setTransactionDate(LocalDate.of(2026, 6, 12));
-            transaction.setReferenceMonth(LocalDate.of(2026, 6, 1));
-            transaction.setCategory(category);
-            transaction.setAccount(account);
-            transactionRepository.save(transaction);
+            transactionRepository.save(TransactionTestFactory.create(transaction -> {
+                transaction.setType(TransactionType.EXPENSE);
+                transaction.setOwnershipType(OwnershipType.SHARED);
+                transaction.setSourceType(TransactionSourceType.MANUAL);
+                transaction.setDescription("Suggestion " + index);
+                transaction.setAmount(new BigDecimal("10.00"));
+                transaction.setConvertedAmount(new BigDecimal("10.00"));
+                transaction.setTransactionDate(LocalDate.of(2026, 6, 12));
+                transaction.setReferenceMonth(LocalDate.of(2026, 6, 1));
+                transaction.setCategory(category);
+                transaction.setAccount(account);
+            }));
         });
 
         mockMvc.perform(get("/api/transactions/descriptions")
@@ -828,12 +833,12 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
         rate.setFetchedAt(OffsetDateTime.now());
         exchangeRateRepository.save(rate);
 
-        Account usdAccount = new Account();
-        usdAccount.setName("US Account");
-        usdAccount.setType(AccountType.CHECKING);
-        usdAccount.setCurrency(CurrencyType.USD);
-        usdAccount.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        usdAccount = accountRepository.save(usdAccount);
+        Account usdAccount = accountRepository.save(AccountTestFactory.create(created -> {
+            created.setName("US Account");
+            created.setType(AccountType.CHECKING);
+            created.setCurrency(CurrencyType.USD);
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
 
         mockMvc.perform(post("/api/transactions")
                         .header("Authorization", "Bearer " + adminToken)
@@ -879,27 +884,27 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
         rate.setFetchedAt(OffsetDateTime.now());
         exchangeRateRepository.save(rate);
 
-        Account usdAccount = new Account();
-        usdAccount.setName("US Account");
-        usdAccount.setType(AccountType.CHECKING);
-        usdAccount.setCurrency(CurrencyType.USD);
-        usdAccount.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        usdAccount = accountRepository.save(usdAccount);
+        Account usdAccount = accountRepository.save(AccountTestFactory.create(created -> {
+            created.setName("US Account");
+            created.setType(AccountType.CHECKING);
+            created.setCurrency(CurrencyType.USD);
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
 
-        Transaction usdTx = new Transaction();
-        usdTx.setType(TransactionType.EXPENSE);
-        usdTx.setOwnershipType(OwnershipType.SHARED);
-        usdTx.setSourceType(TransactionSourceType.MANUAL);
-        usdTx.setDescription("USD Tx");
-        usdTx.setAmount(new BigDecimal("100.00"));
-        usdTx.setConvertedAmount(new BigDecimal("510.00"));
-        usdTx.setExchangeRate(new BigDecimal("5.10"));
-        usdTx.setCurrency("USD");
-        usdTx.setTransactionDate(LocalDate.of(2026, 6, 10));
-        usdTx.setReferenceMonth(LocalDate.of(2026, 6, 1));
-        usdTx.setAccount(usdAccount);
-        usdTx.setCategory(category);
-        transactionRepository.save(usdTx);
+        Transaction usdTx = transactionRepository.save(TransactionTestFactory.create(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("USD Tx");
+            created.setAmount(new BigDecimal("100.00"));
+            created.setConvertedAmount(new BigDecimal("510.00"));
+            created.setExchangeRate(new BigDecimal("5.10"));
+            created.setCurrency("USD");
+            created.setTransactionDate(LocalDate.of(2026, 6, 10));
+            created.setReferenceMonth(LocalDate.of(2026, 6, 1));
+            created.setAccount(usdAccount);
+            created.setCategory(category);
+        }));
 
         mockMvc.perform(get("/api/transactions/" + usdTx.getId()).header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())

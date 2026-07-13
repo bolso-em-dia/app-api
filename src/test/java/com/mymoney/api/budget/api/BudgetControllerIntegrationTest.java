@@ -23,8 +23,12 @@ import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
+import com.mymoney.api.support.AccountTestFactory;
+import com.mymoney.api.support.BudgetTestFactory;
+import com.mymoney.api.support.CategoryTestFactory;
+import com.mymoney.api.support.FamilyMemberTestFactory;
+import com.mymoney.api.support.TransactionTestFactory;
 import com.mymoney.api.transaction.OwnershipType;
-import com.mymoney.api.transaction.Transaction;
 import com.mymoney.api.transaction.TransactionRepository;
 import com.mymoney.api.transaction.TransactionSourceType;
 import com.mymoney.api.transaction.TransactionType;
@@ -82,86 +86,84 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
     void setUp() throws Exception {
         regularUser = familyMemberRepository
                 .findByEmailIgnoreCase("user@bolso-em-dia.local")
-                .orElseGet(FamilyMember::new);
-        regularUser.setName("Regular User");
-        regularUser.setEmail("user@bolso-em-dia.local");
+                .orElseGet(() -> FamilyMemberTestFactory.create(member -> {
+                    member.setName("Regular User");
+                    member.setEmail("user@bolso-em-dia.local");
+                }));
         regularUser.setPasswordHash(passwordEncoder.encode("user123456"));
         regularUser.setRole(FamilyRole.USER);
-        regularUser.setActive(true);
-        regularUser.setAllowanceEnabled(false);
         regularUser = familyMemberRepository.save(regularUser);
 
-        allowanceMember = new FamilyMember();
-        allowanceMember.setName("Karol");
-        allowanceMember.setEmail("karol-budget@bolso-em-dia.local");
-        allowanceMember.setPasswordHash(passwordEncoder.encode("karol123456"));
-        allowanceMember.setRole(FamilyRole.USER);
-        allowanceMember.setActive(true);
-        allowanceMember.setAllowanceEnabled(true);
-        allowanceMember = familyMemberRepository.save(allowanceMember);
+        allowanceMember = familyMemberRepository.save(FamilyMemberTestFactory.create(member -> {
+            member.setName("Karol");
+            member.setEmail("karol-budget@bolso-em-dia.local");
+            member.setPasswordHash(passwordEncoder.encode("karol123456"));
+            member.setRole(FamilyRole.USER);
+            member.setAllowanceEnabled(true);
+        }));
 
-        groceries = new Category();
-        groceries.setName("Groceries");
-        groceries.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        groceries = categoryRepository.save(groceries);
+        groceries = categoryRepository.save(CategoryTestFactory.create(created -> {
+            created.setName("Groceries");
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
 
-        transport = new Category();
-        transport.setName("Transport");
-        transport.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        transport = categoryRepository.save(transport);
+        transport = categoryRepository.save(CategoryTestFactory.create(created -> {
+            created.setName("Transport");
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
 
-        account = new Account();
-        account.setName("Main Checking");
-        account.setType(AccountType.CHECKING);
-        account.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        account = accountRepository.save(account);
+        account = accountRepository.save(AccountTestFactory.create(created -> {
+            created.setName("Main Checking");
+            created.setType(AccountType.CHECKING);
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
 
-        globalBudget = new Budget();
-        globalBudget.setName("Family Essentials");
-        globalBudget.setType(BudgetType.GLOBAL);
-        globalBudget.setMonthlyLimit(new BigDecimal("1000.00"));
-        globalBudget.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        globalBudget.setActive(true);
-        globalBudget.setCategories(new LinkedHashSet<>(java.util.List.of(groceries, transport)));
-        globalBudget = budgetRepository.save(globalBudget);
+        globalBudget = budgetRepository.save(BudgetTestFactory.create(created -> {
+            created.setName("Family Essentials");
+            created.setType(BudgetType.GLOBAL);
+            created.setMonthlyLimit(new BigDecimal("1000.00"));
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+            created.setActive(true);
+            created.setCategories(new LinkedHashSet<>(java.util.List.of(groceries, transport)));
+        }));
 
-        allowanceBudget = new Budget();
-        allowanceBudget.setName("Karol Allowance");
-        allowanceBudget.setType(BudgetType.ALLOWANCE);
-        allowanceBudget.setOwnerMember(allowanceMember);
-        allowanceBudget.setMonthlyLimit(new BigDecimal("400.00"));
-        allowanceBudget.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        allowanceBudget.setActive(true);
-        allowanceBudget = budgetRepository.save(allowanceBudget);
+        allowanceBudget = budgetRepository.save(BudgetTestFactory.create(created -> {
+            created.setName("Karol Allowance");
+            created.setType(BudgetType.ALLOWANCE);
+            created.setOwnerMember(allowanceMember);
+            created.setMonthlyLimit(new BigDecimal("400.00"));
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+            created.setActive(true);
+        }));
 
-        Transaction sharedGroceries = new Transaction();
-        sharedGroceries.setType(TransactionType.EXPENSE);
-        sharedGroceries.setOwnershipType(OwnershipType.SHARED);
-        sharedGroceries.setSourceType(TransactionSourceType.MANUAL);
-        sharedGroceries.setDescription("Market");
-        sharedGroceries.setAmount(new BigDecimal("150.00"));
-        sharedGroceries.setConvertedAmount(new BigDecimal("150.00"));
-        sharedGroceries.setCurrency("BRL");
-        sharedGroceries.setTransactionDate(LocalDate.of(2026, 6, 10));
-        sharedGroceries.setReferenceMonth(LocalDate.of(2026, 6, 1));
-        sharedGroceries.setAccount(account);
-        sharedGroceries.setCategory(groceries);
-        transactionRepository.save(sharedGroceries);
+        transactionRepository.save(TransactionTestFactory.create(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("Market");
+            created.setAmount(new BigDecimal("150.00"));
+            created.setConvertedAmount(new BigDecimal("150.00"));
+            created.setCurrency("BRL");
+            created.setTransactionDate(LocalDate.of(2026, 6, 10));
+            created.setReferenceMonth(LocalDate.of(2026, 6, 1));
+            created.setAccount(account);
+            created.setCategory(groceries);
+        }));
 
-        Transaction individualTransport = new Transaction();
-        individualTransport.setType(TransactionType.EXPENSE);
-        individualTransport.setOwnershipType(OwnershipType.INDIVIDUAL);
-        individualTransport.setSourceType(TransactionSourceType.MANUAL);
-        individualTransport.setDescription("Ride app");
-        individualTransport.setAmount(new BigDecimal("45.00"));
-        individualTransport.setConvertedAmount(new BigDecimal("45.00"));
-        individualTransport.setCurrency("BRL");
-        individualTransport.setTransactionDate(LocalDate.of(2026, 6, 11));
-        individualTransport.setReferenceMonth(LocalDate.of(2026, 6, 1));
-        individualTransport.setAccount(account);
-        individualTransport.setCategory(transport);
-        individualTransport.setMember(allowanceMember);
-        transactionRepository.save(individualTransport);
+        transactionRepository.save(TransactionTestFactory.create(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.INDIVIDUAL);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("Ride app");
+            created.setAmount(new BigDecimal("45.00"));
+            created.setConvertedAmount(new BigDecimal("45.00"));
+            created.setCurrency("BRL");
+            created.setTransactionDate(LocalDate.of(2026, 6, 11));
+            created.setReferenceMonth(LocalDate.of(2026, 6, 1));
+            created.setAccount(account);
+            created.setCategory(transport);
+            created.setMember(allowanceMember);
+        }));
 
         adminToken = loginAsAdmin();
         userToken = loginAsUser();

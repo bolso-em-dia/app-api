@@ -7,18 +7,11 @@ import com.mymoney.api.budget.api.response.BudgetCategoryBreakdownResponse;
 import com.mymoney.api.budget.api.response.BudgetCategoryResponse;
 import com.mymoney.api.budget.api.response.BudgetResponse;
 import com.mymoney.api.transaction.api.response.TransactionResponse;
-import com.mymoney.api.transaction.mapper.TransactionMapper;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
 @Component
 public class BudgetMapper {
-
-    private final TransactionMapper transactionMapper;
-
-    public BudgetMapper(TransactionMapper transactionMapper) {
-        this.transactionMapper = transactionMapper;
-    }
 
     public BudgetResponse toResponse(BudgetView view, List<TransactionResponse> transactions) {
         Budget budget = view.budget();
@@ -48,10 +41,5 @@ public class BudgetMapper {
         return breakdownItems.stream()
                 .map(item -> new BudgetCategoryBreakdownResponse(item.categoryId(), item.categoryName(), item.amount()))
                 .toList();
-    }
-
-    public List<TransactionResponse> toTransactionResponses(
-            List<com.mymoney.api.transaction.Transaction> transactions) {
-        return transactions.stream().map(transactionMapper::toResponse).toList();
     }
 }

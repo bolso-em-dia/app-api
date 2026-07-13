@@ -1,7 +1,7 @@
 package com.mymoney.api.dashboard;
 
 import com.mymoney.api.budget.BudgetView;
-import com.mymoney.api.transaction.Transaction;
+import com.mymoney.api.transaction.api.response.TransactionResponse;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -14,7 +14,7 @@ public record DashboardView(
         BigDecimal availableBalance,
         BigDecimal reservedBudgetAmount,
         List<BudgetView> budgets,
-        List<Transaction> recentTransactions,
+        List<TransactionResponse> recentTransactions,
         List<DashboardCategoryBreakdownItem> categoryBreakdown) {
 
     public DashboardView {

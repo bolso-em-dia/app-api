@@ -6,7 +6,6 @@ import com.mymoney.api.dashboard.DashboardView;
 import com.mymoney.api.dashboard.api.response.DashboardCategoryBreakdownResponse;
 import com.mymoney.api.dashboard.api.response.DashboardResponse;
 import com.mymoney.api.dashboard.api.response.DashboardSummaryResponse;
-import com.mymoney.api.transaction.mapper.TransactionMapper;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -14,11 +13,9 @@ import org.springframework.stereotype.Component;
 public class DashboardMapper {
 
     private final BudgetMapper budgetMapper;
-    private final TransactionMapper transactionMapper;
 
-    public DashboardMapper(BudgetMapper budgetMapper, TransactionMapper transactionMapper) {
+    public DashboardMapper(BudgetMapper budgetMapper) {
         this.budgetMapper = budgetMapper;
-        this.transactionMapper = transactionMapper;
     }
 
     public DashboardResponse toResponse(DashboardView view) {
@@ -33,9 +30,7 @@ public class DashboardMapper {
                 view.budgets().stream()
                         .map(budget -> budgetMapper.toResponse(budget, List.of()))
                         .toList(),
-                view.recentTransactions().stream()
-                        .map(transactionMapper::toResponse)
-                        .toList(),
+                view.recentTransactions(),
                 view.categoryBreakdown().stream()
                         .map(this::toCategoryBreakdownResponse)
                         .toList());

@@ -9,7 +9,6 @@ import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
-import com.mymoney.api.budget.Budget;
 import com.mymoney.api.budget.BudgetRepository;
 import com.mymoney.api.budget.BudgetType;
 import com.mymoney.api.category.Category;
@@ -19,6 +18,11 @@ import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
+import com.mymoney.api.support.AccountTestFactory;
+import com.mymoney.api.support.BudgetTestFactory;
+import com.mymoney.api.support.CategoryTestFactory;
+import com.mymoney.api.support.FamilyMemberTestFactory;
+import com.mymoney.api.support.TransactionTestFactory;
 import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.Transaction;
 import com.mymoney.api.transaction.TransactionRepository;
@@ -67,64 +71,62 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
 
     @BeforeEach
     void setUp() throws Exception {
-        FamilyMember regularUser = familyMemberRepository
+        var regularUser = familyMemberRepository
                 .findByEmailIgnoreCase("user@bolso-em-dia.local")
-                .orElseGet(FamilyMember::new);
-        regularUser.setName("Regular User");
-        regularUser.setEmail("user@bolso-em-dia.local");
+                .orElseGet(() -> FamilyMemberTestFactory.create(member -> {
+                    member.setName("Regular User");
+                    member.setEmail("user@bolso-em-dia.local");
+                }));
         regularUser.setPasswordHash(passwordEncoder.encode("user123456"));
         regularUser.setRole(FamilyRole.USER);
-        regularUser.setActive(true);
-        regularUser.setAllowanceEnabled(false);
         familyMemberRepository.save(regularUser);
 
-        FamilyMember allowanceMember = new FamilyMember();
-        allowanceMember.setName("Karol");
-        allowanceMember.setEmail("karol-dashboard@bolso-em-dia.local");
-        allowanceMember.setPasswordHash(passwordEncoder.encode("karol123456"));
-        allowanceMember.setRole(FamilyRole.USER);
-        allowanceMember.setActive(true);
-        allowanceMember.setAllowanceEnabled(true);
-        allowanceMember = familyMemberRepository.save(allowanceMember);
+        FamilyMember allowanceMember = familyMemberRepository.save(FamilyMemberTestFactory.create(member -> {
+            member.setName("Karol");
+            member.setEmail("karol-dashboard@bolso-em-dia.local");
+            member.setPasswordHash(passwordEncoder.encode("karol123456"));
+            member.setRole(FamilyRole.USER);
+            member.setAllowanceEnabled(true);
+        }));
 
-        Category groceries = new Category();
-        groceries.setName("Groceries");
-        groceries.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        groceries = categoryRepository.save(groceries);
+        Category groceries = categoryRepository.save(CategoryTestFactory.create(created -> {
+            created.setName("Groceries");
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
 
-        Category salary = new Category();
-        salary.setName("Salary");
-        salary.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        salary = categoryRepository.save(salary);
+        Category salary = categoryRepository.save(CategoryTestFactory.create(created -> {
+            created.setName("Salary");
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
 
-        Category transport = new Category();
-        transport.setName("Transport");
-        transport.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        transport = categoryRepository.save(transport);
+        Category transport = categoryRepository.save(CategoryTestFactory.create(created -> {
+            created.setName("Transport");
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
 
-        Account account = new Account();
-        account.setName("Main Checking");
-        account.setType(AccountType.CHECKING);
-        account.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        account = accountRepository.save(account);
+        Account account = accountRepository.save(AccountTestFactory.create(created -> {
+            created.setName("Main Checking");
+            created.setType(AccountType.CHECKING);
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
 
-        Budget familyBudget = new Budget();
-        familyBudget.setName("Family Essentials");
-        familyBudget.setType(BudgetType.GLOBAL);
-        familyBudget.setMonthlyLimit(new BigDecimal("1000.00"));
-        familyBudget.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        familyBudget.setActive(true);
-        familyBudget.setCategories(new LinkedHashSet<>(java.util.List.of(groceries, transport)));
-        budgetRepository.save(familyBudget);
+        budgetRepository.save(BudgetTestFactory.create(created -> {
+            created.setName("Family Essentials");
+            created.setType(BudgetType.GLOBAL);
+            created.setMonthlyLimit(new BigDecimal("1000.00"));
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+            created.setActive(true);
+            created.setCategories(new LinkedHashSet<>(java.util.List.of(groceries, transport)));
+        }));
 
-        Budget allowanceBudget = new Budget();
-        allowanceBudget.setName("Karol Allowance");
-        allowanceBudget.setType(BudgetType.ALLOWANCE);
-        allowanceBudget.setOwnerMember(allowanceMember);
-        allowanceBudget.setMonthlyLimit(new BigDecimal("400.00"));
-        allowanceBudget.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        allowanceBudget.setActive(true);
-        budgetRepository.save(allowanceBudget);
+        budgetRepository.save(BudgetTestFactory.create(created -> {
+            created.setName("Karol Allowance");
+            created.setType(BudgetType.ALLOWANCE);
+            created.setOwnerMember(allowanceMember);
+            created.setMonthlyLimit(new BigDecimal("400.00"));
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+            created.setActive(true);
+        }));
 
         transactionRepository.save(createTransaction(
                 TransactionType.INCOME,
@@ -337,19 +339,19 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
             Account account,
             Category category,
             FamilyMember member) {
-        Transaction transaction = new Transaction();
-        transaction.setType(type);
-        transaction.setOwnershipType(ownershipType);
-        transaction.setSourceType(TransactionSourceType.MANUAL);
-        transaction.setDescription(description);
-        transaction.setAmount(amount);
-        transaction.setConvertedAmount(amount);
-        transaction.setCurrency("BRL");
-        transaction.setTransactionDate(transactionDate);
-        transaction.setReferenceMonth(referenceMonth);
-        transaction.setAccount(account);
-        transaction.setCategory(category);
-        transaction.setMember(member);
-        return transaction;
+        return TransactionTestFactory.create(transaction -> {
+            transaction.setType(type);
+            transaction.setOwnershipType(ownershipType);
+            transaction.setSourceType(TransactionSourceType.MANUAL);
+            transaction.setDescription(description);
+            transaction.setAmount(amount);
+            transaction.setConvertedAmount(amount);
+            transaction.setCurrency("BRL");
+            transaction.setTransactionDate(transactionDate);
+            transaction.setReferenceMonth(referenceMonth);
+            transaction.setAccount(account);
+            transaction.setCategory(category);
+            transaction.setMember(member);
+        });
     }
 }

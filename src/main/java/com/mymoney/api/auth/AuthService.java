@@ -11,8 +11,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +25,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final UserPreferencesService userPreferencesService;
+    private final AuthenticatedMemberResolver authenticatedMemberResolver;
 
     @Transactional
     public AuthResponse login(LoginRequest request, HttpServletResponse response) {
@@ -67,12 +66,12 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public AuthUserResponse currentUser() {
-        return mapUser(currentMember());
+        return mapUser(authenticatedMemberResolver.resolve());
     }
 
     @Transactional
     public AuthUserResponse changeCurrentUserPassword(ChangePasswordRequest request) {
-        FamilyMember member = currentMember();
+        FamilyMember member = authenticatedMemberResolver.resolve();
 
         if (!passwordEncoder.matches(request.currentPassword(), member.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Current password is incorrect.");
@@ -104,18 +103,6 @@ public class AuthService {
                 member.isAllowanceEnabled(),
                 member.isMustChangePassword(),
                 userPreferencesService.resolvePreferences(member));
-    }
-
-    private FamilyMember currentMember() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getName() == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User is not authenticated.");
-        }
-
-        return memberRepository
-                .findByEmailIgnoreCase(authentication.getName())
-                .filter(FamilyMember::isActive)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User was not found."));
     }
 
     private ResponseStatusException invalidCredentials() {
