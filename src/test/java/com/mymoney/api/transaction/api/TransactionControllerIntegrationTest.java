@@ -1,5 +1,6 @@
 package com.mymoney.api.transaction.api;
 
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -827,18 +828,8 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
 
     @Test
     void createTransactionWithUSDAccount_convertsAmount() throws Exception {
-        ExchangeRate rate = new ExchangeRate();
-        rate.setCurrency("USD");
-        rate.setRate(new BigDecimal("5.10"));
-        rate.setFetchedAt(OffsetDateTime.now());
-        exchangeRateRepository.save(rate);
-
-        Account usdAccount = accountRepository.save(AccountTestFactory.create(created -> {
-            created.setName("US Account");
-            created.setType(AccountType.CHECKING);
-            created.setCurrency(CurrencyType.USD);
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        }));
+        seedUsdRate("5.10");
+        Account usdAccount = createUsdAccount();
 
         mockMvc.perform(post("/api/transactions")
                         .header("Authorization", "Bearer " + adminToken)
@@ -878,18 +869,8 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
 
     @Test
     void getTransactionWithUSD_showsCurrencyFields() throws Exception {
-        ExchangeRate rate = new ExchangeRate();
-        rate.setCurrency("USD");
-        rate.setRate(new BigDecimal("5.10"));
-        rate.setFetchedAt(OffsetDateTime.now());
-        exchangeRateRepository.save(rate);
-
-        Account usdAccount = accountRepository.save(AccountTestFactory.create(created -> {
-            created.setName("US Account");
-            created.setType(AccountType.CHECKING);
-            created.setCurrency(CurrencyType.USD);
-            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
-        }));
+        seedUsdRate("5.10");
+        Account usdAccount = createUsdAccount();
 
         Transaction usdTx = transactionRepository.save(TransactionTestFactory.create(created -> {
             created.setType(TransactionType.EXPENSE);
@@ -912,6 +893,154 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                 .andExpect(jsonPath("$.convertedAmount").value(510.00))
                 .andExpect(jsonPath("$.exchangeRate").value(5.10))
                 .andExpect(jsonPath("$.currency").value("USD"));
+    }
+
+    @Test
+    void updateTransactionWithUsdAccount_recalculatesConvertedFieldsAndReferenceMonth() throws Exception {
+        seedUsdRate("5.10");
+        Account usdAccount = createUsdAccount();
+
+        Transaction usdTransaction = transactionRepository.save(TransactionTestFactory.create(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("USD groceries");
+            created.setAmount(new BigDecimal("100.00"));
+            created.setConvertedAmount(new BigDecimal("510.00"));
+            created.setExchangeRate(new BigDecimal("5.10"));
+            created.setCurrency("USD");
+            created.setTransactionDate(LocalDate.of(2026, 6, 10));
+            created.setReferenceMonth(LocalDate.of(2026, 6, 1));
+            created.setAccount(usdAccount);
+            created.setCategory(category);
+        }));
+
+        seedUsdRate("5.25");
+
+        mockMvc.perform(put("/api/transactions/" + usdTransaction.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "USD groceries updated",
+                                  "amount": 120.00,
+                                  "transactionDate": "2026-07-03",
+                                  "accountId": "%s",
+                                  "categoryId": "%s"
+                                }
+                                """
+                                        .formatted(usdAccount.getId(), transportCategory.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("USD groceries updated"))
+                .andExpect(jsonPath("$.amount").value(120.0))
+                .andExpect(jsonPath("$.convertedAmount").value(630.0))
+                .andExpect(jsonPath("$.exchangeRate").value(5.25))
+                .andExpect(jsonPath("$.currency").value("USD"))
+                .andExpect(jsonPath("$.categoryName").value("Transport"))
+                .andExpect(jsonPath("$.referenceMonth").value("2026-07-01"));
+    }
+
+    @Test
+    void createUsdInstallments_setsConvertedFieldsForEachInstallment() throws Exception {
+        seedUsdRate("5.10");
+        Account usdAccount = createUsdAccount();
+
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "USD laptop",
+                                  "amount": 100.00,
+                                  "transactionDate": "2026-06-20",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "installmentCount": 3
+                                }
+                                """
+                                        .formatted(usdAccount.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].amount").value(33.34))
+                .andExpect(jsonPath("$[0].convertedAmount").value(170.03))
+                .andExpect(jsonPath("$[0].exchangeRate").value(5.10))
+                .andExpect(jsonPath("$[0].currency").value("USD"))
+                .andExpect(jsonPath("$[0].installmentNumber").value(1))
+                .andExpect(jsonPath("$[0].installmentTotal").value(3))
+                .andExpect(jsonPath("$[1].amount").value(33.33))
+                .andExpect(jsonPath("$[1].convertedAmount").value(169.98))
+                .andExpect(jsonPath("$[1].installmentNumber").value(2))
+                .andExpect(jsonPath("$[2].amount").value(33.33))
+                .andExpect(jsonPath("$[2].convertedAmount").value(169.98))
+                .andExpect(jsonPath("$[2].installmentNumber").value(3));
+    }
+
+    @Test
+    void deleteFutureScopeRemovesOnlyFutureUsdInstallments() throws Exception {
+        seedUsdRate("5.10");
+        Account usdAccount = createUsdAccount();
+
+        MvcResult result = mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "USD notebook installment",
+                                  "amount": 300.00,
+                                  "transactionDate": "2026-06-25",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "installmentCount": 3
+                                }
+                                """
+                                        .formatted(usdAccount.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String secondInstallmentId = OBJECT_MAPPER
+                .readTree(result.getResponse().getContentAsString())
+                .get(1)
+                .get("id")
+                .asText();
+        String installmentGroupId = OBJECT_MAPPER
+                .readTree(result.getResponse().getContentAsString())
+                .get(0)
+                .get("installmentGroupId")
+                .asText();
+
+        mockMvc.perform(delete("/api/transactions/" + secondInstallmentId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("scope", "FUTURE"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-06-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[?(@.installmentGroupId=='" + installmentGroupId + "')]", hasSize(1)));
+
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-07-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[?(@.installmentGroupId=='" + installmentGroupId + "')]")
+                        .isEmpty());
+
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-08-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[?(@.installmentGroupId=='" + installmentGroupId + "')]")
+                        .isEmpty());
     }
 
     @Test
@@ -947,5 +1076,22 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(0))
                 .andExpect(jsonPath("$.totalItems").value(0));
+    }
+
+    private Account createUsdAccount() {
+        return accountRepository.save(AccountTestFactory.create(created -> {
+            created.setName("US Account");
+            created.setType(AccountType.CHECKING);
+            created.setCurrency(CurrencyType.USD);
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
+    }
+
+    private void seedUsdRate(String rateValue) {
+        var rate = new ExchangeRate();
+        rate.setCurrency("USD");
+        rate.setRate(new BigDecimal(rateValue));
+        rate.setFetchedAt(OffsetDateTime.now());
+        exchangeRateRepository.save(rate);
     }
 }

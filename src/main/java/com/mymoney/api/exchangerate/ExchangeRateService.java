@@ -2,6 +2,7 @@ package com.mymoney.api.exchangerate;
 
 import com.mymoney.api.config.AppExchangeRateProperties;
 import com.mymoney.api.exchangerate.api.response.ExchangeRateResponse;
+import com.mymoney.api.preference.UserPreferencesService;
 import com.mymoney.api.shared.DateProvider;
 import com.mymoney.api.transaction.TransactionRepository;
 import java.math.BigDecimal;
@@ -23,12 +24,14 @@ import org.springframework.web.server.ResponseStatusException;
 public class ExchangeRateService {
 
     private static final String CURRENCY = "USD";
+    private static final String FOREIGN_CURRENCY_DISABLED_MESSAGE = "Foreign currency support is disabled.";
 
     private final ExchangeRateRepository exchangeRateRepository;
     private final TransactionRepository transactionRepository;
     private final AppExchangeRateProperties properties;
     private final ExchangeRateClient exchangeRateClient;
     private final DateProvider dateProvider;
+    private final UserPreferencesService userPreferencesService;
 
     @Scheduled(cron = "0 0 * * * *")
     @Transactional
@@ -65,9 +68,7 @@ public class ExchangeRateService {
 
     @Transactional
     public ExchangeRateResponse refreshManually() {
-        if (!properties.enabled()) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Foreign currency support is disabled.");
-        }
+        validateForeignCurrencyEnabled();
 
         try {
             BigDecimal rate = exchangeRateClient.fetchUsdBrlRate();
@@ -87,9 +88,7 @@ public class ExchangeRateService {
 
     @Transactional(readOnly = true)
     public ExchangeRateResponse getLatest() {
-        if (!properties.enabled()) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Foreign currency support is disabled.");
-        }
+        validateForeignCurrencyEnabled();
 
         ExchangeRate latest = exchangeRateRepository
                 .findFirstByCurrencyOrderByFetchedAtDesc(CURRENCY)
@@ -136,5 +135,14 @@ public class ExchangeRateService {
 
     private boolean isValidRate(BigDecimal rate) {
         return rate != null && rate.compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    private void validateForeignCurrencyEnabled() {
+        if (!properties.enabled()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, FOREIGN_CURRENCY_DISABLED_MESSAGE);
+        }
+        if (!userPreferencesService.getCurrentUserPreferences().showForeignCurrency()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, FOREIGN_CURRENCY_DISABLED_MESSAGE);
+        }
     }
 }

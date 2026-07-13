@@ -2,6 +2,7 @@ package com.mymoney.api.exchangerate.api;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -40,12 +41,16 @@ class ExchangeRateControllerIntegrationTest extends AuthenticatedIntegrationTest
 
     @Test
     void latestEndpoint_returns404WhenNoData() throws Exception {
+        enableForeignCurrency();
+
         mockMvc.perform(get("/api/exchange-rate/latest").header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void latestEndpoint_returnsRateWhenDataExists() throws Exception {
+        enableForeignCurrency();
+
         ExchangeRate rate = new ExchangeRate();
         rate.setCurrency("USD");
         rate.setRate(new BigDecimal("5.1064"));
@@ -61,6 +66,8 @@ class ExchangeRateControllerIntegrationTest extends AuthenticatedIntegrationTest
 
     @Test
     void latestEndpoint_returnsStaleWhenOld() throws Exception {
+        enableForeignCurrency();
+
         ExchangeRate rate = new ExchangeRate();
         rate.setCurrency("USD");
         rate.setRate(new BigDecimal("5.10"));
@@ -78,7 +85,39 @@ class ExchangeRateControllerIntegrationTest extends AuthenticatedIntegrationTest
     }
 
     @Test
+    void latestEndpoint_rejectsWhenForeignCurrencyPreferenceIsDisabled() throws Exception {
+        mockMvc.perform(get("/api/exchange-rate/latest").header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("Foreign currency support is disabled."));
+    }
+
+    @Test
+    void refreshEndpoint_rejectsWhenForeignCurrencyPreferenceIsDisabled() throws Exception {
+        mockMvc.perform(post("/api/exchange-rate/refresh").header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("Foreign currency support is disabled."));
+    }
+
+    @Test
     void refreshEndpoint_requiresAuthentication() throws Exception {
         mockMvc.perform(post("/api/exchange-rate/refresh")).andExpect(status().isUnauthorized());
+    }
+
+    private void enableForeignCurrency() throws Exception {
+        mockMvc.perform(
+                        put("/api/me/preferences")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType("application/json")
+                                .content(
+                                        """
+                                {
+                                  "defaultAccountId": null,
+                                  "locale": "pt-BR",
+                                  "showBalanceWithBudgets": false,
+                                  "showForeignCurrency": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.showForeignCurrency").value(true));
     }
 }
