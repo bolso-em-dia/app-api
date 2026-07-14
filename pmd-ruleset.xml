@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="My Money PMD Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.net/ruleset_2_0_0.xsd">
+
+    <description>PMD rules for My Money API — unused code detection</description>
+
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
+    <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateField">
+        <properties>
+            <property name="reportForAnnotations"
+                      value="org.springframework.stereotype.Service,org.springframework.stereotype.Component,org.springframework.stereotype.Repository,org.springframework.web.bind.annotation.RestController,org.springframework.stereotype.Controller,org.springframework.context.annotation.Configuration,org.springframework.boot.test.context.SpringBootTest,org.springframework.transaction.annotation.Transactional,org.springframework.beans.factory.annotation.Autowired"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/bestpractices.xml/UnusedFormalParameter"/>
+    <rule ref="category/java/bestpractices.xml/UnusedAssignment"/>
+</ruleset>

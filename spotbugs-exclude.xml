@@ -33,6 +33,10 @@
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
     <Match>
+        <Class name="~com\.mymoney\.api\.(account|budget|category|exchangerate|fixedexpense|member|transaction)\.[A-Za-z0-9]+\$[A-Za-z0-9]+Builder"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
         <Class name="com.mymoney.api.budget.BudgetService"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
@@ -95,5 +99,37 @@
     <Match>
         <Class name="com.mymoney.api.exchangerate.ExchangeRateService"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.support.IntegrationTestFixtureSupport"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.support.TestEntityFixtureSupport"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.support.TestSharedSupport"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.support.TransactionIntegrationFixtureSupport"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.support.BudgetIntegrationFixtureSupport"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mymoney.api.support.DashboardIntegrationFixtureSupport"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="~com\.mymoney\.api\..*Test.*"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+    <Match>
+        <Class name="~com\.mymoney\.api\..*Support"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
     </Match>
 </FindBugsFilter>
