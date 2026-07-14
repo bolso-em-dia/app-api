@@ -24,6 +24,7 @@
         <jacoco.maven.plugin.version>0.8.13</jacoco.maven.plugin.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <maven.pmd.plugin.version>3.25.0</maven.pmd.plugin.version>
+        <dependency.check.maven.plugin.version>12.1.1</dependency.check.maven.plugin.version>
     </properties>
 
 
@@ -240,6 +241,17 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>${dependency.check.maven.plugin.version}</version>
+                <configuration>
+                    <failBuildOnCVSS>7</failBuildOnCVSS>
+                    <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
+                    <retireJsAnalyzerEnabled>false</retireJsAnalyzerEnabled>
+                    <nodeAuditAnalyzerEnabled>false</nodeAuditAnalyzerEnabled>
+                </configuration>
             </plugin>
         </plugins>
     </build>

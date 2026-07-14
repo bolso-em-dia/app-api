@@ -18,8 +18,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.util.HtmlUtils;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.HtmlUtils;
 
 @Slf4j
 @RestControllerAdvice
@@ -65,7 +65,8 @@ public class ApiExceptionHandler {
 
         String message = "Request validation failed.";
         var errorDetails = fieldErrors.stream()
-                .map(fe -> new ApiErrorResponse.FieldErrorDetail(sanitize(fe.getField()), sanitize(fe.getDefaultMessage())))
+                .map(fe -> new ApiErrorResponse.FieldErrorDetail(
+                        sanitize(fe.getField()), sanitize(fe.getDefaultMessage())))
                 .toList();
         log.warn(
                 "Validation failed on {} {} by user={} status={} fields=[{}]",
