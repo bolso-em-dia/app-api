@@ -2,6 +2,7 @@ package com.mymoney.api.transaction;
 
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountService;
+import com.mymoney.api.budget.BudgetRepository;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryService;
 import com.mymoney.api.member.FamilyMember;
@@ -41,6 +42,7 @@ public class TransactionService {
     private final EffectiveMonthlyTransactionService effectiveMonthlyTransactionService;
     private final CategoryService categoryService;
     private final AccountService accountService;
+    private final BudgetRepository budgetRepository;
     private final FamilyMemberRepository familyMemberRepository;
     private final CurrencyConversionService currencyConversionService;
     private final DateProvider dateProvider;
@@ -136,6 +138,7 @@ public class TransactionService {
         for (int i = 0; i < installmentCount; i++) {
             LocalDate transactionDate = request.transactionDate().plusMonths(i);
             Transaction transaction = new Transaction();
+            validateIndividualAllowance(request.ownershipType(), member, transactionDate);
             transaction.setType(request.type());
             transaction.setOwnershipType(request.ownershipType());
             transaction.setSourceType(
@@ -164,6 +167,7 @@ public class TransactionService {
         Category category = categoryService.getById(request.categoryId());
         Account account = accountService.getById(request.accountId());
         FamilyMember member = resolveMember(request.ownershipType(), request.memberId());
+        validateIndividualAllowance(request.ownershipType(), member, request.transactionDate());
 
         transaction.setType(request.type());
         transaction.setOwnershipType(request.ownershipType());
@@ -203,21 +207,28 @@ public class TransactionService {
 
         if (memberId == null) {
             throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY,
-                    "Individual transactions require a member with allowance enabled.");
+                    HttpStatus.UNPROCESSABLE_ENTITY, "Individual transactions require a member.");
         }
 
-        FamilyMember member = EntityResolver.resolveOrThrow(
+        return EntityResolver.resolveOrThrow(
                 () -> familyMemberRepository.findById(memberId).filter(FamilyMember::isActive),
                 ErrorMessage.FAMILY_MEMBER_NOT_FOUND.message());
+    }
 
-        if (!member.isAllowanceEnabled()) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY,
-                    "Individual transactions require a member with allowance enabled.");
+    private void validateIndividualAllowance(
+            OwnershipType ownershipType, FamilyMember member, LocalDate transactionDate) {
+        if (ownershipType == OwnershipType.SHARED || member == null) {
+            return;
         }
 
-        return member;
+        if (budgetRepository.existsActiveAllowanceByOwnerMemberIdAndReferenceMonth(
+                member.getId(), referenceMonthFromDate(transactionDate))) {
+            return;
+        }
+
+        throw new ResponseStatusException(
+                HttpStatus.UNPROCESSABLE_ENTITY,
+                "Individual transactions require a valid allowance budget for the selected member.");
     }
 
     private List<BigDecimal> calculateInstallmentAmounts(BigDecimal totalAmount, int installmentCount) {

@@ -43,7 +43,6 @@ public class FamilyMemberService {
         member.setPasswordHash(passwordEncoder.encode(request.password()));
         member.setRole(request.role());
         member.setActive(true);
-        member.setAllowanceEnabled(request.allowanceEnabled());
         member.setMustChangePassword(false);
         return familyMemberRepository.save(member);
     }
@@ -56,7 +55,6 @@ public class FamilyMemberService {
         member.setName(InputNormalizer.requireNonBlank(request.name(), "Name"));
         member.setEmail(normalizeEmail(request.email()));
         member.setRole(request.role());
-        member.setAllowanceEnabled(request.allowanceEnabled());
         if (request.password() != null && !request.password().isBlank()) {
             member.setPasswordHash(passwordEncoder.encode(request.password()));
         }
@@ -67,7 +65,6 @@ public class FamilyMemberService {
     public FamilyMember archive(UUID id) {
         FamilyMember member = getById(id);
         member.setActive(false);
-        member.setAllowanceEnabled(false);
         return familyMemberRepository.save(member);
     }
 

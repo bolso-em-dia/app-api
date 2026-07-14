@@ -100,7 +100,6 @@ public class AuthService {
                 member.getName(),
                 member.getEmail(),
                 member.getRole().name(),
-                member.isAllowanceEnabled(),
                 member.isMustChangePassword(),
                 userPreferencesService.resolvePreferences(member));
     }

@@ -8,6 +8,5 @@ public record FamilyMemberResponse(
         String email,
         String role,
         boolean active,
-        boolean allowanceEnabled,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {}

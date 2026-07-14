@@ -19,7 +19,6 @@ public final class FamilyMemberTestFactory {
                 .passwordHash("encoded-password")
                 .role(FamilyRole.USER)
                 .active(true)
-                .allowanceEnabled(false)
                 .mustChangePassword(false)
                 .build();
         customizer.accept(member);

@@ -210,12 +210,7 @@ public class BudgetService {
         FamilyMember owner = EntityResolver.resolveOrThrow(
                 () -> familyMemberRepository.findById(ownerMemberId).filter(FamilyMember::isActive),
                 ErrorMessage.FAMILY_MEMBER_NOT_FOUND.message());
-        if (!owner.isAllowanceEnabled()) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "Allowance budgets require a member with allowance enabled.");
-        }
-        if (budget.getId() == null
-                && budgetRepository.existsByOwnerMemberIdAndType(owner.getId(), BudgetType.ALLOWANCE)) {
+        if (budgetRepository.existsAnotherByOwnerMemberIdAndType(owner.getId(), BudgetType.ALLOWANCE, budget.getId())) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT, "An allowance budget already exists for this member.");
         }

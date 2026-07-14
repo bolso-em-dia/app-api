@@ -26,7 +26,6 @@ public class AdminSeedRunner implements CommandLineRunner {
             member.setPasswordHash(passwordEncoder.encode(properties.password()));
             member.setRole(FamilyRole.ADMIN);
             member.setActive(true);
-            member.setAllowanceEnabled(false);
             member.setMustChangePassword(true);
             return memberRepository.save(member);
         });
