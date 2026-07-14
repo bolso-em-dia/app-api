@@ -10,18 +10,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class TransactionCategoryAnalyzer {
 
-    public List<CategoryAmount> analyzeByCategory(
-            List<Transaction> transactions,
-            Function<Transaction, BigDecimal> amountExtractor,
-            Comparator<CategoryAmount> order) {
-        return analyzeByCategory(
-                transactions,
-                transaction -> transaction.getCategory().getId().toString(),
-                transaction -> transaction.getCategory().getName(),
-                amountExtractor,
-                order);
-    }
-
     public <T> List<CategoryAmount> analyzeByCategory(
             List<T> items,
             Function<T, String> categoryIdExtractor,

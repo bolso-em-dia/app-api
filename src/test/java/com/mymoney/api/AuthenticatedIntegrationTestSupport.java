@@ -5,7 +5,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.mymoney.api.auth.api.JsonTestUtils;
+import com.mymoney.api.support.BudgetIntegrationFixtureSupport;
+import com.mymoney.api.support.DashboardIntegrationFixtureSupport;
 import com.mymoney.api.support.IntegrationTestFixtureSupport;
+import com.mymoney.api.support.TransactionIntegrationFixtureSupport;
 import java.time.LocalDate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -21,6 +24,15 @@ public abstract class AuthenticatedIntegrationTestSupport extends PostgresIntegr
 
     @Autowired
     private IntegrationTestFixtureSupport fixtureSupport;
+
+    @Autowired
+    private TransactionIntegrationFixtureSupport transactionFixtureSupport;
+
+    @Autowired
+    private BudgetIntegrationFixtureSupport budgetFixtureSupport;
+
+    @Autowired
+    private DashboardIntegrationFixtureSupport dashboardFixtureSupport;
 
     protected String loginAsAdmin() throws Exception {
         fixtureSupport.ensureAdminCanUseProtectedApis();
@@ -52,6 +64,18 @@ public abstract class AuthenticatedIntegrationTestSupport extends PostgresIntegr
 
     protected IntegrationTestFixtureSupport fixtures() {
         return fixtureSupport;
+    }
+
+    protected TransactionIntegrationFixtureSupport transactionFixtures() {
+        return transactionFixtureSupport;
+    }
+
+    protected BudgetIntegrationFixtureSupport budgetFixtures() {
+        return budgetFixtureSupport;
+    }
+
+    protected DashboardIntegrationFixtureSupport dashboardFixtures() {
+        return dashboardFixtureSupport;
     }
 
     protected String bearerToken(String token) {

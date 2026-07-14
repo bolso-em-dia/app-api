@@ -3,7 +3,6 @@ package com.mymoney.api.error;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.validation.FieldError;
 
 public record ApiErrorResponse(
         OffsetDateTime timestamp,
@@ -21,11 +20,8 @@ public record ApiErrorResponse(
         return new ApiErrorResponse(OffsetDateTime.now(), status.value(), status.toString(), message, path);
     }
 
-    public static ApiErrorResponse validationError(String message, String path, List<FieldError> fieldErrors) {
-        List<FieldErrorDetail> details = fieldErrors.stream()
-                .map(fe -> new FieldErrorDetail(fe.getField(), fe.getDefaultMessage()))
-                .toList();
-        return new ApiErrorResponse(OffsetDateTime.now(), 400, "Bad Request", message, path, details);
+    public static ApiErrorResponse validationError(String message, String path, List<FieldErrorDetail> fieldErrors) {
+        return new ApiErrorResponse(OffsetDateTime.now(), 400, "Bad Request", message, path, fieldErrors);
     }
 
     public record FieldErrorDetail(String field, String message) {}

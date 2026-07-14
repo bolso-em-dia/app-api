@@ -27,6 +27,4 @@ public interface FamilyMemberRepository extends JpaRepository<FamilyMember, UUID
     Page<FamilyMember> findByFilters(String search, String status, Pageable pageable);
 
     Optional<FamilyMember> findByEmailIgnoreCase(String email);
-
-    boolean existsByEmailIgnoreCase(String email);
 }

@@ -51,10 +51,11 @@ class ExchangeRateControllerIntegrationTest extends AuthenticatedIntegrationTest
     void latestEndpoint_returnsRateWhenDataExists() throws Exception {
         enableForeignCurrency();
 
-        ExchangeRate rate = new ExchangeRate();
-        rate.setCurrency("USD");
-        rate.setRate(new BigDecimal("5.1064"));
-        rate.setFetchedAt(OffsetDateTime.now());
+        ExchangeRate rate = ExchangeRate.builder()
+                .currency("USD")
+                .rate(new BigDecimal("5.1064"))
+                .fetchedAt(OffsetDateTime.now())
+                .build();
         exchangeRateRepository.save(rate);
 
         mockMvc.perform(get("/api/exchange-rate/latest").header("Authorization", "Bearer " + adminToken))
@@ -68,10 +69,11 @@ class ExchangeRateControllerIntegrationTest extends AuthenticatedIntegrationTest
     void latestEndpoint_returnsStaleWhenOld() throws Exception {
         enableForeignCurrency();
 
-        ExchangeRate rate = new ExchangeRate();
-        rate.setCurrency("USD");
-        rate.setRate(new BigDecimal("5.10"));
-        rate.setFetchedAt(OffsetDateTime.now().minusHours(3));
+        ExchangeRate rate = ExchangeRate.builder()
+                .currency("USD")
+                .rate(new BigDecimal("5.10"))
+                .fetchedAt(OffsetDateTime.now().minusHours(3))
+                .build();
         exchangeRateRepository.save(rate);
 
         mockMvc.perform(get("/api/exchange-rate/latest").header("Authorization", "Bearer " + adminToken))

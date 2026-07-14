@@ -23,6 +23,8 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -31,6 +33,8 @@ import lombok.Setter;
 @Table(name = "budget_models")
 @Getter
 @Setter
+@Builder
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @NoArgsConstructor
 public class Budget {
 
@@ -53,6 +57,7 @@ public class Budget {
             name = "budget_model_categories",
             joinColumns = @JoinColumn(name = "budget_model_id"),
             inverseJoinColumns = @JoinColumn(name = "category_id"))
+    @Builder.Default
     private Set<Category> categories = new LinkedHashSet<>();
 
     @Column(name = "monthly_limit", nullable = false, precision = 14, scale = 2)

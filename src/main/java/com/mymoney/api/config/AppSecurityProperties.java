@@ -11,12 +11,16 @@ public record AppSecurityProperties(
         String refreshCookieName,
         List<String> allowedOrigins) {
 
-    public AppSecurityProperties {
-        allowedOrigins = allowedOrigins == null ? List.of() : List.copyOf(allowedOrigins);
-    }
-
-    @Override
-    public List<String> allowedOrigins() {
-        return List.copyOf(allowedOrigins);
+    public AppSecurityProperties(
+            String jwtSecret,
+            long accessTokenMinutes,
+            long refreshTokenDays,
+            String refreshCookieName,
+            List<String> allowedOrigins) {
+        this.jwtSecret = jwtSecret;
+        this.accessTokenMinutes = accessTokenMinutes;
+        this.refreshTokenDays = refreshTokenDays;
+        this.refreshCookieName = refreshCookieName;
+        this.allowedOrigins = allowedOrigins == null ? List.of() : List.copyOf(allowedOrigins);
     }
 }

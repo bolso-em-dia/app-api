@@ -17,16 +17,17 @@ public final class TransactionTestFactory {
     }
 
     public static Transaction create(Consumer<Transaction> customizer) {
-        var transaction = new Transaction();
-        transaction.setType(TransactionType.EXPENSE);
-        transaction.setOwnershipType(OwnershipType.SHARED);
-        transaction.setSourceType(TransactionSourceType.MANUAL);
-        transaction.setDescription("Test Transaction");
-        transaction.setAmount(new BigDecimal("10.00"));
-        transaction.setConvertedAmount(new BigDecimal("10.00"));
-        transaction.setCurrency("BRL");
-        transaction.setTransactionDate(LocalDate.of(2026, 1, 10));
-        transaction.setReferenceMonth(LocalDate.of(2026, 1, 1));
+        var transaction = Transaction.builder()
+                .type(TransactionType.EXPENSE)
+                .ownershipType(OwnershipType.SHARED)
+                .sourceType(TransactionSourceType.MANUAL)
+                .description("Test Transaction")
+                .amount(new BigDecimal("10.00"))
+                .convertedAmount(new BigDecimal("10.00"))
+                .currency("BRL")
+                .transactionDate(LocalDate.of(2026, 1, 10))
+                .referenceMonth(LocalDate.of(2026, 1, 1))
+                .build();
         customizer.accept(transaction);
         return transaction;
     }

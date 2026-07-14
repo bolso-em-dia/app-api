@@ -15,17 +15,13 @@ import com.mymoney.api.account.AccountType;
 import com.mymoney.api.account.CurrencyType;
 import com.mymoney.api.auth.api.JsonTestUtils;
 import com.mymoney.api.budget.Budget;
-import com.mymoney.api.budget.BudgetRepository;
 import com.mymoney.api.category.Category;
-import com.mymoney.api.category.CategoryRepository;
 import com.mymoney.api.exchangerate.ExchangeRate;
 import com.mymoney.api.exchangerate.ExchangeRateRepository;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
-import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.support.AccountTestFactory;
-import com.mymoney.api.support.IntegrationTestFixtureSupport.BudgetScenario;
 import com.mymoney.api.support.TransactionTestFactory;
 import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.TransactionRepository;
@@ -40,7 +36,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,22 +45,10 @@ import org.springframework.transaction.annotation.Transactional;
 class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
 
     @Autowired
-    private FamilyMemberRepository familyMemberRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private CategoryRepository categoryRepository;
-
-    @Autowired
     private AccountRepository accountRepository;
 
     @Autowired
     private TransactionRepository transactionRepository;
-
-    @Autowired
-    private BudgetRepository budgetRepository;
 
     @Autowired
     private FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
@@ -85,14 +68,15 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
 
     @BeforeEach
     void setUp() throws Exception {
-        BudgetScenario scenario = fixtures().createBudgetScenario();
-        regularUser = scenario.regularUser();
-        allowanceMember = scenario.allowanceMember();
-        groceries = scenario.groceries();
-        transport = scenario.transport();
-        account = scenario.account();
-        globalBudget = scenario.globalBudget();
-        allowanceBudget = scenario.allowanceBudget();
+        regularUser = fixtures().ensureRegularUser();
+        allowanceMember = budgetFixtures().createAllowanceMember();
+        groceries = budgetFixtures().createGroceriesCategory();
+        transport = budgetFixtures().createTransportCategory();
+        account = budgetFixtures().createMainCheckingAccount();
+        globalBudget = budgetFixtures().createGlobalBudget(groceries, transport);
+        allowanceBudget = budgetFixtures().createAllowanceBudget(allowanceMember);
+        budgetFixtures().createSharedGroceriesTransaction(account, groceries);
+        budgetFixtures().createAllowanceTransportTransaction(account, transport, allowanceMember);
 
         adminToken = loginAsAdmin();
         userToken = loginAsUser();
@@ -216,10 +200,11 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
 
     @Test
     void categoryBreakdownUsesConvertedAmountForUsdTransactions() throws Exception {
-        var usdRate = new ExchangeRate();
-        usdRate.setCurrency("USD");
-        usdRate.setRate(new BigDecimal("5.20"));
-        usdRate.setFetchedAt(OffsetDateTime.parse("2026-06-15T12:00:00Z"));
+        var usdRate = ExchangeRate.builder()
+                .currency("USD")
+                .rate(new BigDecimal("5.20"))
+                .fetchedAt(OffsetDateTime.parse("2026-06-15T12:00:00Z"))
+                .build();
         exchangeRateRepository.save(usdRate);
 
         var usdAccount = accountRepository.save(AccountTestFactory.create(created -> {
@@ -336,17 +321,18 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
         LocalDate currentReferenceMonth = currentReferenceMonth();
         LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(4);
 
-        FixedExpenseTemplate projectedExpense = new FixedExpenseTemplate();
-        projectedExpense.setName("Projected Market");
-        projectedExpense.setType(TransactionType.EXPENSE);
-        projectedExpense.setAmount(new BigDecimal("210.00"));
-        projectedExpense.setConvertedAmount(new BigDecimal("210.00"));
-        projectedExpense.setCurrency(com.mymoney.api.account.CurrencyType.BRL);
-        projectedExpense.setCategory(groceries);
-        projectedExpense.setAccount(account);
-        projectedExpense.setDueDay((short) 14);
-        projectedExpense.setCreatedInMonth(currentReferenceMonth.minusMonths(1));
-        projectedExpense.setActive(true);
+        FixedExpenseTemplate projectedExpense = FixedExpenseTemplate.builder()
+                .name("Projected Market")
+                .type(TransactionType.EXPENSE)
+                .amount(new BigDecimal("210.00"))
+                .convertedAmount(new BigDecimal("210.00"))
+                .currency(com.mymoney.api.account.CurrencyType.BRL)
+                .category(groceries)
+                .account(account)
+                .dueDay((short) 14)
+                .createdInMonth(currentReferenceMonth.minusMonths(1))
+                .active(true)
+                .build();
         fixedExpenseTemplateRepository.save(projectedExpense);
 
         // Materialize transactions for the future month

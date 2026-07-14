@@ -9,10 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
-import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
 import com.mymoney.api.category.Category;
-import com.mymoney.api.category.CategoryRepository;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateRequest;
@@ -37,12 +35,6 @@ import org.springframework.transaction.annotation.Transactional;
 @AutoConfigureMockMvc
 @Transactional
 class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
-
-    @Autowired
-    private CategoryRepository categoryRepository;
-
-    @Autowired
-    private AccountRepository accountRepository;
 
     @Autowired
     private FixedExpenseTemplateRepository fixedExpenseTemplateRepository;

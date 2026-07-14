@@ -8,19 +8,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
-import com.mymoney.api.budget.BudgetRepository;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
-import com.mymoney.api.member.FamilyMember;
-import com.mymoney.api.member.FamilyMemberRepository;
-import com.mymoney.api.support.IntegrationTestFixtureSupport.DashboardScenario;
-import com.mymoney.api.support.TransactionTestFactory;
-import com.mymoney.api.transaction.OwnershipType;
-import com.mymoney.api.transaction.Transaction;
-import com.mymoney.api.transaction.TransactionRepository;
-import com.mymoney.api.transaction.TransactionSourceType;
 import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -29,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -38,22 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
 class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
 
     @Autowired
-    private FamilyMemberRepository familyMemberRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
     private CategoryRepository categoryRepository;
 
     @Autowired
     private AccountRepository accountRepository;
-
-    @Autowired
-    private TransactionRepository transactionRepository;
-
-    @Autowired
-    private BudgetRepository budgetRepository;
 
     @Autowired
     private FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
@@ -63,7 +41,17 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
 
     @BeforeEach
     void setUp() throws Exception {
-        DashboardScenario scenario = fixtures().createDashboardScenario();
+        fixtures().ensureRegularUser();
+        var allowanceMember = dashboardFixtures().createAllowanceMember();
+        var groceries = dashboardFixtures().createGroceriesCategory();
+        var salary = dashboardFixtures().createSalaryCategory();
+        var transport = dashboardFixtures().createTransportCategory();
+        var account = dashboardFixtures().createMainCheckingAccount();
+        dashboardFixtures().createFamilyEssentialsBudget(groceries, transport);
+        dashboardFixtures().createAllowanceBudget(allowanceMember);
+        dashboardFixtures().createSalaryTransaction(account, salary);
+        dashboardFixtures().createMarketTransaction(account, groceries);
+        dashboardFixtures().createAllowanceRideAppTransaction(account, transport, allowanceMember);
 
         adminToken = loginAsAdmin();
         userToken = loginAsUser();
@@ -121,26 +109,28 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
         Account account =
                 accountRepository.findByNormalizedName("main checking").orElseThrow();
 
-        FixedExpenseTemplate projectedExpense = new FixedExpenseTemplate();
-        projectedExpense.setName("Projected Rent");
-        projectedExpense.setType(TransactionType.EXPENSE);
-        projectedExpense.setAmount(new BigDecimal("200.00"));
-        projectedExpense.setCategory(groceries);
-        projectedExpense.setAccount(account);
-        projectedExpense.setDueDay((short) 8);
-        projectedExpense.setCreatedInMonth(currentReferenceMonth.minusMonths(1));
-        projectedExpense.setActive(true);
+        FixedExpenseTemplate projectedExpense = FixedExpenseTemplate.builder()
+                .name("Projected Rent")
+                .type(TransactionType.EXPENSE)
+                .amount(new BigDecimal("200.00"))
+                .category(groceries)
+                .account(account)
+                .dueDay((short) 8)
+                .createdInMonth(currentReferenceMonth.minusMonths(1))
+                .active(true)
+                .build();
         fixedExpenseTemplateRepository.save(projectedExpense);
 
-        FixedExpenseTemplate projectedIncome = new FixedExpenseTemplate();
-        projectedIncome.setName("Projected Salary");
-        projectedIncome.setType(TransactionType.INCOME);
-        projectedIncome.setAmount(new BigDecimal("1000.00"));
-        projectedIncome.setCategory(salary);
-        projectedIncome.setAccount(account);
-        projectedIncome.setDueDay((short) 6);
-        projectedIncome.setCreatedInMonth(currentReferenceMonth.minusMonths(1));
-        projectedIncome.setActive(true);
+        FixedExpenseTemplate projectedIncome = FixedExpenseTemplate.builder()
+                .name("Projected Salary")
+                .type(TransactionType.INCOME)
+                .amount(new BigDecimal("1000.00"))
+                .category(salary)
+                .account(account)
+                .dueDay((short) 6)
+                .createdInMonth(currentReferenceMonth.minusMonths(1))
+                .active(true)
+                .build();
         fixedExpenseTemplateRepository.save(projectedIncome);
 
         // Materialize transactions for the future month
@@ -182,15 +172,16 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
         Account account =
                 accountRepository.findByNormalizedName("main checking").orElseThrow();
 
-        FixedExpenseTemplate projectedExpense = new FixedExpenseTemplate();
-        projectedExpense.setName("Projected Rent");
-        projectedExpense.setType(TransactionType.EXPENSE);
-        projectedExpense.setAmount(new BigDecimal("200.00"));
-        projectedExpense.setCategory(groceries);
-        projectedExpense.setAccount(account);
-        projectedExpense.setDueDay((short) 8);
-        projectedExpense.setCreatedInMonth(currentReferenceMonth().minusMonths(1));
-        projectedExpense.setActive(true);
+        FixedExpenseTemplate projectedExpense = FixedExpenseTemplate.builder()
+                .name("Projected Rent")
+                .type(TransactionType.EXPENSE)
+                .amount(new BigDecimal("200.00"))
+                .category(groceries)
+                .account(account)
+                .dueDay((short) 8)
+                .createdInMonth(currentReferenceMonth().minusMonths(1))
+                .active(true)
+                .build();
         fixedExpenseTemplateRepository.save(projectedExpense);
 
         // Materialize transactions for the future month
@@ -233,31 +224,5 @@ class DashboardControllerIntegrationTest extends AuthenticatedIntegrationTestSup
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.summary.totalIncome").isNumber())
                 .andExpect(jsonPath("$.summary.balance").isNumber());
-    }
-
-    private Transaction createTransaction(
-            TransactionType type,
-            OwnershipType ownershipType,
-            String description,
-            BigDecimal amount,
-            LocalDate transactionDate,
-            LocalDate referenceMonth,
-            Account account,
-            Category category,
-            FamilyMember member) {
-        return TransactionTestFactory.create(transaction -> {
-            transaction.setType(type);
-            transaction.setOwnershipType(ownershipType);
-            transaction.setSourceType(TransactionSourceType.MANUAL);
-            transaction.setDescription(description);
-            transaction.setAmount(amount);
-            transaction.setConvertedAmount(amount);
-            transaction.setCurrency("BRL");
-            transaction.setTransactionDate(transactionDate);
-            transaction.setReferenceMonth(referenceMonth);
-            transaction.setAccount(account);
-            transaction.setCategory(category);
-            transaction.setMember(member);
-        });
     }
 }

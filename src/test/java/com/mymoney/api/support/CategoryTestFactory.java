@@ -13,9 +13,10 @@ public final class CategoryTestFactory {
     }
 
     public static Category create(Consumer<Category> customizer) {
-        var category = new Category();
-        category.setName("Test Category");
-        category.setCreatedInMonth(LocalDate.of(2026, 1, 1));
+        var category = Category.builder()
+                .name("Test Category")
+                .createdInMonth(LocalDate.of(2026, 1, 1))
+                .build();
         customizer.accept(category);
         return category;
     }

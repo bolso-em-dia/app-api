@@ -56,10 +56,11 @@ class ExchangeRateServiceTest {
 
     @BeforeEach
     void setUp() {
-        savedRate = new ExchangeRate();
-        savedRate.setCurrency("USD");
-        savedRate.setRate(new BigDecimal("5.10"));
-        savedRate.setFetchedAt(OffsetDateTime.now().minusMinutes(30));
+        savedRate = ExchangeRate.builder()
+                .currency("USD")
+                .rate(new BigDecimal("5.10"))
+                .fetchedAt(OffsetDateTime.now().minusMinutes(30))
+                .build();
         lenient()
                 .when(userPreferencesService.getCurrentUserPreferences())
                 .thenReturn(new UserPreferencesResponse(null, "pt-BR", false, true));

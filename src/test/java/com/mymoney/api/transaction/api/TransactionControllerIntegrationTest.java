@@ -16,15 +16,12 @@ import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
 import com.mymoney.api.account.CurrencyType;
 import com.mymoney.api.category.Category;
-import com.mymoney.api.category.CategoryRepository;
 import com.mymoney.api.exchangerate.ExchangeRate;
 import com.mymoney.api.exchangerate.ExchangeRateRepository;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.member.FamilyMember;
-import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.support.AccountTestFactory;
-import com.mymoney.api.support.IntegrationTestFixtureSupport.TransactionScenario;
 import com.mymoney.api.support.TransactionTestFactory;
 import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.Transaction;
@@ -41,7 +38,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,15 +47,6 @@ import org.springframework.transaction.annotation.Transactional;
 class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
-    @Autowired
-    private FamilyMemberRepository familyMemberRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private CategoryRepository categoryRepository;
 
     @Autowired
     private AccountRepository accountRepository;
@@ -83,12 +70,13 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
 
     @BeforeEach
     void setUp() throws Exception {
-        TransactionScenario scenario = fixtures().createTransactionScenario();
-        allowanceMember = scenario.allowanceMember();
-        category = scenario.groceries();
-        transportCategory = scenario.transport();
-        account = scenario.account();
-        sharedTransaction = scenario.sharedTransaction();
+        fixtures().ensureRegularUser();
+        allowanceMember = transactionFixtures().createAllowanceMember();
+        category = transactionFixtures().createGroceriesCategory();
+        transportCategory = transactionFixtures().createTransportCategory();
+        account = transactionFixtures().createMainCheckingAccount();
+        sharedTransaction = transactionFixtures().createSharedTransaction(account, category);
+        transactionFixtures().createTransportTransaction(account, transportCategory);
 
         adminToken = loginAsAdmin();
         userToken = loginAsUser();
@@ -323,15 +311,16 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
         LocalDate currentReferenceMonth = currentReferenceMonth();
         LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(4);
 
-        FixedExpenseTemplate template = new FixedExpenseTemplate();
-        template.setName("Projected Rent");
-        template.setType(TransactionType.EXPENSE);
-        template.setAmount(new BigDecimal("880.00"));
-        template.setCategory(category);
-        template.setAccount(account);
-        template.setDueDay((short) 12);
-        template.setCreatedInMonth(currentReferenceMonth.minusMonths(1));
-        template.setActive(true);
+        FixedExpenseTemplate template = FixedExpenseTemplate.builder()
+                .name("Projected Rent")
+                .type(TransactionType.EXPENSE)
+                .amount(new BigDecimal("880.00"))
+                .category(category)
+                .account(account)
+                .dueDay((short) 12)
+                .createdInMonth(currentReferenceMonth.minusMonths(1))
+                .active(true)
+                .build();
         template = fixedExpenseTemplateRepository.save(template);
 
         // Materialize transactions for the future month
@@ -1035,10 +1024,11 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
     }
 
     private void seedUsdRate(String rateValue) {
-        var rate = new ExchangeRate();
-        rate.setCurrency("USD");
-        rate.setRate(new BigDecimal(rateValue));
-        rate.setFetchedAt(OffsetDateTime.parse("2026-06-15T12:00:00Z"));
+        var rate = ExchangeRate.builder()
+                .currency("USD")
+                .rate(new BigDecimal(rateValue))
+                .fetchedAt(OffsetDateTime.parse("2026-06-15T12:00:00Z"))
+                .build();
         exchangeRateRepository.save(rate);
     }
 }

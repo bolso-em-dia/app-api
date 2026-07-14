@@ -44,13 +44,11 @@ class EffectiveMonthlyTransactionServiceTest {
 
     private LocalDate currentMonth;
     private LocalDate nextMonth;
-    private LocalDate monthPlus4;
 
     @BeforeEach
     void setUp() {
         currentMonth = YearMonth.now().atDay(1);
         nextMonth = currentMonth.plusMonths(1);
-        monthPlus4 = currentMonth.plusMonths(4);
         lenient().when(dateProvider.currentReferenceMonth()).thenReturn(currentMonth);
         lenient()
                 .when(currencyConversionService.convert(any(), any(), eq(false)))
@@ -103,27 +101,25 @@ class EffectiveMonthlyTransactionServiceTest {
     }
 
     private FixedExpenseTemplate createTemplate() {
-        FixedExpenseTemplate template = new FixedExpenseTemplate();
-        template.setId(UUID.randomUUID());
-        template.setName("Test Template");
-        template.setType(TransactionType.EXPENSE);
-        template.setAmount(new BigDecimal("100.00"));
-        template.setCurrency(CurrencyType.BRL);
-        template.setDueDay((short) 15);
-        template.setCreatedInMonth(currentMonth);
-        template.setArchivedFromMonth(null);
+        Category category =
+                Category.builder().id(UUID.randomUUID()).name("Test Category").build();
 
-        Category category = new Category();
-        category.setId(UUID.randomUUID());
-        category.setName("Test Category");
-        template.setCategory(category);
+        Account account = Account.builder()
+                .id(UUID.randomUUID())
+                .name("Test Account")
+                .currency(CurrencyType.BRL)
+                .build();
 
-        Account account = new Account();
-        account.setId(UUID.randomUUID());
-        account.setName("Test Account");
-        account.setCurrency(CurrencyType.BRL);
-        template.setAccount(account);
-
-        return template;
+        return FixedExpenseTemplate.builder()
+                .id(UUID.randomUUID())
+                .name("Test Template")
+                .type(TransactionType.EXPENSE)
+                .amount(new BigDecimal("100.00"))
+                .currency(CurrencyType.BRL)
+                .dueDay((short) 15)
+                .createdInMonth(currentMonth)
+                .category(category)
+                .account(account)
+                .build();
     }
 }

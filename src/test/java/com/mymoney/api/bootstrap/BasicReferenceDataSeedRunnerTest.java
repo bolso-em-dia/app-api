@@ -115,12 +115,12 @@ class BasicReferenceDataSeedRunnerTest {
 
     @Test
     void doesNotCreateDuplicatesWhenRecordsAlreadyExist() throws Exception {
-        Category existingCategory = new Category();
-        existingCategory.setIcon("shopping-cart");
-        existingCategory.setColor("#3b82f6");
+        Category existingCategory =
+                Category.builder().icon("shopping-cart").color("#3b82f6").build();
 
         when(categoryRepository.findByNormalizedName(any())).thenReturn(Optional.of(existingCategory));
-        when(accountRepository.findByNormalizedName(eq("Pix"))).thenReturn(Optional.of(new Account()));
+        when(accountRepository.findByNormalizedName(eq("Pix")))
+                .thenReturn(Optional.of(Account.builder().build()));
 
         basicReferenceDataSeedRunner.run();
 
@@ -130,13 +130,15 @@ class BasicReferenceDataSeedRunnerTest {
 
     @Test
     void backfillsMissingSeedCategoryColorWithoutCreatingDuplicate() throws Exception {
-        Category existingCategory = new Category();
-        existingCategory.setName("Compras");
-        existingCategory.setIcon("shopping-cart");
-        existingCategory.setColor(null);
+        Category existingCategory = Category.builder()
+                .name("Compras")
+                .icon("shopping-cart")
+                .color(null)
+                .build();
 
         when(categoryRepository.findByNormalizedName(any())).thenReturn(Optional.of(existingCategory));
-        when(accountRepository.findByNormalizedName(eq("Pix"))).thenReturn(Optional.of(new Account()));
+        when(accountRepository.findByNormalizedName(eq("Pix")))
+                .thenReturn(Optional.of(Account.builder().build()));
 
         basicReferenceDataSeedRunner.run();
 
