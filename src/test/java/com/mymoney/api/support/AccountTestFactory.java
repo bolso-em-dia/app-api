@@ -14,10 +14,11 @@ public final class AccountTestFactory {
     }
 
     public static Account create(Consumer<Account> customizer) {
-        var account = new Account();
-        account.setName("Test Account");
-        account.setType(AccountType.CHECKING);
-        account.setCreatedInMonth(LocalDate.of(2026, 1, 1));
+        var account = Account.builder()
+                .name("Test Account")
+                .type(AccountType.CHECKING)
+                .createdInMonth(LocalDate.of(2026, 1, 1))
+                .build();
         customizer.accept(account);
         return account;
     }

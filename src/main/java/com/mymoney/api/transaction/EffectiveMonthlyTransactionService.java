@@ -119,12 +119,7 @@ public class EffectiveMonthlyTransactionService {
     }
 
     private void deleteBeyondHorizon(FixedExpenseTemplate template, LocalDate horizon) {
-        List<Transaction> futureTransactions =
-                transactionRepository.findByFixedExpenseTemplateIdAndReferenceMonthGreaterThan(
-                        template.getId(), horizon);
-        for (Transaction transaction : futureTransactions) {
-            transactionRepository.delete(transaction);
-        }
+        transactionRepository.deleteByFixedExpenseTemplateIdAndReferenceMonthGreaterThan(template.getId(), horizon);
     }
 
     private Set<UUID> materializedTemplateIds(List<Transaction> transactions) {

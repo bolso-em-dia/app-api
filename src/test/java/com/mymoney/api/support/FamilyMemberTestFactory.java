@@ -13,14 +13,15 @@ public final class FamilyMemberTestFactory {
     }
 
     public static FamilyMember create(Consumer<FamilyMember> customizer) {
-        var member = new FamilyMember();
-        member.setName("Test Member");
-        member.setEmail("member@example.com");
-        member.setPasswordHash("encoded-password");
-        member.setRole(FamilyRole.USER);
-        member.setActive(true);
-        member.setAllowanceEnabled(false);
-        member.setMustChangePassword(false);
+        var member = FamilyMember.builder()
+                .name("Test Member")
+                .email("member@example.com")
+                .passwordHash("encoded-password")
+                .role(FamilyRole.USER)
+                .active(true)
+                .allowanceEnabled(false)
+                .mustChangePassword(false)
+                .build();
         customizer.accept(member);
         return member;
     }

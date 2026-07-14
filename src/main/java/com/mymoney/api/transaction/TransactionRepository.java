@@ -167,12 +167,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     @EntityGraph(attributePaths = {"account", "category", "member", "fixedExpenseTemplate"})
     List<Transaction> findByReferenceMonthOrderByTransactionDateAscCreatedAtAsc(LocalDate referenceMonth);
 
-    boolean existsByFixedExpenseTemplateIdAndReferenceMonth(UUID fixedExpenseTemplateId, LocalDate referenceMonth);
-
     Optional<Transaction> findByFixedExpenseTemplateIdAndReferenceMonth(
             UUID fixedExpenseTemplateId, LocalDate referenceMonth);
 
-    List<Transaction> findByFixedExpenseTemplateIdAndReferenceMonthGreaterThan(
+    void deleteByFixedExpenseTemplateIdAndReferenceMonthGreaterThan(
             UUID fixedExpenseTemplateId, LocalDate referenceMonth);
 
     void deleteByFixedExpenseTemplateIdAndReferenceMonthGreaterThanEqual(
@@ -182,8 +180,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     @Query(
             "UPDATE Transaction t SET t.fixedExpenseTemplate = null WHERE t.fixedExpenseTemplate = :template AND t.referenceMonth < :beforeMonth")
     void detachFixedExpenseTemplateBeforeMonth(FixedExpenseTemplate template, LocalDate beforeMonth);
-
-    List<Transaction> findByInstallmentGroupIdOrderByInstallmentNumber(UUID installmentGroupId);
 
     void deleteByInstallmentGroupIdAndInstallmentNumberGreaterThanEqual(
             UUID installmentGroupId, Short installmentNumber);

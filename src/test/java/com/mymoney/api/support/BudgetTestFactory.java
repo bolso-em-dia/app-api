@@ -15,12 +15,13 @@ public final class BudgetTestFactory {
     }
 
     public static Budget create(Consumer<Budget> customizer) {
-        var budget = new Budget();
-        budget.setName("Test Budget");
-        budget.setType(BudgetType.GLOBAL);
-        budget.setMonthlyLimit(new BigDecimal("100.00"));
-        budget.setCreatedInMonth(LocalDate.of(2026, 1, 1));
-        budget.setActive(true);
+        var budget = Budget.builder()
+                .name("Test Budget")
+                .type(BudgetType.GLOBAL)
+                .monthlyLimit(new BigDecimal("100.00"))
+                .createdInMonth(LocalDate.of(2026, 1, 1))
+                .active(true)
+                .build();
         customizer.accept(budget);
         return budget;
     }

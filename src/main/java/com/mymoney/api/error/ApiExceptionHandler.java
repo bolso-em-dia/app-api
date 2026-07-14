@@ -18,6 +18,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.util.HtmlUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
@@ -49,12 +50,13 @@ public class ApiExceptionHandler {
                     message);
         }
 
-        return ResponseEntity.status(status).body(ApiErrorResponse.from(status, message, request.getRequestURI()));
+        return ResponseEntity.status(status)
+                .body(ApiErrorResponse.from(status, sanitize(message), sanitizePath(request)));
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
     public ResponseEntity<ApiErrorResponse> handleValidationFailure(Exception exception, HttpServletRequest request) {
-        List<FieldError> fieldErrors = List.of();
+        var fieldErrors = List.<FieldError>of();
         if (exception instanceof MethodArgumentNotValidException manve) {
             fieldErrors = manve.getBindingResult().getFieldErrors();
         } else if (exception instanceof BindException be) {
@@ -62,17 +64,21 @@ public class ApiExceptionHandler {
         }
 
         String message = "Request validation failed.";
+        var errorDetails = fieldErrors.stream()
+                .map(fe -> new ApiErrorResponse.FieldErrorDetail(sanitize(fe.getField()), sanitize(fe.getDefaultMessage())))
+                .toList();
         log.warn(
                 "Validation failed on {} {} by user={} status={} fields=[{}]",
                 request.getMethod(),
                 request.getRequestURI(),
                 currentUser(),
+                HttpStatus.BAD_REQUEST.value(),
                 fieldErrors.stream()
                         .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
                         .collect(java.util.stream.Collectors.joining(", ")));
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiErrorResponse.validationError(message, request.getRequestURI(), fieldErrors));
+                .body(ApiErrorResponse.validationError(sanitize(message), sanitizePath(request), errorDetails));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -94,7 +100,7 @@ public class ApiExceptionHandler {
                 message);
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiErrorResponse.from(HttpStatus.BAD_REQUEST, message, request.getRequestURI()));
+                .body(ApiErrorResponse.from(HttpStatus.BAD_REQUEST, sanitize(message), sanitizePath(request)));
     }
 
     @ExceptionHandler(AuthorizationDeniedException.class)
@@ -106,10 +112,11 @@ public class ApiExceptionHandler {
                 request.getRequestURI(),
                 currentUser(),
                 HttpStatus.FORBIDDEN.value(),
-                "Access Denied");
+                "Access Denied",
+                exception);
 
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiErrorResponse.from(HttpStatus.FORBIDDEN, "Access Denied", request.getRequestURI()));
+                .body(ApiErrorResponse.from(HttpStatus.FORBIDDEN, "Access Denied", sanitizePath(request)));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -125,7 +132,7 @@ public class ApiExceptionHandler {
                 message);
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiErrorResponse.from(HttpStatus.BAD_REQUEST, message, request.getRequestURI()));
+                .body(ApiErrorResponse.from(HttpStatus.BAD_REQUEST, sanitize(message), sanitizePath(request)));
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
@@ -138,10 +145,11 @@ public class ApiExceptionHandler {
                 request.getRequestURI(),
                 currentUser(),
                 HttpStatus.CONFLICT.value(),
-                message);
+                message,
+                exception);
 
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiErrorResponse.from(HttpStatus.CONFLICT, message, request.getRequestURI()));
+                .body(ApiErrorResponse.from(HttpStatus.CONFLICT, sanitize(message), sanitizePath(request)));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -156,7 +164,8 @@ public class ApiExceptionHandler {
                 exception.getMessage());
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiErrorResponse.from(HttpStatus.BAD_REQUEST, exception.getMessage(), request.getRequestURI()));
+                .body(ApiErrorResponse.from(
+                        HttpStatus.BAD_REQUEST, sanitize(exception.getMessage()), sanitizePath(request)));
     }
 
     @ExceptionHandler(Exception.class)
@@ -170,7 +179,15 @@ public class ApiExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiErrorResponse.from(
-                        HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error.", request.getRequestURI()));
+                        HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error.", sanitizePath(request)));
+    }
+
+    private String sanitizePath(HttpServletRequest request) {
+        return sanitize(request.getRequestURI());
+    }
+
+    private String sanitize(String value) {
+        return value == null ? null : HtmlUtils.htmlEscape(value);
     }
 
     private String currentUser() {
