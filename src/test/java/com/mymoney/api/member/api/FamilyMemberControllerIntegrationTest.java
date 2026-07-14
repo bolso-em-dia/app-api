@@ -56,12 +56,11 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
                         .header("Authorization", bearerToken(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(toJson(new CreateFamilyMemberRequest(
-                                "Karol", "karol@bolso-em-dia.local", "karol123456", FamilyRole.USER, true))))
+                                "Karol", "karol@bolso-em-dia.local", "karol123456", FamilyRole.USER))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Karol"))
                 .andExpect(jsonPath("$.email").value("karol@bolso-em-dia.local"))
-                .andExpect(jsonPath("$.role").value("USER"))
-                .andExpect(jsonPath("$.allowanceEnabled").value(true));
+                .andExpect(jsonPath("$.role").value("USER"));
     }
 
     @Test
@@ -75,16 +74,14 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
                         .header("Authorization", bearerToken(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(toJson(new UpdateFamilyMemberRequest(
-                                "Updated User", "user@bolso-em-dia.local", "updated123456", FamilyRole.USER, true))))
+                                "Updated User", "user@bolso-em-dia.local", "updated123456", FamilyRole.USER))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Updated User"))
-                .andExpect(jsonPath("$.allowanceEnabled").value(true));
+                .andExpect(jsonPath("$.name").value("Updated User"));
 
         mockMvc.perform(patch("/api/family-members/" + regularUser.getId() + "/archive")
                         .header("Authorization", bearerToken(adminToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.active").value(false))
-                .andExpect(jsonPath("$.allowanceEnabled").value(false));
+                .andExpect(jsonPath("$.active").value(false));
 
         mockMvc.perform(get("/api/family-members")
                         .header("Authorization", bearerToken(adminToken))
@@ -103,8 +100,7 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
         mockMvc.perform(post("/api/family-members")
                         .header("Authorization", bearerToken(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJson(
-                                new CreateFamilyMemberRequest("", "invalid-email", "123", FamilyRole.USER, false))))
+                        .content(toJson(new CreateFamilyMemberRequest("", "invalid-email", "123", FamilyRole.USER))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -194,7 +190,7 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
                         .header("Authorization", bearerToken(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(toJson(new CreateFamilyMemberRequest(
-                                "", "test@bolso-em-dia.local", "test123456", FamilyRole.USER, false))))
+                                "", "test@bolso-em-dia.local", "test123456", FamilyRole.USER))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -203,8 +199,8 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
         mockMvc.perform(post("/api/family-members")
                         .header("Authorization", bearerToken(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJson(new CreateFamilyMemberRequest(
-                                "Test", "not-an-email", "test123456", FamilyRole.USER, false))))
+                        .content(toJson(
+                                new CreateFamilyMemberRequest("Test", "not-an-email", "test123456", FamilyRole.USER))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -214,7 +210,7 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
                         .header("Authorization", bearerToken(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(toJson(new CreateFamilyMemberRequest(
-                                "Test", "test@bolso-em-dia.local", "123", FamilyRole.USER, false))))
+                                "Test", "test@bolso-em-dia.local", "123", FamilyRole.USER))))
                 .andExpect(status().isBadRequest());
     }
 

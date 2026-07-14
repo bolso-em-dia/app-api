@@ -37,7 +37,6 @@ public class TestIdentityFixtureSupport {
             member.setName("Regular User");
             member.setRole(FamilyRole.USER);
             member.setActive(true);
-            member.setAllowanceEnabled(false);
             member.setMustChangePassword(false);
         });
     }
@@ -48,7 +47,6 @@ public class TestIdentityFixtureSupport {
         member.setPasswordHash(passwordEncoder.encode(rawPassword));
         member.setRole(FamilyRole.USER);
         member.setActive(true);
-        member.setAllowanceEnabled(false);
         member.setMustChangePassword(false);
         customizer.accept(member);
         return familyMemberRepository.save(member);
@@ -57,7 +55,6 @@ public class TestIdentityFixtureSupport {
     public FamilyMember persistAllowanceMember(String name, String email, String rawPassword) {
         return persistFamilyMember(email, rawPassword, member -> {
             member.setName(name);
-            member.setAllowanceEnabled(true);
         });
     }
 }

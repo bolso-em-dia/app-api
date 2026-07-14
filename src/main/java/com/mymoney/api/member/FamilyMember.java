@@ -46,9 +46,6 @@ public class FamilyMember {
     @Column(nullable = false)
     private boolean active;
 
-    @Column(name = "allowance_enabled", nullable = false)
-    private boolean allowanceEnabled;
-
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword;
 

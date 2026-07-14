@@ -67,5 +67,24 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
             """)
     Optional<Budget> findWithAssociationsById(UUID id);
 
-    boolean existsByOwnerMemberIdAndType(UUID ownerMemberId, BudgetType type);
+    @Query(
+            """
+            select count(e) > 0
+            from Budget e
+            where e.ownerMember.id = :ownerMemberId
+              and e.type = :type
+              and (:budgetId is null or e.id <> :budgetId)
+            """)
+    boolean existsAnotherByOwnerMemberIdAndType(UUID ownerMemberId, BudgetType type, UUID budgetId);
+
+    @Query(
+            """
+            select count(e) > 0
+            from Budget e
+            where e.ownerMember.id = :ownerMemberId
+              and e.type = com.mymoney.api.budget.BudgetType.ALLOWANCE
+              and e.createdInMonth <= :referenceMonth
+              and (e.archivedFromMonth is null or e.archivedFromMonth > :referenceMonth)
+            """)
+    boolean existsActiveAllowanceByOwnerMemberIdAndReferenceMonth(UUID ownerMemberId, LocalDate referenceMonth);
 }

@@ -58,7 +58,6 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
 
     private String adminToken;
     private String userToken;
-    private FamilyMember regularUser;
     private FamilyMember allowanceMember;
     private Category groceries;
     private Category transport;
@@ -68,7 +67,7 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
 
     @BeforeEach
     void setUp() throws Exception {
-        regularUser = fixtures().ensureRegularUser();
+        fixtures().ensureRegularUser();
         allowanceMember = budgetFixtures().createAllowanceMember();
         groceries = budgetFixtures().createGroceriesCategory();
         transport = budgetFixtures().createTransportCategory();
@@ -133,21 +132,6 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
                                   "monthlyLimit": 150.00
                                 }
                                 """))
-                .andExpect(status().isUnprocessableEntity());
-
-        mockMvc.perform(post("/api/budgets")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                """
-                                {
-                                  "name": "Invalid Allowance",
-                                  "type": "ALLOWANCE",
-                                  "ownerMemberId": "%s",
-                                  "monthlyLimit": 150.00
-                                }
-                                """
-                                        .formatted(regularUser.getId())))
                 .andExpect(status().isUnprocessableEntity());
 
         mockMvc.perform(patch("/api/budgets/" + globalBudget.getId() + "/archive")
@@ -257,6 +241,24 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
                                 }
                                 """
                                         .formatted(allowanceMember.getId())))
+                .andExpect(status().isConflict());
+
+        var anotherAllowanceMember = budgetFixtures().createAllowanceMember();
+        budgetFixtures().createAllowanceBudget(anotherAllowanceMember);
+
+        mockMvc.perform(put("/api/budgets/" + globalBudget.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "name": "Global To Existing Allowance Owner",
+                                  "type": "ALLOWANCE",
+                                  "ownerMemberId": "%s",
+                                  "monthlyLimit": 300.00
+                                }
+                                """
+                                        .formatted(anotherAllowanceMember.getId())))
                 .andExpect(status().isConflict());
 
         MvcResult createResult = mockMvc.perform(post("/api/budgets")

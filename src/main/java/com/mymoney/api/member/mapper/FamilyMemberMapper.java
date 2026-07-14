@@ -14,7 +14,6 @@ public class FamilyMemberMapper {
                 member.getEmail(),
                 member.getRole().name(),
                 member.isActive(),
-                member.isAllowanceEnabled(),
                 member.getCreatedAt(),
                 member.getUpdatedAt());
     }

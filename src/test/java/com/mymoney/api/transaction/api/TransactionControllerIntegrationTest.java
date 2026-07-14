@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -15,6 +16,7 @@ import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
 import com.mymoney.api.account.CurrencyType;
+import com.mymoney.api.budget.Budget;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.exchangerate.ExchangeRate;
 import com.mymoney.api.exchangerate.ExchangeRateRepository;
@@ -66,12 +68,21 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
     private Category category;
     private Category transportCategory;
     private Account account;
+    private Budget allowanceBudget;
     private Transaction sharedTransaction;
 
     @BeforeEach
     void setUp() throws Exception {
         fixtures().ensureRegularUser();
         allowanceMember = transactionFixtures().createAllowanceMember();
+        allowanceBudget = fixtures().persistBudget(budget -> {
+            budget.setType(com.mymoney.api.budget.BudgetType.ALLOWANCE);
+            budget.setOwnerMember(allowanceMember);
+            budget.setName("Karol Allowance");
+            budget.setMonthlyLimit(new BigDecimal("400.00"));
+            budget.setCreatedInMonth(currentReferenceMonth());
+            budget.setActive(true);
+        });
         category = transactionFixtures().createGroceriesCategory();
         transportCategory = transactionFixtures().createTransportCategory();
         account = transactionFixtures().createMainCheckingAccount();
@@ -227,6 +238,50 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                                 """
                                         .formatted(account.getId(), category.getId())))
                 .andExpect(status().isUnprocessableEntity());
+
+        mockMvc.perform(put("/api/budgets/" + allowanceBudget.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "name": "Karol Allowance",
+                                  "type": "ALLOWANCE",
+                                  "ownerMemberId": "%s",
+                                  "monthlyLimit": 400.00
+                                }
+                                """
+                                        .formatted(allowanceMember.getId())))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void individualTransactionsRequireAllowanceInTransactionMonth() throws Exception {
+        mockMvc.perform(patch("/api/budgets/" + allowanceBudget.getId() + "/archive")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-09-01"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "INDIVIDUAL",
+                                  "description": "Blocked future personal expense",
+                                  "amount": 30.00,
+                                  "transactionDate": "2026-09-20",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "memberId": "%s"
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId(), allowanceMember.getId())))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message")
+                        .value("Individual transactions require a valid allowance budget for the selected member."));
     }
 
     @Test
