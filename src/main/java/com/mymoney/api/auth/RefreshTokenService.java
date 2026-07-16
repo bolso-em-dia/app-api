@@ -143,6 +143,9 @@ public class RefreshTokenService {
         var deleted = refreshTokenRepository.deleteByExpiresAtBefore(cutoff);
         if (deleted > 0) {
             log.info("Purged {} expired refresh tokens older than {}.", deleted, cutoff);
+            return;
         }
+
+        log.info("No expired refresh tokens to purge. cutoff={}", cutoff);
     }
 }
