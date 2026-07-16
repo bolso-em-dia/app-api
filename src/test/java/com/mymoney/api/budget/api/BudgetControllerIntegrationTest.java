@@ -1,5 +1,6 @@
 package com.mymoney.api.budget.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -15,6 +16,7 @@ import com.mymoney.api.account.AccountType;
 import com.mymoney.api.account.CurrencyType;
 import com.mymoney.api.auth.api.JsonTestUtils;
 import com.mymoney.api.budget.Budget;
+import com.mymoney.api.budget.BudgetRepository;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.exchangerate.ExchangeRate;
 import com.mymoney.api.exchangerate.ExchangeRateRepository;
@@ -55,6 +57,9 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
 
     @Autowired
     private ExchangeRateRepository exchangeRateRepository;
+
+    @Autowired
+    private BudgetRepository budgetRepository;
 
     private String adminToken;
     private String userToken;
@@ -319,6 +324,60 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
     }
 
     @Test
+    void budgetWritesShouldPopulateAuditFields() throws Exception {
+        var createResult = mockMvc.perform(post("/api/budgets")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "name": "Audited Budget",
+                                  "type": "GLOBAL",
+                                  "categoryIds": ["%s"],
+                                  "monthlyLimit": 220.00
+                                }
+                                """
+                                        .formatted(transport.getId())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        var createdId =
+                JsonTestUtils.extractJsonValue(createResult.getResponse().getContentAsString(), "id");
+        var created =
+                budgetRepository.findById(java.util.UUID.fromString(createdId)).orElseThrow();
+        assertThat(created.getCreatedBy()).isEqualTo(adminMemberId());
+        assertThat(created.getUpdatedBy()).isEqualTo(adminMemberId());
+
+        mockMvc.perform(put("/api/budgets/" + createdId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "name": "Audited Budget Updated",
+                                  "type": "GLOBAL",
+                                  "categoryIds": ["%s"],
+                                  "monthlyLimit": 230.00
+                                }
+                                """
+                                        .formatted(transport.getId())))
+                .andExpect(status().isOk());
+
+        var updated =
+                budgetRepository.findById(java.util.UUID.fromString(createdId)).orElseThrow();
+        assertThat(updated.getUpdatedBy()).isEqualTo(adminMemberId());
+
+        mockMvc.perform(patch("/api/budgets/" + createdId + "/archive")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", "2026-07-01"))
+                .andExpect(status().isOk());
+
+        var archived =
+                budgetRepository.findById(java.util.UUID.fromString(createdId)).orElseThrow();
+        assertThat(archived.getUpdatedBy()).isEqualTo(adminMemberId());
+    }
+
+    @Test
     void futureMonthBudgetConsumesProjectedFixedExpense() throws Exception {
         LocalDate currentReferenceMonth = currentReferenceMonth();
         LocalDate futureReferenceMonth = currentReferenceMonth.plusMonths(4);
@@ -390,5 +449,9 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
                         .header("Authorization", "Bearer " + adminToken)
                         .param("referenceMonth", "2026-07-01"))
                 .andExpect(status().isNotFound());
+    }
+
+    private java.util.UUID adminMemberId() {
+        return fixtures().ensureAdminCanUseProtectedApis().getId();
     }
 }

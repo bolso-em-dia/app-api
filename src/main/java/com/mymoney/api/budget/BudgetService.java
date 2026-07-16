@@ -1,5 +1,6 @@
 package com.mymoney.api.budget;
 
+import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.budget.api.request.CreateBudgetRequest;
 import com.mymoney.api.budget.api.request.UpdateBudgetRequest;
 import com.mymoney.api.category.Category;
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BudgetService {
@@ -41,6 +44,7 @@ public class BudgetService {
     private final FamilyMemberRepository familyMemberRepository;
     private final TransactionService transactionService;
     private final TransactionCategoryAnalyzer transactionCategoryAnalyzer;
+    private final AuditorResolver auditorResolver;
     private final DateProvider dateProvider;
 
     @Transactional(readOnly = true)
@@ -79,7 +83,7 @@ public class BudgetService {
 
     @Transactional
     public Budget create(CreateBudgetRequest request) {
-        Budget budget = new Budget();
+        var budget = new Budget();
         apply(
                 budget,
                 request.name(),
@@ -89,12 +93,20 @@ public class BudgetService {
                 request.monthlyLimit());
         budget.setCreatedInMonth(dateProvider.currentReferenceMonth());
         budget.setActive(true);
-        return budgetRepository.save(budget);
+        var saved = budgetRepository.save(budget);
+        log.info(
+                "Budget created: id={}, name={}, type={}, ownerMemberId={}, memberId={}",
+                saved.getId(),
+                saved.getName(),
+                saved.getType(),
+                saved.getOwnerMember() != null ? saved.getOwnerMember().getId() : null,
+                auditorResolver.resolveMemberId());
+        return saved;
     }
 
     @Transactional
     public Budget update(UUID id, UpdateBudgetRequest request) {
-        Budget budget = getById(id);
+        var budget = getById(id);
         apply(
                 budget,
                 request.name(),
@@ -102,19 +114,33 @@ public class BudgetService {
                 request.ownerMemberId(),
                 request.categoryIds(),
                 request.monthlyLimit());
-        return budgetRepository.save(budget);
+        var saved = budgetRepository.save(budget);
+        log.info(
+                "Budget updated: id={}, name={}, type={}, ownerMemberId={}, memberId={}",
+                saved.getId(),
+                saved.getName(),
+                saved.getType(),
+                saved.getOwnerMember() != null ? saved.getOwnerMember().getId() : null,
+                auditorResolver.resolveMemberId());
+        return saved;
     }
 
     @Transactional
     public Budget archive(UUID id, LocalDate referenceMonth) {
-        Budget budget = getById(id);
+        var budget = getById(id);
         if (referenceMonth.isBefore(budget.getCreatedInMonth())) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "Archive month cannot be before the budget creation month.");
         }
         budget.setArchivedFromMonth(referenceMonth);
         budget.setActive(false);
-        return budgetRepository.save(budget);
+        var saved = budgetRepository.save(budget);
+        log.info(
+                "Budget archived: id={}, archivedFromMonth={}, memberId={}",
+                saved.getId(),
+                saved.getArchivedFromMonth(),
+                auditorResolver.resolveMemberId());
+        return saved;
     }
 
     @Transactional(readOnly = true)

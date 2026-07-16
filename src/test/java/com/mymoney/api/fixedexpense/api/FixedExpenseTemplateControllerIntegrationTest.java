@@ -1,5 +1,6 @@
 package com.mymoney.api.fixedexpense.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountType;
+import com.mymoney.api.auth.api.JsonTestUtils;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
@@ -206,6 +208,47 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
     }
 
     @Test
+    void fixedExpenseTemplateWritesShouldPopulateAuditFields() throws Exception {
+        var createResult = mockMvc.perform(post("/api/fixed-transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new CreateFixedExpenseTemplateRequest(
+                                "Audited Template",
+                                TransactionType.EXPENSE,
+                                new BigDecimal("90.00"),
+                                category.getId(),
+                                account.getId(),
+                                10))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        var createdId =
+                JsonTestUtils.extractJsonValue(createResult.getResponse().getContentAsString(), "id");
+        var created = fixedExpenseTemplateRepository
+                .findById(java.util.UUID.fromString(createdId))
+                .orElseThrow();
+        assertThat(created.getCreatedBy()).isEqualTo(adminMemberId());
+        assertThat(created.getUpdatedBy()).isEqualTo(adminMemberId());
+
+        mockMvc.perform(put("/api/fixed-transactions/" + createdId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateFixedExpenseTemplateRequest(
+                                "Audited Template Updated",
+                                TransactionType.EXPENSE,
+                                new BigDecimal("95.00"),
+                                category.getId(),
+                                account.getId(),
+                                11))))
+                .andExpect(status().isOk());
+
+        var updated = fixedExpenseTemplateRepository
+                .findById(java.util.UUID.fromString(createdId))
+                .orElseThrow();
+        assertThat(updated.getUpdatedBy()).isEqualTo(adminMemberId());
+    }
+
+    @Test
     void deleteDetachesPastTransactionsAndRemovesCurrentAndFuture() throws Exception {
         LocalDate twoMonthsAgo = currentReferenceMonth().minusMonths(2);
         LocalDate pastMonth = currentReferenceMonth().minusMonths(1);
@@ -364,5 +407,9 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
 
     private String toJson(Object value) throws Exception {
         return fixtures().writeJson(value);
+    }
+
+    private java.util.UUID adminMemberId() {
+        return fixtures().ensureAdminCanUseProtectedApis().getId();
     }
 }

@@ -1,5 +1,6 @@
 package com.mymoney.api.member.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -8,12 +9,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.mymoney.api.AuthenticatedIntegrationTestSupport;
+import com.mymoney.api.auth.api.JsonTestUtils;
 import com.mymoney.api.member.FamilyMember;
+import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.member.FamilyRole;
 import com.mymoney.api.member.api.request.CreateFamilyMemberRequest;
 import com.mymoney.api.member.api.request.UpdateFamilyMemberRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -23,6 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 @AutoConfigureMockMvc
 @Transactional
 class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTestSupport {
+
+    @Autowired
+    private FamilyMemberRepository familyMemberRepository;
 
     private String adminToken;
     private String userToken;
@@ -93,6 +100,58 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
                         .header("Authorization", bearerToken(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(true));
+    }
+
+    @Test
+    void familyMemberWritesShouldPopulateAuditFields() throws Exception {
+        var createResult = mockMvc.perform(post("/api/family-members")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new CreateFamilyMemberRequest(
+                                "Audited User", "audited@bolso-em-dia.local", "audited123456", FamilyRole.USER))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        var createdId =
+                JsonTestUtils.extractJsonValue(createResult.getResponse().getContentAsString(), "id");
+        var created = familyMemberRepository
+                .findById(java.util.UUID.fromString(createdId))
+                .orElseThrow();
+        assertThat(created.getCreatedBy()).isEqualTo(adminMemberId());
+        assertThat(created.getUpdatedBy()).isEqualTo(adminMemberId());
+
+        mockMvc.perform(put("/api/family-members/" + createdId)
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateFamilyMemberRequest(
+                                "Audited User Updated",
+                                "audited@bolso-em-dia.local",
+                                "audited123456",
+                                FamilyRole.USER))))
+                .andExpect(status().isOk());
+
+        var updated = familyMemberRepository
+                .findById(java.util.UUID.fromString(createdId))
+                .orElseThrow();
+        assertThat(updated.getUpdatedBy()).isEqualTo(adminMemberId());
+
+        mockMvc.perform(patch("/api/family-members/" + createdId + "/archive")
+                        .header("Authorization", bearerToken(adminToken)))
+                .andExpect(status().isOk());
+        assertThat(familyMemberRepository
+                        .findById(java.util.UUID.fromString(createdId))
+                        .orElseThrow()
+                        .getUpdatedBy())
+                .isEqualTo(adminMemberId());
+
+        mockMvc.perform(patch("/api/family-members/" + createdId + "/restore")
+                        .header("Authorization", bearerToken(adminToken)))
+                .andExpect(status().isOk());
+        assertThat(familyMemberRepository
+                        .findById(java.util.UUID.fromString(createdId))
+                        .orElseThrow()
+                        .getUpdatedBy())
+                .isEqualTo(adminMemberId());
     }
 
     @Test
@@ -216,5 +275,9 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
 
     private String toJson(Object value) throws Exception {
         return fixtures().writeJson(value);
+    }
+
+    private java.util.UUID adminMemberId() {
+        return fixtures().ensureAdminCanUseProtectedApis().getId();
     }
 }

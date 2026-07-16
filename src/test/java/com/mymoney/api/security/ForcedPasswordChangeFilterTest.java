@@ -63,6 +63,7 @@ class ForcedPasswordChangeFilterTest {
         var jwt = Jwt.withTokenValue("token")
                 .header("alg", "none")
                 .subject("admin@bolso-em-dia.local")
+                .claim("mid", UUID.randomUUID().toString())
                 .claim("mustChangePwd", true)
                 .build();
         var authentication = new UsernamePasswordAuthenticationToken(

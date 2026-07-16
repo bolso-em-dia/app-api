@@ -1,5 +1,6 @@
 package com.mymoney.api.preference.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,6 +12,7 @@ import com.mymoney.api.AuthenticatedIntegrationTestSupport;
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.account.AccountType;
+import com.mymoney.api.preference.MemberPreferencesRepository;
 import com.mymoney.api.preference.api.request.UpdateUserPreferencesRequest;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +31,9 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
 
     @Autowired
     private AccountRepository accountRepository;
+
+    @Autowired
+    private MemberPreferencesRepository memberPreferencesRepository;
 
     private String adminToken;
     private Account activeAccount;
@@ -90,6 +95,33 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                 .andExpect(jsonPath("$.locale").value("en-US"))
                 .andExpect(jsonPath("$.showBalanceWithBudgets").value(true))
                 .andExpect(jsonPath("$.showForeignCurrency").value(false));
+    }
+
+    @Test
+    void preferencesWritesShouldPopulateAuditFields() throws Exception {
+        mockMvc.perform(put("/api/me/preferences")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateUserPreferencesRequest(activeAccount.getId(), "en-US", true, false))))
+                .andExpect(status().isOk());
+
+        var preferences = memberPreferencesRepository
+                .findDetailedByMemberId(adminMemberId())
+                .orElseThrow();
+        assertThat(preferences.getCreatedBy()).isEqualTo(adminMemberId());
+        assertThat(preferences.getUpdatedBy()).isEqualTo(adminMemberId());
+
+        mockMvc.perform(put("/api/me/preferences")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateUserPreferencesRequest(null, "pt-BR", false, true))))
+                .andExpect(status().isOk());
+
+        assertThat(memberPreferencesRepository
+                        .findDetailedByMemberId(adminMemberId())
+                        .orElseThrow()
+                        .getUpdatedBy())
+                .isEqualTo(adminMemberId());
     }
 
     @Test
@@ -220,5 +252,9 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
 
     private String toJson(Object value) throws Exception {
         return fixtures().writeJson(value);
+    }
+
+    private java.util.UUID adminMemberId() {
+        return fixtures().ensureAdminCanUseProtectedApis().getId();
     }
 }

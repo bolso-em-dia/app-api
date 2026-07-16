@@ -35,12 +35,13 @@ public class JwtService {
     }
 
     public String generateAccessToken(FamilyMember member) {
-        Instant now = Instant.now();
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        var now = Instant.now();
+        var claims = JwtClaimsSet.builder()
                 .issuer("bolso-em-dia")
                 .subject(member.getEmail())
                 .issuedAt(now)
                 .expiresAt(now.plus(accessTokenDuration))
+                .claim("mid", member.getId().toString())
                 .claim("role", member.getRole().name())
                 .claim("mustChangePwd", member.isMustChangePassword())
                 .build();

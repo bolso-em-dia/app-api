@@ -24,6 +24,12 @@ management:
       exposure:
         include: health,info
 
+logging:
+  level:
+    com.mymoney.api: DEBUG
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+
 app:
   security:
     jwt-secret: ${APP_JWT_SECRET:change-this-secret-change-this-secret}

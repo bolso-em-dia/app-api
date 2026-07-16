@@ -12,6 +12,10 @@ spring:
         query.plan_cache_max_size: 128
         format_sql: false
 
+logging:
+  level:
+    com.mymoney.api: INFO
+
 app:
   security:
     jwt-secret: test-secret-test-secret-test-secret

@@ -2,8 +2,8 @@ package com.mymoney.api.transaction;
 
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountService;
+import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.budget.BudgetRepository;
-import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryService;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TransactionService {
@@ -45,6 +47,7 @@ public class TransactionService {
     private final BudgetRepository budgetRepository;
     private final FamilyMemberRepository familyMemberRepository;
     private final CurrencyConversionService currencyConversionService;
+    private final AuditorResolver auditorResolver;
     private final DateProvider dateProvider;
     private final com.mymoney.api.transaction.mapper.TransactionMapper transactionMapper;
 
@@ -125,19 +128,20 @@ public class TransactionService {
     @Transactional
     public List<TransactionResponse> create(CreateTransactionRequest request) {
         validateInstallmentCount(request.installmentCount());
-        Category category = categoryService.getById(request.categoryId());
-        Account account = accountService.getById(request.accountId());
-        FamilyMember member = resolveMember(request.ownershipType(), request.memberId());
+        var category = categoryService.getById(request.categoryId());
+        var account = accountService.getById(request.accountId());
+        var member = resolveMember(request.ownershipType(), request.memberId());
 
-        int installmentCount = request.installmentCount() == null ? 1 : request.installmentCount();
+        var installmentCount = request.installmentCount() == null ? 1 : request.installmentCount();
         validateInstallmentHorizon(request.transactionDate(), installmentCount);
-        UUID installmentGroupId = installmentCount > 1 ? UUID.randomUUID() : null;
-        List<BigDecimal> installmentAmounts = calculateInstallmentAmounts(request.amount(), installmentCount);
+        var installmentGroupId = installmentCount > 1 ? UUID.randomUUID() : null;
+        var installmentAmounts = calculateInstallmentAmounts(request.amount(), installmentCount);
+        var actorMemberId = auditorResolver.resolveMemberId();
 
-        List<TransactionResponse> created = new ArrayList<>();
+        var created = new ArrayList<TransactionResponse>();
         for (int i = 0; i < installmentCount; i++) {
-            LocalDate transactionDate = request.transactionDate().plusMonths(i);
-            Transaction transaction = new Transaction();
+            var transactionDate = request.transactionDate().plusMonths(i);
+            var transaction = new Transaction();
             validateIndividualAllowance(request.ownershipType(), member, transactionDate);
             transaction.setType(request.type());
             transaction.setOwnershipType(request.ownershipType());
@@ -155,7 +159,15 @@ public class TransactionService {
             transaction.setInstallmentGroupId(installmentGroupId);
             transaction.setInstallmentNumber(installmentCount > 1 ? (short) (i + 1) : null);
             transaction.setInstallmentTotal(installmentCount > 1 ? (short) installmentCount : null);
-            created.add(getResponseById(transactionRepository.save(transaction).getId()));
+            var saved = transactionRepository.save(transaction);
+            log.info(
+                    "Transaction created: id={}, type={}, ownershipType={}, referenceMonth={}, memberId={}",
+                    saved.getId(),
+                    saved.getType(),
+                    saved.getOwnershipType(),
+                    saved.getReferenceMonth(),
+                    actorMemberId);
+            created.add(getResponseById(saved.getId()));
         }
 
         return created;
@@ -163,10 +175,10 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponse update(UUID id, UpdateTransactionRequest request) {
-        Transaction transaction = getById(id);
-        Category category = categoryService.getById(request.categoryId());
-        Account account = accountService.getById(request.accountId());
-        FamilyMember member = resolveMember(request.ownershipType(), request.memberId());
+        var transaction = getById(id);
+        var category = categoryService.getById(request.categoryId());
+        var account = accountService.getById(request.accountId());
+        var member = resolveMember(request.ownershipType(), request.memberId());
         validateIndividualAllowance(request.ownershipType(), member, request.transactionDate());
 
         transaction.setType(request.type());
@@ -180,24 +192,51 @@ public class TransactionService {
         transaction.setAccount(account);
         transaction.setMember(member);
 
-        return getResponseById(transactionRepository.save(transaction).getId());
+        var saved = transactionRepository.save(transaction);
+        log.info(
+                "Transaction updated: id={}, type={}, ownershipType={}, referenceMonth={}, memberId={}",
+                saved.getId(),
+                saved.getType(),
+                saved.getOwnershipType(),
+                saved.getReferenceMonth(),
+                auditorResolver.resolveMemberId());
+        return getResponseById(saved.getId());
     }
 
     @Transactional
     public void delete(UUID id, DeleteScope scope) {
-        Transaction transaction = getById(id);
+        var transaction = getById(id);
+        var actorMemberId = auditorResolver.resolveMemberId();
         if (transaction.getInstallmentGroupId() == null || scope == DeleteScope.SINGLE) {
             transactionRepository.delete(transaction);
+            log.info(
+                    "Transaction deleted: id={}, scope={}, installmentGroupId={}, memberId={}",
+                    transaction.getId(),
+                    scope,
+                    transaction.getInstallmentGroupId(),
+                    actorMemberId);
             return;
         }
 
         if (scope == DeleteScope.FUTURE) {
             transactionRepository.deleteByInstallmentGroupIdAndInstallmentNumberGreaterThanEqual(
                     transaction.getInstallmentGroupId(), transaction.getInstallmentNumber());
+            log.info(
+                    "Transaction deleted: id={}, scope={}, installmentGroupId={}, memberId={}",
+                    transaction.getId(),
+                    scope,
+                    transaction.getInstallmentGroupId(),
+                    actorMemberId);
             return;
         }
 
         transactionRepository.deleteByInstallmentGroupId(transaction.getInstallmentGroupId());
+        log.info(
+                "Transaction deleted: id={}, scope={}, installmentGroupId={}, memberId={}",
+                transaction.getId(),
+                scope,
+                transaction.getInstallmentGroupId(),
+                actorMemberId);
     }
 
     private FamilyMember resolveMember(OwnershipType ownershipType, UUID memberId) {
