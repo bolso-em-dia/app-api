@@ -1,5 +1,6 @@
 package com.mymoney.api.exchangerate;
 
+import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.config.AppExchangeRateProperties;
 import com.mymoney.api.exchangerate.api.response.ExchangeRateResponse;
 import com.mymoney.api.preference.UserPreferencesService;
@@ -31,6 +32,7 @@ public class ExchangeRateService {
     private final AppExchangeRateProperties properties;
     private final ExchangeRateClient exchangeRateClient;
     private final DateProvider dateProvider;
+    private final AuditorResolver auditorResolver;
     private final UserPreferencesService userPreferencesService;
 
     @Scheduled(cron = "0 0 * * * *")
@@ -61,6 +63,7 @@ public class ExchangeRateService {
         if (exchangeRateRepository
                 .findFirstByCurrencyOrderByFetchedAtDesc(CURRENCY)
                 .isPresent()) {
+            log.info("Exchange rate already available on startup, skipping initial fetch.");
             return;
         }
         fetchAndUpdateRates();
@@ -77,6 +80,11 @@ public class ExchangeRateService {
                         HttpStatus.BAD_GATEWAY, "Exchange rate API returned an invalid rate.");
             }
             ExchangeRate exchangeRate = saveRateAndUpdateTransactions(rate);
+            log.info(
+                    "Exchange rate refreshed manually: rate={}, fetchedAt={}, memberId={}",
+                    exchangeRate.getRate(),
+                    exchangeRate.getFetchedAt(),
+                    auditorResolver.resolveMemberId());
             return new ExchangeRateResponse(rate, exchangeRate.getFetchedAt(), false);
         } catch (ResponseStatusException e) {
             throw e;

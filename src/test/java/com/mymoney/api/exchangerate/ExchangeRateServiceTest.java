@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.config.AppExchangeRateProperties;
 import com.mymoney.api.exchangerate.api.response.ExchangeRateResponse;
 import com.mymoney.api.preference.UserPreferencesService;
@@ -19,6 +20,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,6 +49,9 @@ class ExchangeRateServiceTest {
     private DateProvider dateProvider;
 
     @Mock
+    private AuditorResolver auditorResolver;
+
+    @Mock
     private UserPreferencesService userPreferencesService;
 
     @InjectMocks
@@ -64,6 +69,7 @@ class ExchangeRateServiceTest {
         lenient()
                 .when(userPreferencesService.getCurrentUserPreferences())
                 .thenReturn(new UserPreferencesResponse(null, "pt-BR", false, true));
+        lenient().when(auditorResolver.resolveMemberId()).thenReturn(UUID.randomUUID());
     }
 
     // BT01

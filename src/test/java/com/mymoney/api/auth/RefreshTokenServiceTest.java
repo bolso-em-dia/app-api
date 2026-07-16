@@ -2,6 +2,7 @@ package com.mymoney.api.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -88,6 +89,19 @@ class RefreshTokenServiceTest {
         assertThat(appender.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.WARN);
             assertThat(event.getFormattedMessage()).contains("cookie value is empty");
+        });
+    }
+
+    @Test
+    void purgeExpiredTokens_logsInfoWhenNothingIsDeleted() {
+        when(refreshTokenRepository.deleteByExpiresAtBefore(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(0);
+
+        refreshTokenService.purgeExpiredTokens();
+
+        assertThat(appender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.INFO);
+            assertThat(event.getFormattedMessage()).contains("No expired refresh tokens to purge");
         });
     }
 }
