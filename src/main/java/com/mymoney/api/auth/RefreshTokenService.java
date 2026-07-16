@@ -30,15 +30,16 @@ public class RefreshTokenService {
 
     @Transactional
     public void rotate(FamilyMember member, HttpServletResponse response) {
-        String rawToken = UUID.randomUUID() + "." + UUID.randomUUID();
+        var rawToken = UUID.randomUUID() + "." + UUID.randomUUID();
 
-        RefreshToken refreshToken = new RefreshToken();
+        var refreshToken = new RefreshToken();
         refreshToken.setMember(member);
         refreshToken.setTokenHash(hash(rawToken));
         refreshToken.setExpiresAt(OffsetDateTime.now().plusDays(properties.refreshTokenDays()));
         refreshTokenRepository.save(refreshToken);
+        log.debug("Rotated refresh token for memberId={}", member.getId());
 
-        ResponseCookie cookie = ResponseCookie.from(properties.refreshCookieName(), rawToken)
+        var cookie = ResponseCookie.from(properties.refreshCookieName(), rawToken)
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("Lax")
@@ -50,33 +51,73 @@ public class RefreshTokenService {
 
     @Transactional(readOnly = true)
     public Optional<RefreshToken> findValidToken(String rawToken) {
-        return refreshTokenRepository
-                .findByTokenHash(hash(rawToken))
-                .filter(token -> !token.isExpired())
-                .filter(token -> !token.isRevoked())
-                .filter(token -> token.getMember().isActive());
+        var token = refreshTokenRepository.findByTokenHash(hash(rawToken));
+        if (token.isEmpty()) {
+            log.debug("Refresh token validation failed because token was not found");
+            return Optional.empty();
+        }
+
+        var refreshToken = token.orElseThrow();
+        if (refreshToken.isExpired()) {
+            log.warn(
+                    "Refresh token validation failed because token is expired for memberId={}",
+                    refreshToken.getMember().getId());
+            return Optional.empty();
+        }
+        if (refreshToken.isRevoked()) {
+            log.warn(
+                    "Refresh token validation failed because token is revoked for memberId={}",
+                    refreshToken.getMember().getId());
+            return Optional.empty();
+        }
+        if (!refreshToken.getMember().isActive()) {
+            log.warn(
+                    "Refresh token validation failed because member is inactive for memberId={}",
+                    refreshToken.getMember().getId());
+            return Optional.empty();
+        }
+
+        return Optional.of(refreshToken);
     }
 
     @Transactional
     public void revoke(RefreshToken token) {
         token.setRevokedAt(OffsetDateTime.now());
         refreshTokenRepository.save(token);
+        log.debug("Revoked refresh token for memberId={}", token.getMember().getId());
     }
 
     public Optional<String> extractRefreshToken(HttpServletRequest request) {
-        if (request.getCookies() == null) {
+        var cookies = request.getCookies();
+        if (cookies == null) {
+            log.warn(
+                    "Refresh token cookie extraction failed because request has no cookies. path={}",
+                    request.getRequestURI());
             return Optional.empty();
         }
-        for (Cookie cookie : request.getCookies()) {
+
+        for (Cookie cookie : cookies) {
             if (properties.refreshCookieName().equals(cookie.getName())) {
-                return Optional.ofNullable(cookie.getValue());
+                if (cookie.getValue() == null || cookie.getValue().isBlank()) {
+                    log.warn(
+                            "Refresh token cookie extraction failed because cookie value is empty. path={}",
+                            request.getRequestURI());
+                    return Optional.empty();
+                }
+                return Optional.of(cookie.getValue());
             }
         }
+
+        log.warn(
+                "Refresh token cookie extraction failed because cookie {} was not found. path={} cookieCount={}",
+                properties.refreshCookieName(),
+                request.getRequestURI(),
+                cookies.length);
         return Optional.empty();
     }
 
     public void clearRefreshCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(properties.refreshCookieName(), "")
+        var cookie = ResponseCookie.from(properties.refreshCookieName(), "")
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("Lax")
@@ -98,8 +139,8 @@ public class RefreshTokenService {
     @Scheduled(cron = "0 0 3 * * *")
     @Transactional
     public void purgeExpiredTokens() {
-        OffsetDateTime cutoff = OffsetDateTime.now().minusDays(7);
-        int deleted = refreshTokenRepository.deleteByExpiresAtBefore(cutoff);
+        var cutoff = OffsetDateTime.now().minusDays(7);
+        var deleted = refreshTokenRepository.deleteByExpiresAtBefore(cutoff);
         if (deleted > 0) {
             log.info("Purged {} expired refresh tokens older than {}.", deleted, cutoff);
         }

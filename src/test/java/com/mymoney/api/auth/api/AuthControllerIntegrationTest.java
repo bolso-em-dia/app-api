@@ -103,6 +103,36 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
+    void refreshIgnoresInvalidAuthorizationHeaderWhenRefreshCookieIsValid() throws Exception {
+        MvcResult loginResult = mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "email": "admin@bolso-em-dia.local",
+                                  "password": "admin123456"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(cookie().exists(REFRESH_COOKIE_NAME))
+                .andReturn();
+
+        Cookie loginRefreshCookie = loginResult.getResponse().getCookie(REFRESH_COOKIE_NAME);
+        if (loginRefreshCookie == null) {
+            throw new IllegalStateException("Refresh cookie was not set on login.");
+        }
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(loginRefreshCookie)
+                        .header("Authorization", "Bearer invalid-token"))
+                .andExpect(status().isOk())
+                .andExpect(cookie().exists(REFRESH_COOKIE_NAME))
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.user.email").value("admin@bolso-em-dia.local"));
+    }
+
+    @Test
     void loginAndMeFlowWorks() throws Exception {
         MvcResult result = mockMvc.perform(
                         post("/api/auth/login")

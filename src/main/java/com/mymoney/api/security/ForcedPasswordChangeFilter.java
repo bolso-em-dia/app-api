@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -16,6 +17,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ForcedPasswordChangeFilter extends OncePerRequestFilter {
@@ -32,7 +34,7 @@ public class ForcedPasswordChangeFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain)
             throws ServletException, IOException {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getName() == null || isAllowedPath(request.getRequestURI())) {
             filterChain.doFilter(request, response);
             return;
@@ -41,6 +43,11 @@ public class ForcedPasswordChangeFilter extends OncePerRequestFilter {
         boolean needsPasswordChange = isFlaggedInJwt(authentication) && isFlaggedInDatabase(authentication);
 
         if (needsPasswordChange) {
+            log.warn(
+                    "Blocked request because password change is required for user={} method={} path={}",
+                    authentication.getName(),
+                    request.getMethod(),
+                    request.getRequestURI());
             accessDeniedHandler.handle(request, response, new AccessDeniedException("Password change is required."));
             return;
         }
