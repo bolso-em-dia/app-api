@@ -1,5 +1,6 @@
 package com.mymoney.api.transaction.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -151,6 +152,63 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("Updated Market"))
                 .andExpect(jsonPath("$.amount").value(200.0));
+    }
+
+    @Test
+    void transactionWritesShouldPopulateAuditFields() throws Exception {
+        var createResult = mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Audited Transaction",
+                                  "amount": 55.00,
+                                  "transactionDate": "2026-06-12",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "installmentCount": 1
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        var createdId = OBJECT_MAPPER
+                .readTree(createResult.getResponse().getContentAsString())
+                .get(0)
+                .get("id")
+                .asText();
+        var created = transactionRepository
+                .findById(java.util.UUID.fromString(createdId))
+                .orElseThrow();
+        assertThat(created.getCreatedBy()).isEqualTo(adminMemberId());
+        assertThat(created.getUpdatedBy()).isEqualTo(adminMemberId());
+
+        mockMvc.perform(put("/api/transactions/" + createdId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Audited Transaction Updated",
+                                  "amount": 65.00,
+                                  "transactionDate": "2026-06-15",
+                                  "accountId": "%s",
+                                  "categoryId": "%s"
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isOk());
+
+        var updated = transactionRepository
+                .findById(java.util.UUID.fromString(createdId))
+                .orElseThrow();
+        assertThat(updated.getUpdatedBy()).isEqualTo(adminMemberId());
     }
 
     @Test
@@ -430,6 +488,10 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                         .param("limit", "-1"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Limit must be positive."));
+    }
+
+    private java.util.UUID adminMemberId() {
+        return fixtures().ensureAdminCanUseProtectedApis().getId();
     }
 
     @Test

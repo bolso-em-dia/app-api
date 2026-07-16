@@ -9,10 +9,12 @@ import com.mymoney.api.shared.DateProvider;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class BasicReferenceDataSeedRunner implements CommandLineRunner {
@@ -42,14 +44,16 @@ public class BasicReferenceDataSeedRunner implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        LocalDate referenceMonth = dateProvider.currentReferenceMonth();
-        seedCategories(referenceMonth);
-        seedPixAccount(referenceMonth);
+        var referenceMonth = dateProvider.currentReferenceMonth();
+        var createdCategories = seedCategories(referenceMonth);
+        var createdAccounts = seedPixAccount(referenceMonth);
+        log.info("Seed completed: {} categories, {} accounts created", createdCategories, createdAccounts);
     }
 
-    private void seedCategories(LocalDate referenceMonth) {
+    private int seedCategories(LocalDate referenceMonth) {
+        var createdCategories = 0;
         for (SeedCategory seedCategory : DEFAULT_CATEGORIES) {
-            Category existingCategory =
+            var existingCategory =
                     categoryRepository.findByNormalizedName(seedCategory.name()).orElse(null);
             if (existingCategory != null) {
                 boolean shouldSave = false;
@@ -70,21 +74,23 @@ public class BasicReferenceDataSeedRunner implements CommandLineRunner {
                 continue;
             }
 
-            Category category = new Category();
+            var category = new Category();
             category.setName(seedCategory.name());
             category.setIcon(seedCategory.iconId());
             category.setColor(seedCategory.color());
             category.setCreatedInMonth(referenceMonth);
             categoryRepository.save(category);
+            createdCategories++;
         }
+        return createdCategories;
     }
 
-    private void seedPixAccount(LocalDate referenceMonth) {
+    private int seedPixAccount(LocalDate referenceMonth) {
         if (accountRepository.findByNormalizedName(PIX_ACCOUNT_NAME).isPresent()) {
-            return;
+            return 0;
         }
 
-        Account account = new Account();
+        var account = new Account();
         account.setName(PIX_ACCOUNT_NAME);
         account.setType(AccountType.CHECKING);
         account.setBrand(null);
@@ -93,6 +99,7 @@ public class BasicReferenceDataSeedRunner implements CommandLineRunner {
         account.setDueDay(null);
         account.setCreatedInMonth(referenceMonth);
         accountRepository.save(account);
+        return 1;
     }
 
     private boolean isBlank(String value) {

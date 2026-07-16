@@ -1,5 +1,6 @@
 package com.mymoney.api.category;
 
+import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.category.api.request.ArchiveCategoryRequest;
 import com.mymoney.api.category.api.request.CreateCategoryRequest;
 import com.mymoney.api.category.api.request.UpdateCategoryRequest;
@@ -12,6 +13,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -19,11 +21,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final AuditorResolver auditorResolver;
     private final DateProvider dateProvider;
 
     @Transactional(readOnly = true)
@@ -48,30 +52,40 @@ public class CategoryService {
 
     @Transactional
     public CategoryResponse create(CreateCategoryRequest request) {
-        Category category = new Category();
+        var category = new Category();
         category.setName(InputNormalizer.requireNonBlank(request.name(), "Name"));
         category.setIcon(InputNormalizer.normalizeNullable(request.icon()));
         category.setColor(InputNormalizer.normalizeNullable(request.color()));
         category.setCreatedInMonth(dateProvider.currentReferenceMonth());
-        Category saved = categoryRepository.save(category);
+        var saved = categoryRepository.save(category);
+        log.info(
+                "Category created: id={}, name={}, memberId={}",
+                saved.getId(),
+                saved.getName(),
+                auditorResolver.resolveMemberId());
         return getResponseById(saved.getId());
     }
 
     @Transactional
     public CategoryResponse update(UUID id, UpdateCategoryRequest request) {
-        Category category = getById(id);
+        var category = getById(id);
         category.setName(InputNormalizer.requireNonBlank(request.name(), "Name"));
         category.setIcon(InputNormalizer.normalizeNullable(request.icon()));
         category.setColor(InputNormalizer.normalizeNullable(request.color()));
-        Category saved = categoryRepository.save(category);
+        var saved = categoryRepository.save(category);
+        log.info(
+                "Category updated: id={}, name={}, memberId={}",
+                saved.getId(),
+                saved.getName(),
+                auditorResolver.resolveMemberId());
         return getResponseById(saved.getId());
     }
 
     @Transactional
     public CategoryResponse archive(UUID id, ArchiveCategoryRequest request) {
-        Category category = getById(id);
-        Category replacementCategory = getById(request.replacementCategoryId());
-        LocalDate archivedFromMonth = dateProvider.currentReferenceMonth();
+        var category = getById(id);
+        var replacementCategory = getById(request.replacementCategoryId());
+        var archivedFromMonth = dateProvider.currentReferenceMonth();
 
         if (category.getId().equals(replacementCategory.getId())) {
             throw new ResponseStatusException(
@@ -89,7 +103,13 @@ public class CategoryService {
 
         category.setArchivedFromMonth(archivedFromMonth);
         category.setReplacementCategory(replacementCategory);
-        Category saved = categoryRepository.save(category);
+        var saved = categoryRepository.save(category);
+        log.info(
+                "Category archived: id={}, replacementCategoryId={}, archivedFromMonth={}, memberId={}",
+                saved.getId(),
+                replacementCategory.getId(),
+                saved.getArchivedFromMonth(),
+                auditorResolver.resolveMemberId());
         return getResponseById(saved.getId());
     }
 

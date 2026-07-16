@@ -1,5 +1,6 @@
 package com.mymoney.api.transaction;
 
+import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
 import com.mymoney.api.shared.DateProvider;
@@ -15,9 +16,11 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EffectiveMonthlyTransactionService {
@@ -31,6 +34,7 @@ public class EffectiveMonthlyTransactionService {
     private final TransactionRepository transactionRepository;
     private final FixedExpenseTemplateRepository fixedExpenseTemplateRepository;
     private final CurrencyConversionService currencyConversionService;
+    private final AuditorResolver auditorResolver;
     private final DateProvider dateProvider;
 
     @Transactional
@@ -72,19 +76,23 @@ public class EffectiveMonthlyTransactionService {
 
     @Transactional
     public void materializeMonth(LocalDate referenceMonth) {
-        List<FixedExpenseTemplate> templatesToMaterialize =
-                fixedExpenseTemplateRepository.findActiveNotMaterializedForMonth(referenceMonth);
+        var templatesToMaterialize = fixedExpenseTemplateRepository.findActiveNotMaterializedForMonth(referenceMonth);
 
         if (templatesToMaterialize.isEmpty()) {
             return;
         }
 
-        List<Transaction> transactions = new ArrayList<>(templatesToMaterialize.size());
+        var transactions = new ArrayList<Transaction>(templatesToMaterialize.size());
         for (FixedExpenseTemplate template : templatesToMaterialize) {
             transactions.add(materializeTransaction(template, referenceMonth));
         }
 
         transactionRepository.saveAll(transactions);
+        log.info(
+                "Effective monthly transactions materialized: count={}, referenceMonth={}, memberId={}",
+                transactions.size(),
+                referenceMonth,
+                auditorResolver.resolveMemberId());
     }
 
     @Transactional

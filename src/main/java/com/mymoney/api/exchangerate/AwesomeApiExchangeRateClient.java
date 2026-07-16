@@ -1,6 +1,5 @@
 package com.mymoney.api.exchangerate;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.net.URI;
@@ -8,8 +7,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 public class AwesomeApiExchangeRateClient implements ExchangeRateClient {
 
@@ -23,23 +24,32 @@ public class AwesomeApiExchangeRateClient implements ExchangeRateClient {
 
     @Override
     public BigDecimal fetchUsdBrlRate() throws Exception {
-        HttpRequest request = HttpRequest.newBuilder()
+        var request = HttpRequest.newBuilder()
                 .uri(URI.create(API_URL))
                 .timeout(REQUEST_TIMEOUT)
                 .GET()
                 .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() != 200) {
-            throw new RuntimeException("API returned HTTP " + response.statusCode());
-        }
+        try {
+            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                log.warn("Awesome API returned non-200 status: status={}", response.statusCode());
+                throw new RuntimeException("API returned HTTP " + response.statusCode());
+            }
 
-        JsonNode root = objectMapper.readTree(response.body());
-        JsonNode pair = root.get(CURRENCY_PAIR);
-        if (pair == null || !pair.has("bid")) {
-            throw new RuntimeException("API response missing USDBRL.bid field.");
-        }
+            var root = objectMapper.readTree(response.body());
+            var pair = root.get(CURRENCY_PAIR);
+            if (pair == null || !pair.has("bid")) {
+                log.warn("Awesome API response missing bid field for pair={}", CURRENCY_PAIR);
+                throw new RuntimeException("API response missing USDBRL.bid field.");
+            }
 
-        return new BigDecimal(pair.get("bid").asText());
+            var rate = new BigDecimal(pair.get("bid").asText());
+            log.info("Awesome API exchange rate fetched successfully: pair={}, rate={}", CURRENCY_PAIR, rate);
+            return rate;
+        } catch (Exception exception) {
+            log.error("Awesome API exchange rate fetch failed.", exception);
+            throw exception;
+        }
     }
 }

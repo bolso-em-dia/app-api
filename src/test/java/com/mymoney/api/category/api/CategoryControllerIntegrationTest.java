@@ -1,5 +1,6 @@
 package com.mymoney.api.category.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -8,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.mymoney.api.AuthenticatedIntegrationTestSupport;
+import com.mymoney.api.auth.api.JsonTestUtils;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryRepository;
 import java.time.LocalDate;
@@ -174,6 +176,62 @@ class CategoryControllerIntegrationTest extends AuthenticatedIntegrationTestSupp
     }
 
     @Test
+    void categoryWritesShouldPopulateAuditFields() throws Exception {
+        var createResult = mockMvc.perform(
+                        post("/api/categories")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "name": "Audited Category",
+                                  "icon": "wallet",
+                                  "color": "#123456"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        var createdId =
+                JsonTestUtils.extractJsonValue(createResult.getResponse().getContentAsString(), "id");
+        var created = categoryRepository
+                .findById(java.util.UUID.fromString(createdId))
+                .orElseThrow();
+        assertThat(created.getCreatedBy()).isEqualTo(adminMemberId());
+        assertThat(created.getUpdatedBy()).isEqualTo(adminMemberId());
+
+        mockMvc.perform(
+                        put("/api/categories/" + createdId)
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                {
+                                  "name": "Audited Category Updated",
+                                  "icon": "wallet",
+                                  "color": "#654321"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        var updated = categoryRepository
+                .findById(java.util.UUID.fromString(createdId))
+                .orElseThrow();
+        assertThat(updated.getUpdatedBy()).isEqualTo(adminMemberId());
+
+        mockMvc.perform(patch("/api/categories/" + createdId + "/archive")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"replacementCategoryId\": \"" + categoryB.getId() + "\"}"))
+                .andExpect(status().isOk());
+
+        var archived = categoryRepository
+                .findById(java.util.UUID.fromString(createdId))
+                .orElseThrow();
+        assertThat(archived.getUpdatedBy()).isEqualTo(adminMemberId());
+    }
+
+    @Test
     void optionsEndpointRespectsReferenceMonth() throws Exception {
         categoryA.setArchivedFromMonth(LocalDate.of(2026, 8, 1));
         categoryA.setReplacementCategory(categoryB);
@@ -308,5 +366,9 @@ class CategoryControllerIntegrationTest extends AuthenticatedIntegrationTestSupp
                                 """
                                         .formatted(longName)))
                 .andExpect(status().isBadRequest());
+    }
+
+    private java.util.UUID adminMemberId() {
+        return fixtures().ensureAdminCanUseProtectedApis().getId();
     }
 }

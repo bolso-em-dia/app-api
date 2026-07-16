@@ -1,5 +1,6 @@
 package com.mymoney.api.account.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -14,6 +15,7 @@ import com.mymoney.api.account.AccountType;
 import com.mymoney.api.account.CurrencyType;
 import com.mymoney.api.account.api.request.CreateAccountRequest;
 import com.mymoney.api.account.api.request.UpdateAccountRequest;
+import com.mymoney.api.auth.api.JsonTestUtils;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -159,6 +161,49 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
     }
 
     @Test
+    void accountWritesShouldPopulateAuditFields() throws Exception {
+        var createResult = mockMvc.perform(post("/api/accounts")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new CreateAccountRequest(
+                                "Audited Account", AccountType.CHECKING, null, null, null, null, null))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        var createdId =
+                JsonTestUtils.extractJsonValue(createResult.getResponse().getContentAsString(), "id");
+        var created =
+                accountRepository.findById(java.util.UUID.fromString(createdId)).orElseThrow();
+        assertThat(created.getCreatedBy()).isEqualTo(adminMemberId());
+        assertThat(created.getUpdatedBy()).isEqualTo(adminMemberId());
+
+        mockMvc.perform(put("/api/accounts/" + createdId)
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new UpdateAccountRequest(
+                                "Audited Account Updated",
+                                AccountType.CHECKING,
+                                CurrencyType.USD,
+                                null,
+                                null,
+                                null,
+                                null))))
+                .andExpect(status().isOk());
+
+        var updated =
+                accountRepository.findById(java.util.UUID.fromString(createdId)).orElseThrow();
+        assertThat(updated.getUpdatedBy()).isEqualTo(adminMemberId());
+
+        mockMvc.perform(patch("/api/accounts/" + createdId + "/archive")
+                        .header("Authorization", bearerToken(adminToken)))
+                .andExpect(status().isOk());
+
+        var archived =
+                accountRepository.findById(java.util.UUID.fromString(createdId)).orElseThrow();
+        assertThat(archived.getUpdatedBy()).isEqualTo(adminMemberId());
+    }
+
+    @Test
     void listAccountsRequiresAuthentication() throws Exception {
         mockMvc.perform(get("/api/accounts")).andExpect(status().isUnauthorized());
     }
@@ -289,5 +334,9 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
 
     private String toJson(Object value) throws Exception {
         return fixtures().writeJson(value);
+    }
+
+    private java.util.UUID adminMemberId() {
+        return fixtures().ensureAdminCanUseProtectedApis().getId();
     }
 }

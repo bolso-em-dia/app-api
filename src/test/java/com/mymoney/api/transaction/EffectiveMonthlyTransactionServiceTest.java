@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.CurrencyType;
+import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplate;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateRepository;
@@ -40,6 +41,9 @@ class EffectiveMonthlyTransactionServiceTest {
     @Mock
     private DateProvider dateProvider;
 
+    @Mock
+    private AuditorResolver auditorResolver;
+
     private EffectiveMonthlyTransactionService service;
 
     private LocalDate currentMonth;
@@ -50,12 +54,17 @@ class EffectiveMonthlyTransactionServiceTest {
         currentMonth = YearMonth.now().atDay(1);
         nextMonth = currentMonth.plusMonths(1);
         lenient().when(dateProvider.currentReferenceMonth()).thenReturn(currentMonth);
+        lenient().when(auditorResolver.resolveMemberId()).thenReturn(UUID.randomUUID());
         lenient()
                 .when(currencyConversionService.convert(any(), any(), eq(false)))
                 .thenAnswer(invocation ->
                         new CurrencyConversionService.ConvertedAmount(invocation.getArgument(0), null, "BRL"));
         service = new EffectiveMonthlyTransactionService(
-                transactionRepository, fixedExpenseTemplateRepository, currencyConversionService, dateProvider);
+                transactionRepository,
+                fixedExpenseTemplateRepository,
+                currencyConversionService,
+                auditorResolver,
+                dateProvider);
     }
 
     @Test

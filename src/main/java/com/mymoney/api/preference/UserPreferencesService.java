@@ -2,6 +2,7 @@ package com.mymoney.api.preference;
 
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
+import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.auth.AuthenticatedMemberResolver;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.preference.api.request.UpdateUserPreferencesRequest;
@@ -12,11 +13,13 @@ import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserPreferencesService {
@@ -30,6 +33,7 @@ public class UserPreferencesService {
     private final AccountRepository accountRepository;
     private final DateProvider dateProvider;
     private final AuthenticatedMemberResolver authenticatedMemberResolver;
+    private final AuditorResolver auditorResolver;
 
     @Transactional(readOnly = true)
     public UserPreferencesResponse getCurrentUserPreferences() {
@@ -46,13 +50,13 @@ public class UserPreferencesService {
 
     @Transactional
     public UserPreferencesResponse updateCurrentUserPreferences(UpdateUserPreferencesRequest request) {
-        FamilyMember member = authenticatedMemberResolver.resolve();
+        var member = authenticatedMemberResolver.resolve();
         validateLocale(request.locale());
 
-        MemberPreferences preferences = memberPreferencesRepository
+        var preferences = memberPreferencesRepository
                 .findDetailedByMemberId(member.getId())
                 .orElseGet(() -> {
-                    MemberPreferences created = new MemberPreferences();
+                    var created = new MemberPreferences();
                     created.setMember(member);
                     return created;
                 });
@@ -62,7 +66,14 @@ public class UserPreferencesService {
         preferences.setShowForeignCurrency(request.showForeignCurrency());
         preferences.setDefaultAccount(resolveDefaultAccount(request.defaultAccountId()));
 
-        return toResponse(memberPreferencesRepository.save(preferences));
+        var saved = memberPreferencesRepository.save(preferences);
+        log.info(
+                "Member preferences updated: id={}, defaultAccountId={}, locale={}, memberId={}",
+                saved.getId(),
+                saved.getDefaultAccount() != null ? saved.getDefaultAccount().getId() : null,
+                saved.getLocale(),
+                auditorResolver.resolveMemberId());
+        return toResponse(saved);
     }
 
     private UserPreferencesResponse defaultResponse() {
@@ -92,7 +103,7 @@ public class UserPreferencesService {
             return null;
         }
 
-        Account account = accountRepository
+        var account = accountRepository
                 .findById(defaultAccountId)
                 .orElseThrow(() ->
                         new ResponseStatusException(HttpStatus.NOT_FOUND, ErrorMessage.ACCOUNT_NOT_FOUND.message()));

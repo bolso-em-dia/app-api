@@ -2,6 +2,7 @@ package com.mymoney.api.account;
 
 import com.mymoney.api.account.api.request.CreateAccountRequest;
 import com.mymoney.api.account.api.request.UpdateAccountRequest;
+import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.shared.DateProvider;
 import com.mymoney.api.shared.DayValidator;
 import com.mymoney.api.shared.EntityResolver;
@@ -11,6 +12,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -18,11 +20,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AccountService {
 
     private final AccountRepository accountRepository;
+    private final AuditorResolver auditorResolver;
     private final DateProvider dateProvider;
 
     @Transactional(readOnly = true)
@@ -37,7 +41,7 @@ public class AccountService {
 
     @Transactional
     public Account create(CreateAccountRequest request) {
-        Account account = new Account();
+        var account = new Account();
         apply(
                 account,
                 request.name(),
@@ -48,12 +52,20 @@ public class AccountService {
                 request.closingDay(),
                 request.dueDay());
         account.setCreatedInMonth(dateProvider.currentReferenceMonth());
-        return accountRepository.save(account);
+        var saved = accountRepository.save(account);
+        log.info(
+                "Account created: id={}, name={}, type={}, currency={}, memberId={}",
+                saved.getId(),
+                saved.getName(),
+                saved.getType(),
+                saved.getCurrency(),
+                auditorResolver.resolveMemberId());
+        return saved;
     }
 
     @Transactional
     public Account update(UUID id, UpdateAccountRequest request) {
-        Account account = getById(id);
+        var account = getById(id);
         apply(
                 account,
                 request.name(),
@@ -63,19 +75,33 @@ public class AccountService {
                 request.color(),
                 request.closingDay(),
                 request.dueDay());
-        return accountRepository.save(account);
+        var saved = accountRepository.save(account);
+        log.info(
+                "Account updated: id={}, name={}, type={}, currency={}, memberId={}",
+                saved.getId(),
+                saved.getName(),
+                saved.getType(),
+                saved.getCurrency(),
+                auditorResolver.resolveMemberId());
+        return saved;
     }
 
     @Transactional
     public Account archive(UUID id) {
-        Account account = getById(id);
-        LocalDate archivedFromMonth = dateProvider.currentReferenceMonth();
+        var account = getById(id);
+        var archivedFromMonth = dateProvider.currentReferenceMonth();
         if (archivedFromMonth.isBefore(account.getCreatedInMonth())) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "Archive month cannot be before the account creation month.");
         }
         account.setArchivedFromMonth(archivedFromMonth);
-        return accountRepository.save(account);
+        var saved = accountRepository.save(account);
+        log.info(
+                "Account archived: id={}, archivedFromMonth={}, memberId={}",
+                saved.getId(),
+                saved.getArchivedFromMonth(),
+                auditorResolver.resolveMemberId());
+        return saved;
     }
 
     @Transactional(readOnly = true)
