@@ -5,11 +5,12 @@ import com.mymoney.api.account.AccountService;
 import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.budget.BudgetRepository;
 import com.mymoney.api.category.CategoryService;
+import com.mymoney.api.error.CodedResponseStatusException;
+import com.mymoney.api.error.ErrorCode;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.shared.DateProvider;
 import com.mymoney.api.shared.EntityResolver;
-import com.mymoney.api.shared.ErrorMessage;
 import com.mymoney.api.shared.InputNormalizer;
 import com.mymoney.api.transaction.api.request.CreateTransactionRequest;
 import com.mymoney.api.transaction.api.request.UpdateTransactionRequest;
@@ -29,7 +30,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -80,7 +80,7 @@ public class TransactionService {
             normalizedLimit = DEFAULT_DESCRIPTION_SUGGESTION_LIMIT;
         } else {
             if (limit < 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Limit must be positive.");
+                throw new CodedResponseStatusException(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_PAGE_SIZE);
             }
             normalizedLimit = Math.max(1, Math.min(limit, MAX_DESCRIPTION_SUGGESTION_LIMIT));
         }
@@ -108,8 +108,8 @@ public class TransactionService {
     public TransactionResponse getResponseById(UUID id) {
         return transactionRepository
                 .findResponseById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, ErrorMessage.TRANSACTION_NOT_FOUND.message()));
+                .orElseThrow(
+                        () -> new CodedResponseStatusException(HttpStatus.NOT_FOUND, ErrorCode.TRANSACTION_NOT_FOUND));
     }
 
     @Transactional
@@ -121,8 +121,8 @@ public class TransactionService {
     public Transaction getById(UUID id) {
         return transactionRepository
                 .findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, ErrorMessage.TRANSACTION_NOT_FOUND.message()));
+                .orElseThrow(
+                        () -> new CodedResponseStatusException(HttpStatus.NOT_FOUND, ErrorCode.TRANSACTION_NOT_FOUND));
     }
 
     @Transactional
@@ -245,13 +245,13 @@ public class TransactionService {
         }
 
         if (memberId == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "Individual transactions require a member.");
+            throw new CodedResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.INDIVIDUAL_TRANSACTION_REQUIRES_MEMBER);
         }
 
         return EntityResolver.resolveOrThrow(
                 () -> familyMemberRepository.findById(memberId).filter(FamilyMember::isActive),
-                ErrorMessage.FAMILY_MEMBER_NOT_FOUND.message());
+                ErrorCode.FAMILY_MEMBER_NOT_FOUND);
     }
 
     private void validateIndividualAllowance(
@@ -265,9 +265,8 @@ public class TransactionService {
             return;
         }
 
-        throw new ResponseStatusException(
-                HttpStatus.UNPROCESSABLE_ENTITY,
-                "Individual transactions require a valid allowance budget for the selected member.");
+        throw new CodedResponseStatusException(
+                HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.INDIVIDUAL_TRANSACTION_REQUIRES_ALLOWANCE);
     }
 
     private List<BigDecimal> calculateInstallmentAmounts(BigDecimal totalAmount, int installmentCount) {
@@ -302,8 +301,7 @@ public class TransactionService {
             return;
         }
         if (installmentCount < 1 || installmentCount > 120) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "Installment count must be between 1 and 120.");
+            throw new CodedResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.INSTALLMENT_COUNT_RANGE);
         }
     }
 
@@ -311,8 +309,8 @@ public class TransactionService {
         LocalDate lastReferenceMonth = referenceMonthFromDate(transactionDate.plusMonths(installmentCount - 1L));
         LocalDate maxReferenceMonth = dateProvider.currentReferenceMonth().plusYears(MAX_INSTALLMENT_YEARS);
         if (lastReferenceMonth.isAfter(maxReferenceMonth)) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "Installment plan cannot exceed 2 years.");
+            throw new CodedResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.INSTALLMENT_PLAN_TOO_LONG);
         }
     }
 

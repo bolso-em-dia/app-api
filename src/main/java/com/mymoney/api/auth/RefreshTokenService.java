@@ -41,7 +41,7 @@ public class RefreshTokenService {
 
         var cookie = ResponseCookie.from(properties.refreshCookieName(), rawToken)
                 .httpOnly(true)
-                .secure(true)
+                .secure(properties.refreshCookieSecure())
                 .sameSite("Lax")
                 .path("/")
                 .maxAge(Duration.ofDays(properties.refreshTokenDays()))
@@ -119,7 +119,7 @@ public class RefreshTokenService {
     public void clearRefreshCookie(HttpServletResponse response) {
         var cookie = ResponseCookie.from(properties.refreshCookieName(), "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(properties.refreshCookieSecure())
                 .sameSite("Lax")
                 .path("/")
                 .maxAge(0)

@@ -3,10 +3,11 @@ package com.mymoney.api.account;
 import com.mymoney.api.account.api.request.CreateAccountRequest;
 import com.mymoney.api.account.api.request.UpdateAccountRequest;
 import com.mymoney.api.audit.AuditorResolver;
+import com.mymoney.api.error.CodedResponseStatusException;
+import com.mymoney.api.error.ErrorCode;
 import com.mymoney.api.shared.DateProvider;
 import com.mymoney.api.shared.DayValidator;
 import com.mymoney.api.shared.EntityResolver;
-import com.mymoney.api.shared.ErrorMessage;
 import com.mymoney.api.shared.InputNormalizer;
 import java.time.LocalDate;
 import java.util.List;
@@ -18,7 +19,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -91,8 +91,8 @@ public class AccountService {
         var account = getById(id);
         var archivedFromMonth = dateProvider.currentReferenceMonth();
         if (archivedFromMonth.isBefore(account.getCreatedInMonth())) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "Archive month cannot be before the account creation month.");
+            throw new CodedResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.ARCHIVE_BEFORE_ACCOUNT_CREATION);
         }
         account.setArchivedFromMonth(archivedFromMonth);
         var saved = accountRepository.save(account);
@@ -138,8 +138,8 @@ public class AccountService {
     private void validateTypeFields(AccountType type, Integer closingDay, Integer dueDay) {
         if (type == AccountType.CREDIT_CARD) {
             if (closingDay == null || dueDay == null) {
-                throw new ResponseStatusException(
-                        HttpStatus.UNPROCESSABLE_ENTITY, "Credit cards require both closing day and due day.");
+                throw new CodedResponseStatusException(
+                        HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.CREDIT_CARD_REQUIRES_DAYS);
             }
             DayValidator.validateDayRange(closingDay, "Closing day");
             DayValidator.validateDayRange(dueDay, "Due day");
@@ -147,13 +147,11 @@ public class AccountService {
         }
 
         if (closingDay != null || dueDay != null) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "Only credit cards accept closing day and due day.");
+            throw new CodedResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.NON_CREDIT_CARD_DAYS);
         }
     }
 
     private Account resolveAccount(UUID id) {
-        return EntityResolver.resolveOrThrow(
-                () -> accountRepository.findById(id), ErrorMessage.ACCOUNT_NOT_FOUND.message());
+        return EntityResolver.resolveOrThrow(() -> accountRepository.findById(id), ErrorCode.ACCOUNT_NOT_FOUND);
     }
 }

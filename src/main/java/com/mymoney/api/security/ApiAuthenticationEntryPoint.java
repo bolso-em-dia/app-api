@@ -2,6 +2,8 @@ package com.mymoney.api.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mymoney.api.error.ApiErrorResponse;
+import com.mymoney.api.error.ErrorCode;
+import com.mymoney.api.logging.SecurityLoggingHelper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -25,15 +27,19 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
             HttpServletRequest request, HttpServletResponse response, AuthenticationException authException)
             throws IOException {
         log.warn(
-                "Authentication failure on {} {} message={}",
+                "Authentication failure on {} {} by user={} message={}",
                 request.getMethod(),
-                request.getRequestURI(),
-                authException.getMessage());
+                SecurityLoggingHelper.sanitizePath(request),
+                SecurityLoggingHelper.currentUser(),
+                SecurityLoggingHelper.sanitize(authException.getMessage()));
 
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(
                 response.getWriter(),
-                ApiErrorResponse.from(HttpStatus.UNAUTHORIZED, "Authentication is required.", request.getRequestURI()));
+                ApiErrorResponse.coded(
+                        HttpStatus.UNAUTHORIZED,
+                        ErrorCode.AUTHENTICATION_REQUIRED,
+                        SecurityLoggingHelper.sanitizePath(request)));
     }
 }

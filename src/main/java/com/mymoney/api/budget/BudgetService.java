@@ -5,11 +5,12 @@ import com.mymoney.api.budget.api.request.CreateBudgetRequest;
 import com.mymoney.api.budget.api.request.UpdateBudgetRequest;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryService;
+import com.mymoney.api.error.CodedResponseStatusException;
+import com.mymoney.api.error.ErrorCode;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.shared.DateProvider;
 import com.mymoney.api.shared.EntityResolver;
-import com.mymoney.api.shared.ErrorMessage;
 import com.mymoney.api.shared.InputNormalizer;
 import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.TransactionCategoryAnalyzer;
@@ -32,7 +33,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -77,8 +77,7 @@ public class BudgetService {
     public Budget getById(UUID id) {
         return budgetRepository
                 .findWithAssociationsById(id)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, ErrorMessage.BUDGET_NOT_FOUND.message()));
+                .orElseThrow(() -> new CodedResponseStatusException(HttpStatus.NOT_FOUND, ErrorCode.BUDGET_NOT_FOUND));
     }
 
     @Transactional
@@ -129,8 +128,8 @@ public class BudgetService {
     public Budget archive(UUID id, LocalDate referenceMonth) {
         var budget = getById(id);
         if (referenceMonth.isBefore(budget.getCreatedInMonth())) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "Archive month cannot be before the budget creation month.");
+            throw new CodedResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.ARCHIVE_BEFORE_BUDGET_CREATION);
         }
         budget.setArchivedFromMonth(referenceMonth);
         budget.setActive(false);
@@ -230,15 +229,13 @@ public class BudgetService {
 
     private void applyAllowanceBudget(Budget budget, UUID ownerMemberId) {
         if (ownerMemberId == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "Allowance budgets require an owner member.");
+            throw new CodedResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.ALLOWANCE_REQUIRES_OWNER);
         }
-        FamilyMember owner = EntityResolver.resolveOrThrow(
+        var owner = EntityResolver.resolveOrThrow(
                 () -> familyMemberRepository.findById(ownerMemberId).filter(FamilyMember::isActive),
-                ErrorMessage.FAMILY_MEMBER_NOT_FOUND.message());
+                ErrorCode.FAMILY_MEMBER_NOT_FOUND);
         if (budgetRepository.existsAnotherByOwnerMemberIdAndType(owner.getId(), BudgetType.ALLOWANCE, budget.getId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "An allowance budget already exists for this member.");
+            throw new CodedResponseStatusException(HttpStatus.CONFLICT, ErrorCode.DUPLICATE_ALLOWANCE_BUDGET);
         }
         budget.setOwnerMember(owner);
         budget.setCategories(new LinkedHashSet<>());
@@ -246,8 +243,8 @@ public class BudgetService {
 
     private void applyGlobalBudget(Budget budget, List<UUID> categoryIds) {
         if (categoryIds == null || categoryIds.isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "Global budgets require at least one category.");
+            throw new CodedResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.GLOBAL_BUDGET_REQUIRES_CATEGORY);
         }
 
         budget.setOwnerMember(null);

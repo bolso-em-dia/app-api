@@ -2,6 +2,8 @@ package com.mymoney.api.exchangerate;
 
 import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.config.AppExchangeRateProperties;
+import com.mymoney.api.error.CodedResponseStatusException;
+import com.mymoney.api.error.ErrorCode;
 import com.mymoney.api.exchangerate.api.response.ExchangeRateResponse;
 import com.mymoney.api.preference.UserPreferencesService;
 import com.mymoney.api.shared.DateProvider;
@@ -17,7 +19,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -25,7 +26,6 @@ import org.springframework.web.server.ResponseStatusException;
 public class ExchangeRateService {
 
     private static final String CURRENCY = "USD";
-    private static final String FOREIGN_CURRENCY_DISABLED_MESSAGE = "Foreign currency support is disabled.";
 
     private final ExchangeRateRepository exchangeRateRepository;
     private final TransactionRepository transactionRepository;
@@ -76,8 +76,7 @@ public class ExchangeRateService {
         try {
             BigDecimal rate = exchangeRateClient.fetchUsdBrlRate();
             if (!isValidRate(rate)) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_GATEWAY, "Exchange rate API returned an invalid rate.");
+                throw new CodedResponseStatusException(HttpStatus.BAD_GATEWAY, ErrorCode.EXCHANGE_RATE_API_INVALID);
             }
             ExchangeRate exchangeRate = saveRateAndUpdateTransactions(rate);
             log.info(
@@ -86,11 +85,11 @@ public class ExchangeRateService {
                     exchangeRate.getFetchedAt(),
                     auditorResolver.resolveMemberId());
             return new ExchangeRateResponse(rate, exchangeRate.getFetchedAt(), false);
-        } catch (ResponseStatusException e) {
+        } catch (CodedResponseStatusException e) {
             throw e;
         } catch (Exception e) {
             log.warn("Manual exchange rate refresh failed.", e);
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Exchange rate API unavailable.");
+            throw new CodedResponseStatusException(HttpStatus.BAD_GATEWAY, ErrorCode.EXCHANGE_RATE_API_UNAVAILABLE, e);
         }
     }
 
@@ -101,7 +100,7 @@ public class ExchangeRateService {
         ExchangeRate latest = exchangeRateRepository
                 .findFirstByCurrencyOrderByFetchedAtDesc(CURRENCY)
                 .orElseThrow(
-                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No exchange rate data available."));
+                        () -> new CodedResponseStatusException(HttpStatus.NOT_FOUND, ErrorCode.NO_EXCHANGE_RATE_DATA));
 
         boolean stale = latest.getFetchedAt().isBefore(OffsetDateTime.now().minusHours(2));
 
@@ -147,10 +146,12 @@ public class ExchangeRateService {
 
     private void validateForeignCurrencyEnabled() {
         if (!properties.enabled()) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, FOREIGN_CURRENCY_DISABLED_MESSAGE);
+            throw new CodedResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.FOREIGN_CURRENCY_DISABLED);
         }
         if (!userPreferencesService.getCurrentUserPreferences().showForeignCurrency()) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, FOREIGN_CURRENCY_DISABLED_MESSAGE);
+            throw new CodedResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.FOREIGN_CURRENCY_DISABLED);
         }
     }
 }

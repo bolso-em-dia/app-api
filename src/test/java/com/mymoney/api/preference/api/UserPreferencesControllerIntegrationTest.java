@@ -191,6 +191,7 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                                 false,
                                 false))))
                 .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(40401))
                 .andExpect(jsonPath("$.message").value("Account was not found."));
     }
 
@@ -205,6 +206,7 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                         .content(
                                 toJson(new UpdateUserPreferencesRequest(activeAccount.getId(), "pt-BR", false, false))))
                 .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value(42219))
                 .andExpect(jsonPath("$.message").value("Default account must be active for the current month."));
     }
 
@@ -219,6 +221,7 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                         .content(
                                 toJson(new UpdateUserPreferencesRequest(activeAccount.getId(), "pt-BR", false, false))))
                 .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value(42219))
                 .andExpect(jsonPath("$.message").value("Default account must be active for the current month."));
     }
 
@@ -229,6 +232,7 @@ class UserPreferencesControllerIntegrationTest extends AuthenticatedIntegrationT
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(toJson(new UpdateUserPreferencesRequest(null, "es-ES", false, false))))
                 .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value(42218))
                 .andExpect(jsonPath("$.message").value("Locale is not supported."));
     }
 
