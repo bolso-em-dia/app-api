@@ -107,14 +107,27 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(toJson(new CreateAccountRequest(
                                 "Checking With Card Fields", AccountType.CHECKING, null, null, null, 5, 10))))
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value(42203))
+                .andExpect(jsonPath("$.message").value("Only credit cards accept closing day and due day."));
 
         mockMvc.perform(post("/api/accounts")
                         .header("Authorization", bearerToken(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(toJson(new CreateAccountRequest(
                                 "Card Missing Days", AccountType.CREDIT_CARD, null, null, null, null, null))))
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value(42202))
+                .andExpect(jsonPath("$.message").value("Credit cards require both closing day and due day."));
+
+        mockMvc.perform(post("/api/accounts")
+                        .header("Authorization", bearerToken(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(toJson(new CreateAccountRequest(
+                                "Card Invalid Closing Day", AccountType.CREDIT_CARD, null, null, null, 0, 10))))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value(42220))
+                .andExpect(jsonPath("$.message").value("Closing day must be between 1 and 31."));
 
         accountA.setArchivedFromMonth(LocalDate.of(2026, 8, 1));
         accountRepository.save(accountA);
@@ -157,7 +170,10 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
                 .andExpect(jsonPath("$.items[0].name").value("Main Checking"));
 
         mockMvc.perform(get("/api/accounts").header("Authorization", bearerToken(userToken)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(40301))
+                .andExpect(jsonPath("$.message").value("Access denied."))
+                .andExpect(jsonPath("$.path").value("/api/accounts"));
     }
 
     @Test
@@ -227,14 +243,16 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(toJson(
                                 new CreateAccountRequest("Test", AccountType.CHECKING, null, null, null, null, null))))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(40301));
     }
 
     @Test
     void getAccountReturns404ForNonExistentId() throws Exception {
         mockMvc.perform(get("/api/accounts/00000000-0000-0000-0000-000000000000")
                         .header("Authorization", bearerToken(adminToken)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(40401));
     }
 
     @Test
@@ -276,7 +294,8 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
                                         """
                                 {"name": "", "type": "CHECKING"}
                                 """))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(40001));
     }
 
     @Test

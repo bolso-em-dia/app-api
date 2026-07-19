@@ -4,6 +4,8 @@ import com.mymoney.api.auth.api.request.ChangePasswordRequest;
 import com.mymoney.api.auth.api.request.LoginRequest;
 import com.mymoney.api.auth.api.response.AuthResponse;
 import com.mymoney.api.auth.api.response.AuthUserResponse;
+import com.mymoney.api.error.CodedResponseStatusException;
+import com.mymoney.api.error.ErrorCode;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
 import com.mymoney.api.preference.UserPreferencesService;
@@ -15,7 +17,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -57,12 +58,12 @@ public class AuthService {
                     "Auth refresh rejected because refresh token cookie is missing. path={} cookieCount={}",
                     request.getRequestURI(),
                     cookieCount(request));
-            return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token is missing.");
+            return new CodedResponseStatusException(HttpStatus.UNAUTHORIZED, ErrorCode.REFRESH_TOKEN_MISSING);
         });
 
         var refreshToken = refreshTokenService.findValidToken(rawRefreshToken).orElseThrow(() -> {
             log.warn("Auth refresh rejected because refresh token is invalid. path={}", request.getRequestURI());
-            return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token is invalid.");
+            return new CodedResponseStatusException(HttpStatus.UNAUTHORIZED, ErrorCode.REFRESH_TOKEN_INVALID);
         });
 
         refreshTokenService.revoke(refreshToken);
@@ -101,14 +102,16 @@ public class AuthService {
             log.warn(
                     "Auth password change rejected for memberId={} because current password does not match",
                     member.getId());
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Current password is incorrect.");
+            throw new CodedResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.INCORRECT_CURRENT_PASSWORD);
         }
 
         if (!request.newPassword().equals(request.confirmPassword())) {
             log.warn(
                     "Auth password change rejected for memberId={} because confirmation does not match",
                     member.getId());
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Password confirmation does not match.");
+            throw new CodedResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.PASSWORD_CONFIRMATION_MISMATCH);
         }
 
         member.setPasswordHash(passwordEncoder.encode(request.newPassword()));
@@ -135,8 +138,8 @@ public class AuthService {
                 userPreferencesService.resolvePreferences(member));
     }
 
-    private ResponseStatusException invalidCredentials() {
-        return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password.");
+    private CodedResponseStatusException invalidCredentials() {
+        return new CodedResponseStatusException(HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_CREDENTIALS);
     }
 
     private int cookieCount(HttpServletRequest request) {

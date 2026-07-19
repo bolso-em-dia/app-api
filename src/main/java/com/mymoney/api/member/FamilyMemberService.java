@@ -1,10 +1,11 @@
 package com.mymoney.api.member;
 
 import com.mymoney.api.audit.AuditorResolver;
+import com.mymoney.api.error.CodedResponseStatusException;
+import com.mymoney.api.error.ErrorCode;
 import com.mymoney.api.member.api.request.CreateFamilyMemberRequest;
 import com.mymoney.api.member.api.request.UpdateFamilyMemberRequest;
 import com.mymoney.api.shared.EntityResolver;
-import com.mymoney.api.shared.ErrorMessage;
 import com.mymoney.api.shared.InputNormalizer;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +16,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -34,7 +34,7 @@ public class FamilyMemberService {
     @Transactional(readOnly = true)
     public FamilyMember getById(UUID id) {
         return EntityResolver.resolveOrThrow(
-                () -> familyMemberRepository.findById(id), ErrorMessage.FAMILY_MEMBER_NOT_FOUND.message());
+                () -> familyMemberRepository.findById(id), ErrorCode.FAMILY_MEMBER_NOT_FOUND);
     }
 
     @Transactional
@@ -111,7 +111,7 @@ public class FamilyMemberService {
                 .findByEmailIgnoreCase(normalizedEmail)
                 .filter(existing -> !existing.getId().equals(currentId))
                 .ifPresent(existing -> {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, ErrorMessage.EMAIL_ALREADY_IN_USE.message());
+                    throw new CodedResponseStatusException(HttpStatus.CONFLICT, ErrorCode.EMAIL_ALREADY_IN_USE);
                 });
     }
 

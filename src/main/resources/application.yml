@@ -26,7 +26,7 @@ management:
 
 logging:
   level:
-    com.mymoney.api: DEBUG
+    com.mymoney.api: INFO
     org.springframework.security: WARN
     org.springframework.web: WARN
 
@@ -36,6 +36,7 @@ app:
     access-token-minutes: ${APP_ACCESS_TOKEN_MINUTES:15}
     refresh-token-days: ${APP_REFRESH_TOKEN_DAYS:7}
     refresh-cookie-name: ${APP_REFRESH_COOKIE_NAME:bolso_em_dia_refresh_token}
+    refresh-cookie-secure: ${APP_REFRESH_COOKIE_SECURE:true}
     allowed-origins: ${APP_ALLOWED_ORIGINS:http://localhost:4173,http://localhost:5173}
   admin:
     name: ${APP_ADMIN_NAME:Admin}
@@ -43,4 +44,4 @@ app:
     password: ${APP_ADMIN_PASSWORD:admin123456}
   exchange-rate:
     enabled: false
-  version: "1.0.4"
+  version: "1.0.5"

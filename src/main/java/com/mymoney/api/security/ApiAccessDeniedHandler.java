@@ -2,6 +2,8 @@ package com.mymoney.api.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mymoney.api.error.ApiErrorResponse;
+import com.mymoney.api.error.ErrorCode;
+import com.mymoney.api.logging.SecurityLoggingHelper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -10,8 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
@@ -29,22 +29,17 @@ public class ApiAccessDeniedHandler implements AccessDeniedHandler {
         log.warn(
                 "Access denied on {} {} by user={} message={}",
                 request.getMethod(),
-                request.getRequestURI(),
-                currentUser(),
-                accessDeniedException.getMessage());
+                SecurityLoggingHelper.sanitizePath(request),
+                SecurityLoggingHelper.currentUser(),
+                SecurityLoggingHelper.sanitize(accessDeniedException.getMessage()));
 
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(
                 response.getWriter(),
-                ApiErrorResponse.from(HttpStatus.FORBIDDEN, "Access denied.", request.getRequestURI()));
-    }
-
-    private String currentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getName() == null) {
-            return "anonymous";
-        }
-        return authentication.getName();
+                ApiErrorResponse.coded(
+                        HttpStatus.FORBIDDEN,
+                        ErrorCode.FILTER_ACCESS_DENIED,
+                        SecurityLoggingHelper.sanitizePath(request)));
     }
 }

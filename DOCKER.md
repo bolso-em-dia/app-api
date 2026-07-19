@@ -55,6 +55,10 @@ Required runtime variables:
 - `APP_ADMIN_PASSWORD`
 - `APP_JWT_SECRET`
 
+Optional auth cookie runtime variable:
+
+- `APP_REFRESH_COOKIE_SECURE` (defaults to `true`; set to `false` only for HTTP-only local/runtime scenarios)
+
 ## Health Check
 
 The image publishes its own Docker health check against:

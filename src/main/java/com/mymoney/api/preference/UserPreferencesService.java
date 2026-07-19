@@ -4,11 +4,12 @@ import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountRepository;
 import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.auth.AuthenticatedMemberResolver;
+import com.mymoney.api.error.CodedResponseStatusException;
+import com.mymoney.api.error.ErrorCode;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.preference.api.request.UpdateUserPreferencesRequest;
 import com.mymoney.api.preference.api.response.UserPreferencesResponse;
 import com.mymoney.api.shared.DateProvider;
-import com.mymoney.api.shared.ErrorMessage;
 import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
@@ -17,7 +18,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -92,9 +92,9 @@ public class UserPreferencesService {
     }
 
     private void validateLocale(String locale) {
-        String normalized = locale == null ? "" : locale.trim();
+        var normalized = locale == null ? "" : locale.trim();
         if (!SUPPORTED_LOCALES.contains(normalized)) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Locale is not supported.");
+            throw new CodedResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.UNSUPPORTED_LOCALE);
         }
     }
 
@@ -105,12 +105,10 @@ public class UserPreferencesService {
 
         var account = accountRepository
                 .findById(defaultAccountId)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, ErrorMessage.ACCOUNT_NOT_FOUND.message()));
+                .orElseThrow(() -> new CodedResponseStatusException(HttpStatus.NOT_FOUND, ErrorCode.ACCOUNT_NOT_FOUND));
 
         if (!isAccountActiveInMonth(account, dateProvider.currentReferenceMonth())) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "Default account must be active for the current month.");
+            throw new CodedResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.DEFAULT_ACCOUNT_INACTIVE);
         }
 
         return account;

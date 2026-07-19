@@ -45,6 +45,7 @@ Current defaults from `application.yml`:
 - `APP_ACCESS_TOKEN_MINUTES=15`
 - `APP_REFRESH_TOKEN_DAYS=7`
 - `APP_REFRESH_COOKIE_NAME=bolso_em_dia_refresh_token`
+- `APP_REFRESH_COOKIE_SECURE=true`
 - `APP_ALLOWED_ORIGINS=http://localhost:4173,http://localhost:5173`
 - `APP_ADMIN_NAME=Admin`
 - `APP_ADMIN_EMAIL=admin@bolso-em-dia.local`

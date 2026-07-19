@@ -9,7 +9,10 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.mymoney.api.config.AppSecurityProperties;
+import com.mymoney.api.member.FamilyMember;
+import com.mymoney.api.member.FamilyRole;
 import jakarta.servlet.http.Cookie;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 
 @ExtendWith(MockitoExtension.class)
 class RefreshTokenServiceTest {
@@ -36,6 +40,8 @@ class RefreshTokenServiceTest {
     void setUp() {
         refreshTokenService = new RefreshTokenService(refreshTokenRepository, properties);
         lenient().when(properties.refreshCookieName()).thenReturn("bolso_em_dia_refresh_token");
+        lenient().when(properties.refreshTokenDays()).thenReturn(7L);
+        lenient().when(properties.refreshCookieSecure()).thenReturn(true);
 
         logger = (Logger) LoggerFactory.getLogger(RefreshTokenService.class);
         appender = new ListAppender<>();
@@ -103,5 +109,46 @@ class RefreshTokenServiceTest {
             assertThat(event.getLevel()).isEqualTo(Level.INFO);
             assertThat(event.getFormattedMessage()).contains("No expired refresh tokens to purge");
         });
+    }
+
+    @Test
+    void rotate_setsSecureAttributeWhenConfigured() {
+        var response = new MockHttpServletResponse();
+
+        refreshTokenService.rotate(activeMember(), response);
+
+        assertThat(response.getHeader("Set-Cookie")).contains("Secure");
+    }
+
+    @Test
+    void rotate_omitsSecureAttributeWhenDisabled() {
+        when(properties.refreshCookieSecure()).thenReturn(false);
+        var response = new MockHttpServletResponse();
+
+        refreshTokenService.rotate(activeMember(), response);
+
+        assertThat(response.getHeader("Set-Cookie")).doesNotContain("Secure");
+    }
+
+    @Test
+    void clearRefreshCookie_omitsSecureAttributeWhenDisabled() {
+        when(properties.refreshCookieSecure()).thenReturn(false);
+        var response = new MockHttpServletResponse();
+
+        refreshTokenService.clearRefreshCookie(response);
+
+        assertThat(response.getHeader("Set-Cookie")).doesNotContain("Secure");
+    }
+
+    private FamilyMember activeMember() {
+        return FamilyMember.builder()
+                .id(UUID.randomUUID())
+                .name("Admin")
+                .email("admin@bolso-em-dia.local")
+                .passwordHash("hash")
+                .role(FamilyRole.ADMIN)
+                .active(true)
+                .mustChangePassword(false)
+                .build();
     }
 }

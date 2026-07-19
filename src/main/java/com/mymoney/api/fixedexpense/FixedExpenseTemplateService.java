@@ -5,13 +5,14 @@ import com.mymoney.api.account.AccountService;
 import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.category.Category;
 import com.mymoney.api.category.CategoryService;
+import com.mymoney.api.error.CodedResponseStatusException;
+import com.mymoney.api.error.ErrorCode;
 import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.UpdateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.response.FixedExpenseTemplateResponse;
 import com.mymoney.api.shared.DateProvider;
 import com.mymoney.api.shared.DayValidator;
 import com.mymoney.api.shared.EntityResolver;
-import com.mymoney.api.shared.ErrorMessage;
 import com.mymoney.api.shared.InputNormalizer;
 import com.mymoney.api.transaction.CurrencyConversionService;
 import com.mymoney.api.transaction.EffectiveMonthlyTransactionService;
@@ -26,7 +27,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -52,15 +52,14 @@ public class FixedExpenseTemplateService {
     public FixedExpenseTemplateResponse getResponseById(UUID id) {
         return fixedExpenseTemplateRepository
                 .findResponseById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, ErrorMessage.FIXED_EXPENSE_TEMPLATE_NOT_FOUND.message()));
+                .orElseThrow(() -> new CodedResponseStatusException(
+                        HttpStatus.NOT_FOUND, ErrorCode.FIXED_EXPENSE_TEMPLATE_NOT_FOUND));
     }
 
     @Transactional(readOnly = true)
     public FixedExpenseTemplate getById(UUID id) {
         return EntityResolver.resolveOrThrow(
-                () -> fixedExpenseTemplateRepository.findById(id),
-                ErrorMessage.FIXED_EXPENSE_TEMPLATE_NOT_FOUND.message());
+                () -> fixedExpenseTemplateRepository.findById(id), ErrorCode.FIXED_EXPENSE_TEMPLATE_NOT_FOUND);
     }
 
     @Transactional

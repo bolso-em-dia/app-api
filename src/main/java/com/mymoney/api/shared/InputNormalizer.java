@@ -1,7 +1,8 @@
 package com.mymoney.api.shared;
 
+import com.mymoney.api.error.CodedResponseStatusException;
+import com.mymoney.api.error.ErrorCode;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 public final class InputNormalizer {
 
@@ -20,9 +21,10 @@ public final class InputNormalizer {
     }
 
     public static String requireNonBlank(String value, String fieldName) {
-        String trimmed = value == null ? "" : value.trim();
+        var trimmed = value == null ? "" : value.trim();
         if (trimmed.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " cannot be empty.");
+            throw new CodedResponseStatusException(
+                    HttpStatus.BAD_REQUEST, ErrorCode.FIELD_CANNOT_BE_EMPTY, fieldName + " cannot be empty.");
         }
         return trimmed;
     }

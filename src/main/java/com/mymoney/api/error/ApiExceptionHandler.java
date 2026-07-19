@@ -1,17 +1,15 @@
 package com.mymoney.api.error;
 
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
+import com.mymoney.api.logging.SecurityLoggingHelper;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -19,7 +17,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.util.HtmlUtils;
 
 @Slf4j
 @RestControllerAdvice
@@ -28,30 +25,44 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiErrorResponse> handleResponseStatus(
             ResponseStatusException exception, HttpServletRequest request) {
-        HttpStatusCode status = exception.getStatusCode();
-        String message = exception.getReason() == null ? status.toString() : exception.getReason();
+        var status = exception.getStatusCode();
+        var message = exception.getReason() == null ? status.toString() : exception.getReason();
+        Integer code = null;
+        if (exception instanceof CodedResponseStatusException codedException) {
+            code = codedException.getCode();
+        }
 
         if (status.is5xxServerError()) {
             log.error(
                     "Application failure on {} {} by user={} status={} message={}",
                     request.getMethod(),
-                    request.getRequestURI(),
-                    currentUser(),
+                    SecurityLoggingHelper.sanitizePath(request),
+                    SecurityLoggingHelper.currentUser(),
                     status.value(),
-                    message,
+                    SecurityLoggingHelper.sanitize(message),
                     exception);
         } else if (status.value() >= 400) {
             log.warn(
                     "Request failed on {} {} by user={} status={} message={}",
                     request.getMethod(),
-                    request.getRequestURI(),
-                    currentUser(),
+                    SecurityLoggingHelper.sanitizePath(request),
+                    SecurityLoggingHelper.currentUser(),
                     status.value(),
-                    message);
+                    SecurityLoggingHelper.sanitize(message));
         }
 
         return ResponseEntity.status(status)
-                .body(ApiErrorResponse.from(status, sanitize(message), sanitizePath(request)));
+                .body(
+                        code == null
+                                ? ApiErrorResponse.from(
+                                        status,
+                                        SecurityLoggingHelper.sanitize(message),
+                                        SecurityLoggingHelper.sanitizePath(request))
+                                : ApiErrorResponse.coded(
+                                        status,
+                                        ((CodedResponseStatusException) exception).getErrorCode(),
+                                        SecurityLoggingHelper.sanitize(message),
+                                        SecurityLoggingHelper.sanitizePath(request)));
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
@@ -66,28 +77,35 @@ public class ApiExceptionHandler {
         String message = "Request validation failed.";
         var errorDetails = fieldErrors.stream()
                 .map(fe -> new ApiErrorResponse.FieldErrorDetail(
-                        sanitize(fe.getField()), sanitize(fe.getDefaultMessage())))
+                        SecurityLoggingHelper.sanitize(fe.getField()),
+                        SecurityLoggingHelper.sanitize(fe.getDefaultMessage())))
                 .toList();
         log.warn(
                 "Validation failed on {} {} by user={} status={} fields=[{}]",
                 request.getMethod(),
-                request.getRequestURI(),
-                currentUser(),
+                SecurityLoggingHelper.sanitizePath(request),
+                SecurityLoggingHelper.currentUser(),
                 HttpStatus.BAD_REQUEST.value(),
                 fieldErrors.stream()
-                        .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+                        .map(fe -> SecurityLoggingHelper.sanitize(fe.getField()) + ": "
+                                + SecurityLoggingHelper.sanitize(fe.getDefaultMessage()))
                         .collect(java.util.stream.Collectors.joining(", ")));
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiErrorResponse.validationError(sanitize(message), sanitizePath(request), errorDetails));
+                .body(ApiErrorResponse.validationError(
+                        SecurityLoggingHelper.sanitize(message),
+                        SecurityLoggingHelper.sanitizePath(request),
+                        errorDetails));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleUnreadableRequest(
             HttpMessageNotReadableException exception, HttpServletRequest request) {
-        String message = "Request body is invalid.";
+        var message = ErrorCode.INVALID_REQUEST_BODY.description();
+        var errorCode = ErrorCode.INVALID_REQUEST_BODY;
         Throwable cause = exception.getCause();
         if (cause instanceof UnrecognizedPropertyException unrecognizedPropertyException) {
+            errorCode = ErrorCode.UNRECOGNIZED_FIELD;
             message =
                     "Request body contains unsupported field: " + unrecognizedPropertyException.getPropertyName() + ".";
         }
@@ -95,13 +113,17 @@ public class ApiExceptionHandler {
         log.warn(
                 "Unreadable request on {} {} by user={} status={} message={}",
                 request.getMethod(),
-                request.getRequestURI(),
-                currentUser(),
+                SecurityLoggingHelper.sanitizePath(request),
+                SecurityLoggingHelper.currentUser(),
                 HttpStatus.BAD_REQUEST.value(),
-                message);
+                SecurityLoggingHelper.sanitize(message));
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiErrorResponse.from(HttpStatus.BAD_REQUEST, sanitize(message), sanitizePath(request)));
+                .body(ApiErrorResponse.coded(
+                        HttpStatus.BAD_REQUEST,
+                        errorCode,
+                        SecurityLoggingHelper.sanitize(message),
+                        SecurityLoggingHelper.sanitizePath(request)));
     }
 
     @ExceptionHandler(AuthorizationDeniedException.class)
@@ -110,47 +132,58 @@ public class ApiExceptionHandler {
         log.warn(
                 "Request denied on {} {} by user={} status={} message={}",
                 request.getMethod(),
-                request.getRequestURI(),
-                currentUser(),
+                SecurityLoggingHelper.sanitizePath(request),
+                SecurityLoggingHelper.currentUser(),
                 HttpStatus.FORBIDDEN.value(),
-                "Access Denied",
+                ErrorCode.METHOD_ACCESS_DENIED.description(),
                 exception);
 
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiErrorResponse.from(HttpStatus.FORBIDDEN, "Access Denied", sanitizePath(request)));
+                .body(ApiErrorResponse.coded(
+                        HttpStatus.FORBIDDEN,
+                        ErrorCode.METHOD_ACCESS_DENIED,
+                        SecurityLoggingHelper.sanitizePath(request)));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiErrorResponse> handleTypeMismatch(
             MethodArgumentTypeMismatchException exception, HttpServletRequest request) {
-        String message = "Invalid value for parameter '" + exception.getName() + "'.";
+        var message = ErrorCode.INVALID_PARAMETER.description() + " '" + exception.getName() + "'.";
         log.warn(
                 "Type mismatch on {} {} by user={} status={} message={}",
                 request.getMethod(),
-                request.getRequestURI(),
-                currentUser(),
+                SecurityLoggingHelper.sanitizePath(request),
+                SecurityLoggingHelper.currentUser(),
                 HttpStatus.BAD_REQUEST.value(),
-                message);
+                SecurityLoggingHelper.sanitize(message));
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiErrorResponse.from(HttpStatus.BAD_REQUEST, sanitize(message), sanitizePath(request)));
+                .body(ApiErrorResponse.coded(
+                        HttpStatus.BAD_REQUEST,
+                        ErrorCode.INVALID_PARAMETER,
+                        SecurityLoggingHelper.sanitize(message),
+                        SecurityLoggingHelper.sanitizePath(request)));
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     public ResponseEntity<ApiErrorResponse> handleOptimisticLock(
             ObjectOptimisticLockingFailureException exception, HttpServletRequest request) {
-        String message = "Resource was modified by another user.";
+        var message = ErrorCode.CONCURRENT_MODIFICATION.description();
         log.warn(
                 "Optimistic lock failure on {} {} by user={} status={} message={}",
                 request.getMethod(),
-                request.getRequestURI(),
-                currentUser(),
+                SecurityLoggingHelper.sanitizePath(request),
+                SecurityLoggingHelper.currentUser(),
                 HttpStatus.CONFLICT.value(),
-                message,
+                SecurityLoggingHelper.sanitize(message),
                 exception);
 
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiErrorResponse.from(HttpStatus.CONFLICT, sanitize(message), sanitizePath(request)));
+                .body(ApiErrorResponse.coded(
+                        HttpStatus.CONFLICT,
+                        ErrorCode.CONCURRENT_MODIFICATION,
+                        SecurityLoggingHelper.sanitize(message),
+                        SecurityLoggingHelper.sanitizePath(request)));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -159,43 +192,33 @@ public class ApiExceptionHandler {
         log.warn(
                 "Invalid argument on {} {} by user={} status={} message={}",
                 request.getMethod(),
-                request.getRequestURI(),
-                currentUser(),
+                SecurityLoggingHelper.sanitizePath(request),
+                SecurityLoggingHelper.currentUser(),
                 HttpStatus.BAD_REQUEST.value(),
-                exception.getMessage());
+                SecurityLoggingHelper.sanitize(exception.getMessage()));
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiErrorResponse.from(
-                        HttpStatus.BAD_REQUEST, sanitize(exception.getMessage()), sanitizePath(request)));
+                .body(ApiErrorResponse.coded(
+                        HttpStatus.BAD_REQUEST,
+                        ErrorCode.INVALID_PARAMETER,
+                        SecurityLoggingHelper.sanitize(exception.getMessage()),
+                        SecurityLoggingHelper.sanitizePath(request)));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpected(Exception exception, HttpServletRequest request) {
         log.error(
-                "Unhandled exception on {} {} by user={}",
+                "Unhandled exception on {} {} by user={} status={}",
                 request.getMethod(),
-                request.getRequestURI(),
-                currentUser(),
+                SecurityLoggingHelper.sanitizePath(request),
+                SecurityLoggingHelper.currentUser(),
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 exception);
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiErrorResponse.from(
-                        HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error.", sanitizePath(request)));
-    }
-
-    private String sanitizePath(HttpServletRequest request) {
-        return sanitize(request.getRequestURI());
-    }
-
-    private String sanitize(String value) {
-        return value == null ? null : HtmlUtils.htmlEscape(value);
-    }
-
-    private String currentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getName() == null) {
-            return "anonymous";
-        }
-        return authentication.getName();
+                .body(ApiErrorResponse.coded(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        ErrorCode.INTERNAL_ERROR,
+                        SecurityLoggingHelper.sanitizePath(request)));
     }
 }

@@ -18,6 +18,7 @@ class JwtServiceTest {
                 15,
                 7,
                 "bolso_em_dia_refresh_token",
+                true,
                 List.of("http://localhost:4173")));
         var memberId = UUID.randomUUID();
         var member = FamilyMember.builder()

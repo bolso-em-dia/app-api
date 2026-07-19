@@ -1,13 +1,14 @@
 package com.mymoney.api.transaction;
 
 import com.mymoney.api.account.CurrencyType;
+import com.mymoney.api.error.CodedResponseStatusException;
+import com.mymoney.api.error.ErrorCode;
 import com.mymoney.api.exchangerate.ExchangeRate;
 import com.mymoney.api.exchangerate.ExchangeRateRepository;
 import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +33,8 @@ public class CurrencyConversionService {
 
     private BigDecimal missingRate(boolean throwIfMissing) {
         if (throwIfMissing) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Exchange rate not available.");
+            throw new CodedResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.EXCHANGE_RATE_NOT_AVAILABLE);
         }
         return BigDecimal.ONE;
     }
