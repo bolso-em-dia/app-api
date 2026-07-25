@@ -1,5 +1,6 @@
 package com.mymoney.api.config.api;
 
+import com.mymoney.api.config.api.response.VersionResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,7 +16,7 @@ public class VersionController {
     }
 
     @GetMapping("/api/version")
-    public ResponseEntity<String> version() {
-        return ResponseEntity.ok(version);
+    public ResponseEntity<VersionResponse> version() {
+        return ResponseEntity.ok(new VersionResponse(version));
     }
 }
