@@ -140,7 +140,7 @@ jobs:
         run: |
           echo "${META_JSON}" > /tmp/metadata.json
           TAGS=$(jq -cr '.tags | map("-t " + .) | join(" ")' /tmp/metadata.json)
-          DIGESTS=$(printf '${{ env.DOCKERHUB_NAMESPACE }}/${{ env.IMAGE_NAME }}@sha256:%s ' /tmp/digests/*)
+          DIGESTS=$(cd /tmp/digests && printf '${{ env.DOCKERHUB_NAMESPACE }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
           if [ -z "${TAGS}" ]; then
             echo "ERROR: No tags generated from metadata" >&2
             exit 1
