@@ -135,15 +135,18 @@ jobs:
             latest=false
 
       - name: Create manifest list and push
-        working-directory: /tmp/digests
         env:
           META_JSON: ${{ steps.metadata.outputs.json }}
         run: |
-          echo "${META_JSON}" > metadata.json
-          TAGS=$(jq -cr '.tags | map("-t " + .) | join(" ")' metadata.json)
-          DIGESTS=$(printf '${{ env.DOCKERHUB_NAMESPACE }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+          echo "${META_JSON}" > /tmp/metadata.json
+          TAGS=$(jq -cr '.tags | map("-t " + .) | join(" ")' /tmp/metadata.json)
+          DIGESTS=$(printf '${{ env.DOCKERHUB_NAMESPACE }}/${{ env.IMAGE_NAME }}@sha256:%s ' /tmp/digests/*)
           if [ -z "${TAGS}" ]; then
             echo "ERROR: No tags generated from metadata" >&2
+            exit 1
+          fi
+          if [ -z "${DIGESTS}" ]; then
+            echo "ERROR: No digest files found in /tmp/digests" >&2
             exit 1
           fi
           docker buildx imagetools create ${TAGS} ${DIGESTS}
