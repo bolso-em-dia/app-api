@@ -3,7 +3,9 @@ package com.mymoney.api.security;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.mymoney.api.PostgresIntegrationTestSupport;
@@ -35,7 +37,9 @@ class SecurityConfigIntegrationTest extends PostgresIntegrationTestSupport {
     void actualResponseExposesRequestIdHeader() throws Exception {
         mockMvc.perform(get("/api/version").header(HttpHeaders.ORIGIN, "http://localhost:4173"))
                 .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("application/json"))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, containsString("X-Request-ID")))
-                .andExpect(header().exists("X-Request-ID"));
+                .andExpect(header().exists("X-Request-ID"))
+                .andExpect(jsonPath("$.version").isNotEmpty());
     }
 }
