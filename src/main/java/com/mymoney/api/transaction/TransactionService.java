@@ -2,6 +2,7 @@ package com.mymoney.api.transaction;
 
 import com.mymoney.api.account.Account;
 import com.mymoney.api.account.AccountService;
+import com.mymoney.api.account.AccountType;
 import com.mymoney.api.audit.AuditorResolver;
 import com.mymoney.api.budget.BudgetRepository;
 import com.mymoney.api.category.CategoryService;
@@ -131,9 +132,12 @@ public class TransactionService {
         var category = categoryService.getById(request.categoryId());
         var account = accountService.getById(request.accountId());
         var member = resolveMember(request.ownershipType(), request.memberId());
+        var referenceMonthPolicy = resolveCreateReferenceMonthPolicy(request.referenceMonthPolicy());
 
         var installmentCount = request.installmentCount() == null ? 1 : request.installmentCount();
-        validateInstallmentHorizon(request.transactionDate(), installmentCount);
+        var firstReferenceMonth =
+                resolveReferenceMonth(request.transactionDate(), account, request.type(), referenceMonthPolicy);
+        validateInstallmentHorizon(firstReferenceMonth, installmentCount);
         var installmentGroupId = installmentCount > 1 ? UUID.randomUUID() : null;
         var installmentAmounts = calculateInstallmentAmounts(request.amount(), installmentCount);
         var actorMemberId = auditorResolver.resolveMemberId();
@@ -141,8 +145,9 @@ public class TransactionService {
         var created = new ArrayList<TransactionResponse>();
         for (int i = 0; i < installmentCount; i++) {
             var transactionDate = request.transactionDate().plusMonths(i);
+            var referenceMonth = firstReferenceMonth.plusMonths(i);
             var transaction = new Transaction();
-            validateIndividualAllowance(request.ownershipType(), member, transactionDate);
+            validateIndividualAllowance(request.ownershipType(), member, referenceMonth);
             transaction.setType(request.type());
             transaction.setOwnershipType(request.ownershipType());
             transaction.setSourceType(
@@ -152,7 +157,8 @@ public class TransactionService {
             transaction.setAmount(rawAmount);
             applyCurrency(transaction, account, rawAmount, true);
             transaction.setTransactionDate(transactionDate);
-            transaction.setReferenceMonth(referenceMonthFromDate(transactionDate));
+            transaction.setReferenceMonth(referenceMonth);
+            transaction.setReferenceMonthPolicy(referenceMonthPolicy);
             transaction.setAccount(account);
             transaction.setCategory(category);
             transaction.setMember(member);
@@ -179,7 +185,10 @@ public class TransactionService {
         var category = categoryService.getById(request.categoryId());
         var account = accountService.getById(request.accountId());
         var member = resolveMember(request.ownershipType(), request.memberId());
-        validateIndividualAllowance(request.ownershipType(), member, request.transactionDate());
+        var referenceMonthPolicy = resolveUpdateReferenceMonthPolicy(transaction, request.referenceMonthPolicy());
+        var referenceMonth =
+                resolveReferenceMonth(request.transactionDate(), account, request.type(), referenceMonthPolicy);
+        validateIndividualAllowance(request.ownershipType(), member, referenceMonth);
 
         transaction.setType(request.type());
         transaction.setOwnershipType(request.ownershipType());
@@ -187,7 +196,8 @@ public class TransactionService {
         transaction.setAmount(request.amount());
         applyCurrency(transaction, account, request.amount(), true);
         transaction.setTransactionDate(request.transactionDate());
-        transaction.setReferenceMonth(referenceMonthFromDate(request.transactionDate()));
+        transaction.setReferenceMonth(referenceMonth);
+        transaction.setReferenceMonthPolicy(referenceMonthPolicy);
         transaction.setCategory(category);
         transaction.setAccount(account);
         transaction.setMember(member);
@@ -199,6 +209,28 @@ public class TransactionService {
                 saved.getType(),
                 saved.getOwnershipType(),
                 saved.getReferenceMonth(),
+                auditorResolver.resolveMemberId());
+        return getResponseById(saved.getId());
+    }
+
+    @Transactional
+    public TransactionResponse updateReferenceMonthPolicy(UUID id, ReferenceMonthPolicy referenceMonthPolicy) {
+        var transaction = getById(id);
+        validateReferenceMonthPolicyUpdateAllowed(transaction);
+
+        transaction.setReferenceMonthPolicy(referenceMonthPolicy);
+        transaction.setReferenceMonth(resolveReferenceMonth(
+                transaction.getTransactionDate(),
+                transaction.getAccount(),
+                transaction.getType(),
+                referenceMonthPolicy));
+
+        var saved = transactionRepository.save(transaction);
+        log.info(
+                "Transaction reference month policy updated: id={}, referenceMonth={}, policy={}, memberId={}",
+                saved.getId(),
+                saved.getReferenceMonth(),
+                saved.getReferenceMonthPolicy(),
                 auditorResolver.resolveMemberId());
         return getResponseById(saved.getId());
     }
@@ -255,13 +287,12 @@ public class TransactionService {
     }
 
     private void validateIndividualAllowance(
-            OwnershipType ownershipType, FamilyMember member, LocalDate transactionDate) {
+            OwnershipType ownershipType, FamilyMember member, LocalDate referenceMonth) {
         if (ownershipType == OwnershipType.SHARED || member == null) {
             return;
         }
 
-        if (budgetRepository.existsActiveAllowanceByOwnerMemberIdAndReferenceMonth(
-                member.getId(), referenceMonthFromDate(transactionDate))) {
+        if (budgetRepository.existsActiveAllowanceByOwnerMemberIdAndReferenceMonth(member.getId(), referenceMonth)) {
             return;
         }
 
@@ -305,12 +336,80 @@ public class TransactionService {
         }
     }
 
-    private void validateInstallmentHorizon(LocalDate transactionDate, int installmentCount) {
-        LocalDate lastReferenceMonth = referenceMonthFromDate(transactionDate.plusMonths(installmentCount - 1L));
+    private void validateInstallmentHorizon(LocalDate firstReferenceMonth, int installmentCount) {
+        LocalDate lastReferenceMonth = firstReferenceMonth.plusMonths(installmentCount - 1L);
         LocalDate maxReferenceMonth = dateProvider.currentReferenceMonth().plusYears(MAX_INSTALLMENT_YEARS);
         if (lastReferenceMonth.isAfter(maxReferenceMonth)) {
             throw new CodedResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.INSTALLMENT_PLAN_TOO_LONG);
+        }
+    }
+
+    private ReferenceMonthPolicy resolveCreateReferenceMonthPolicy(ReferenceMonthPolicy referenceMonthPolicy) {
+        return referenceMonthPolicy == null ? ReferenceMonthPolicy.AUTO : referenceMonthPolicy;
+    }
+
+    private ReferenceMonthPolicy resolveUpdateReferenceMonthPolicy(
+            Transaction transaction, ReferenceMonthPolicy referenceMonthPolicy) {
+        if (referenceMonthPolicy != null) {
+            return referenceMonthPolicy;
+        }
+        return transaction.getReferenceMonthPolicy() == null
+                ? ReferenceMonthPolicy.AUTO
+                : transaction.getReferenceMonthPolicy();
+    }
+
+    private LocalDate resolveReferenceMonth(
+            LocalDate transactionDate,
+            Account account,
+            TransactionType transactionType,
+            ReferenceMonthPolicy referenceMonthPolicy) {
+        var policy = referenceMonthPolicy == null ? ReferenceMonthPolicy.AUTO : referenceMonthPolicy;
+        validateReferenceMonthPolicy(account, transactionType, policy);
+
+        var transactionMonth = referenceMonthFromDate(transactionDate);
+        if (policy == ReferenceMonthPolicy.FORCE_CURRENT || !supportsCreditCardNextMonth(account, transactionType)) {
+            return transactionMonth;
+        }
+        if (policy == ReferenceMonthPolicy.FORCE_NEXT) {
+            return transactionMonth.plusMonths(1);
+        }
+        if (shouldMoveToNextMonth(transactionDate, account)) {
+            return transactionMonth.plusMonths(1);
+        }
+        return transactionMonth;
+    }
+
+    private void validateReferenceMonthPolicy(
+            Account account, TransactionType transactionType, ReferenceMonthPolicy referenceMonthPolicy) {
+        if (referenceMonthPolicy != ReferenceMonthPolicy.FORCE_NEXT) {
+            return;
+        }
+        if (supportsCreditCardNextMonth(account, transactionType)) {
+            return;
+        }
+        throw new CodedResponseStatusException(
+                HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.REFERENCE_MONTH_POLICY_NOT_ALLOWED);
+    }
+
+    private boolean supportsCreditCardNextMonth(Account account, TransactionType transactionType) {
+        return transactionType == TransactionType.EXPENSE
+                && account.getType() == AccountType.CREDIT_CARD
+                && account.getClosingDay() != null;
+    }
+
+    private boolean shouldMoveToNextMonth(LocalDate transactionDate, Account account) {
+        if (account.getClosingDay() == null) {
+            return false;
+        }
+        return transactionDate.getDayOfMonth() > account.getClosingDay();
+    }
+
+    private void validateReferenceMonthPolicyUpdateAllowed(Transaction transaction) {
+        if (transaction.getSourceType() != TransactionSourceType.MANUAL
+                || !supportsCreditCardNextMonth(transaction.getAccount(), transaction.getType())) {
+            throw new CodedResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.REFERENCE_MONTH_POLICY_UPDATE_NOT_ALLOWED);
         }
     }
 

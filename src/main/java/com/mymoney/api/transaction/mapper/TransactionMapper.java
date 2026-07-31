@@ -24,6 +24,7 @@ public class TransactionMapper {
                 transaction.getCurrency(),
                 transaction.getTransactionDate(),
                 transaction.getReferenceMonth(),
+                transaction.getReferenceMonthPolicy().name(),
                 transaction.getAccount().getId().toString(),
                 transaction.getAccount().getName(),
                 transaction.getCategory().getId().toString(),

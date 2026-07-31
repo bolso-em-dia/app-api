@@ -52,6 +52,10 @@ public enum ErrorCode {
     UNSUPPORTED_LOCALE(42218, "Locale is not supported."),
     DEFAULT_ACCOUNT_INACTIVE(42219, "Default account must be active for the current month."),
     DAY_OUT_OF_RANGE(42220, "Day must be between 1 and 31."),
+    REFERENCE_MONTH_POLICY_NOT_ALLOWED(42221, "Reference month policy is not allowed for this transaction."),
+    MOVE_TO_NEXT_MONTH_NOT_ALLOWED(42222, "Only manual credit-card expenses can be moved to the next month."),
+    REFERENCE_MONTH_POLICY_UPDATE_NOT_ALLOWED(
+            42223, "Only manual credit-card expenses support reference month policy updates."),
 
     INTERNAL_ERROR(50001, "Unexpected server error."),
 

@@ -1,6 +1,7 @@
 package com.mymoney.api.transaction.api.response;
 
 import com.mymoney.api.transaction.OwnershipType;
+import com.mymoney.api.transaction.ReferenceMonthPolicy;
 import com.mymoney.api.transaction.TransactionSourceType;
 import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
@@ -20,6 +21,7 @@ public record TransactionResponse(
         String currency,
         LocalDate transactionDate,
         LocalDate referenceMonth,
+        String referenceMonthPolicy,
         String accountId,
         String accountName,
         String categoryId,
@@ -46,6 +48,7 @@ public record TransactionResponse(
             String currency,
             LocalDate transactionDate,
             LocalDate referenceMonth,
+            ReferenceMonthPolicy referenceMonthPolicy,
             UUID accountId,
             String accountName,
             UUID categoryId,
@@ -71,6 +74,7 @@ public record TransactionResponse(
                 currency,
                 transactionDate,
                 referenceMonth,
+                referenceMonthPolicy.name(),
                 accountId.toString(),
                 accountName,
                 categoryId.toString(),

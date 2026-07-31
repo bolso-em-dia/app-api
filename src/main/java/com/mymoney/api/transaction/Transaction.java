@@ -77,6 +77,10 @@ public class Transaction {
     @Column(name = "reference_month", nullable = false)
     private LocalDate referenceMonth;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "reference_month_policy", nullable = false, length = 20)
+    private ReferenceMonthPolicy referenceMonthPolicy;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "account_id", nullable = false)
     private Account account;
@@ -129,6 +133,9 @@ public class Transaction {
         }
         createdAt = now;
         updatedAt = now;
+        if (referenceMonthPolicy == null) {
+            referenceMonthPolicy = ReferenceMonthPolicy.AUTO;
+        }
     }
 
     @PreUpdate

@@ -6,6 +6,7 @@ import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.TransactionService;
 import com.mymoney.api.transaction.TransactionType;
 import com.mymoney.api.transaction.api.request.CreateTransactionRequest;
+import com.mymoney.api.transaction.api.request.UpdateTransactionReferenceMonthPolicyRequest;
 import com.mymoney.api.transaction.api.request.UpdateTransactionRequest;
 import com.mymoney.api.transaction.api.response.TransactionResponse;
 import jakarta.validation.Valid;
@@ -22,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -99,6 +101,12 @@ public class TransactionController {
     public ResponseEntity<TransactionResponse> update(
             @PathVariable UUID id, @Valid @RequestBody UpdateTransactionRequest request) {
         return ResponseEntity.ok(transactionService.update(id, request));
+    }
+
+    @PatchMapping("/{id}/reference-month-policy")
+    public ResponseEntity<TransactionResponse> updateReferenceMonthPolicy(
+            @PathVariable UUID id, @Valid @RequestBody UpdateTransactionReferenceMonthPolicyRequest request) {
+        return ResponseEntity.ok(transactionService.updateReferenceMonthPolicy(id, request.referenceMonthPolicy()));
     }
 
     @DeleteMapping("/{id}")

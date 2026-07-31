@@ -366,6 +366,192 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                                 """
                                         .formatted(account.getId(), category.getId())))
                 .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(
+                        patch("/api/transactions/00000000-0000-0000-0000-000000000000/reference-month-policy")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"referenceMonthPolicy":"FORCE_NEXT"}
+                                        """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void creditCardExpenseAfterClosingDayMovesToNextReferenceMonth() throws Exception {
+        var creditCard = createCreditCardAccount((short) 26);
+
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Late card purchase",
+                                  "amount": 95.30,
+                                  "transactionDate": "2026-07-27",
+                                  "accountId": "%s",
+                                  "categoryId": "%s"
+                                }
+                                """
+                                        .formatted(creditCard.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].referenceMonth").value("2026-08-01"))
+                .andExpect(jsonPath("$[0].referenceMonthPolicy").value("AUTO"));
+    }
+
+    @Test
+    void creditCardExpenseCanForceCurrentMonthEvenAfterClosingDay() throws Exception {
+        var creditCard = createCreditCardAccount((short) 26);
+
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Forced current card purchase",
+                                  "amount": 95.30,
+                                  "transactionDate": "2026-07-27",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "referenceMonthPolicy": "FORCE_CURRENT"
+                                }
+                                """
+                                        .formatted(creditCard.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].referenceMonth").value("2026-07-01"))
+                .andExpect(jsonPath("$[0].referenceMonthPolicy").value("FORCE_CURRENT"));
+    }
+
+    @Test
+    void creditCardInstallmentsAfterClosingDayFollowTheFirstShiftedMonth() throws Exception {
+        var creditCard = createCreditCardAccount((short) 26);
+
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Card installments",
+                                  "amount": 300.00,
+                                  "transactionDate": "2026-07-27",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "installmentCount": 3
+                                }
+                                """
+                                        .formatted(creditCard.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].referenceMonth").value("2026-08-01"))
+                .andExpect(jsonPath("$[1].referenceMonth").value("2026-09-01"))
+                .andExpect(jsonPath("$[2].referenceMonth").value("2026-10-01"));
+    }
+
+    @Test
+    void patchReferenceMonthPolicyMovesManualCreditCardExpenseToNextMonth() throws Exception {
+        var creditCard = createCreditCardAccount((short) 26);
+
+        var result = mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Card purchase",
+                                  "amount": 40.00,
+                                  "transactionDate": "2026-07-05",
+                                  "accountId": "%s",
+                                  "categoryId": "%s"
+                                }
+                                """
+                                        .formatted(creditCard.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        var transactionId = OBJECT_MAPPER
+                .readTree(result.getResponse().getContentAsString())
+                .get(0)
+                .get("id")
+                .asText();
+
+        mockMvc.perform(
+                        patch("/api/transactions/" + transactionId + "/reference-month-policy")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"referenceMonthPolicy":"FORCE_NEXT"}
+                                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.referenceMonth").value("2026-08-01"))
+                .andExpect(jsonPath("$.referenceMonthPolicy").value("FORCE_NEXT"));
+    }
+
+    @Test
+    void patchReferenceMonthPolicyCanReturnManualCreditCardExpenseToCurrentMonth() throws Exception {
+        var creditCard = createCreditCardAccount((short) 26);
+
+        var result = mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Shifted card purchase",
+                                  "amount": 40.00,
+                                  "transactionDate": "2026-07-27",
+                                  "accountId": "%s",
+                                  "categoryId": "%s"
+                                }
+                                """
+                                        .formatted(creditCard.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        var transactionId = OBJECT_MAPPER
+                .readTree(result.getResponse().getContentAsString())
+                .get(0)
+                .get("id")
+                .asText();
+
+        mockMvc.perform(
+                        patch("/api/transactions/" + transactionId + "/reference-month-policy")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"referenceMonthPolicy":"FORCE_CURRENT"}
+                                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.referenceMonth").value("2026-07-01"))
+                .andExpect(jsonPath("$.referenceMonthPolicy").value("FORCE_CURRENT"));
+    }
+
+    @Test
+    void patchReferenceMonthPolicyRejectsIneligibleTransactions() throws Exception {
+        mockMvc.perform(
+                        patch("/api/transactions/" + sharedTransaction.getId() + "/reference-month-policy")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"referenceMonthPolicy":"FORCE_NEXT"}
+                                        """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message")
+                        .value("Only manual credit-card expenses support reference month policy updates."));
     }
 
     @Test
@@ -625,6 +811,16 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
 
         mockMvc.perform(delete("/api/transactions/" + sharedTransaction.getId())
                         .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        patch("/api/transactions/" + sharedTransaction.getId() + "/reference-month-policy")
+                                .header("Authorization", "Bearer " + userToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"referenceMonthPolicy":"FORCE_NEXT"}
+                                        """))
                 .andExpect(status().isForbidden());
     }
 
@@ -1136,6 +1332,16 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
             created.setName("US Account");
             created.setType(AccountType.CHECKING);
             created.setCurrency(CurrencyType.USD);
+            created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
+        }));
+    }
+
+    private Account createCreditCardAccount(short closingDay) {
+        return accountRepository.save(AccountTestFactory.create(created -> {
+            created.setName("Test Card");
+            created.setType(AccountType.CREDIT_CARD);
+            created.setClosingDay(closingDay);
+            created.setDueDay((short) 10);
             created.setCreatedInMonth(LocalDate.of(2026, 6, 1));
         }));
     }

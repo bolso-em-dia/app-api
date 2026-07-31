@@ -1,6 +1,7 @@
 package com.mymoney.api.support;
 
 import com.mymoney.api.transaction.OwnershipType;
+import com.mymoney.api.transaction.ReferenceMonthPolicy;
 import com.mymoney.api.transaction.Transaction;
 import com.mymoney.api.transaction.TransactionSourceType;
 import com.mymoney.api.transaction.TransactionType;
@@ -27,6 +28,7 @@ public final class TransactionTestFactory {
                 .currency("BRL")
                 .transactionDate(LocalDate.of(2026, 1, 10))
                 .referenceMonth(LocalDate.of(2026, 1, 1))
+                .referenceMonthPolicy(ReferenceMonthPolicy.FORCE_CURRENT)
                 .build();
         customizer.accept(transaction);
         return transaction;

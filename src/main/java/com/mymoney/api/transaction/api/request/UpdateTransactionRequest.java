@@ -1,6 +1,7 @@
 package com.mymoney.api.transaction.api.request;
 
 import com.mymoney.api.transaction.OwnershipType;
+import com.mymoney.api.transaction.ReferenceMonthPolicy;
 import com.mymoney.api.transaction.TransactionType;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -17,4 +18,5 @@ public record UpdateTransactionRequest(
         @NotNull LocalDate transactionDate,
         @NotNull UUID accountId,
         @NotNull UUID categoryId,
-        UUID memberId) {}
+        UUID memberId,
+        ReferenceMonthPolicy referenceMonthPolicy) {}
