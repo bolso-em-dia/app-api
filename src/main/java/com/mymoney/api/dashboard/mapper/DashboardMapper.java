@@ -1,7 +1,6 @@
 package com.mymoney.api.dashboard.mapper;
 
 import com.mymoney.api.budget.mapper.BudgetMapper;
-import com.mymoney.api.dashboard.DashboardCategoryBreakdownItem;
 import com.mymoney.api.dashboard.DashboardView;
 import com.mymoney.api.dashboard.api.response.DashboardCategoryBreakdownResponse;
 import com.mymoney.api.dashboard.api.response.DashboardResponse;
@@ -32,11 +31,8 @@ public class DashboardMapper {
                         .toList(),
                 view.recentTransactions(),
                 view.categoryBreakdown().stream()
-                        .map(this::toCategoryBreakdownResponse)
+                        .map(item -> new DashboardCategoryBreakdownResponse(
+                                item.categoryId(), item.categoryName(), item.amount()))
                         .toList());
-    }
-
-    private DashboardCategoryBreakdownResponse toCategoryBreakdownResponse(DashboardCategoryBreakdownItem item) {
-        return new DashboardCategoryBreakdownResponse(item.categoryId(), item.categoryName(), item.amount());
     }
 }
