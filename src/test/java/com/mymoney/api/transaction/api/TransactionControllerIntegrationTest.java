@@ -34,6 +34,7 @@ import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -375,6 +376,19 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                                         {"referenceMonthPolicy":"FORCE_NEXT"}
                                         """))
                 .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(
+                        patch("/api/transactions/00000000-0000-0000-0000-000000000000/move-date")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {
+                                          "scope": "SINGLE",
+                                  "expectedCurrentTransactionDate": "2026-06-10",
+                                  "confirmedNewTransactionDate": "2026-07-10"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -552,6 +566,254 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message")
                         .value("Only manual credit-card expenses support reference month policy updates."));
+    }
+
+    @Test
+    void patchMoveDateMovesManualTransactionToNextMonth() throws Exception {
+        mockMvc.perform(patch("/api/transactions/" + sharedTransaction.getId() + "/move-date")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(moveDateRequest("SINGLE", "2026-06-10", "2026-07-10")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactionDate").value("2026-07-10"))
+                .andExpect(jsonPath("$.referenceMonth").value("2026-07-01"))
+                .andExpect(jsonPath("$.referenceMonthPolicy").value("FORCE_CURRENT"));
+    }
+
+    @Test
+    void patchMoveDateClampsToLastDayOfNextMonth() throws Exception {
+        var endOfMonthTransaction = transactionRepository.save(TransactionTestFactory.create(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("Month End");
+            created.setAmount(new BigDecimal("70.00"));
+            created.setConvertedAmount(new BigDecimal("70.00"));
+            created.setCurrency("BRL");
+            created.setTransactionDate(LocalDate.of(2026, 8, 31));
+            created.setReferenceMonth(LocalDate.of(2026, 8, 1));
+            created.setCategory(category);
+            created.setAccount(account);
+        }));
+
+        mockMvc.perform(patch("/api/transactions/" + endOfMonthTransaction.getId() + "/move-date")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(moveDateRequest("SINGLE", "2026-08-31", "2026-09-30")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactionDate").value("2026-09-30"))
+                .andExpect(jsonPath("$.referenceMonth").value("2026-09-01"));
+    }
+
+    @Test
+    void patchMoveDatePreservesAutoPolicyAndRecalculatesReferenceMonth() throws Exception {
+        var creditCard = createCreditCardAccount((short) 5);
+
+        var result = mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Card purchase",
+                                  "amount": 40.00,
+                                  "transactionDate": "2026-07-27",
+                                  "accountId": "%s",
+                                  "categoryId": "%s"
+                                }
+                                """
+                                        .formatted(creditCard.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].referenceMonth").value("2026-08-01"))
+                .andReturn();
+
+        var transactionId = OBJECT_MAPPER
+                .readTree(result.getResponse().getContentAsString())
+                .get(0)
+                .get("id")
+                .asText();
+
+        mockMvc.perform(patch("/api/transactions/" + transactionId + "/move-date")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(moveDateRequest("SINGLE", "2026-07-27", "2026-08-27")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactionDate").value("2026-08-27"))
+                .andExpect(jsonPath("$.referenceMonth").value("2026-09-01"))
+                .andExpect(jsonPath("$.referenceMonthPolicy").value("AUTO"));
+    }
+
+    @Test
+    void patchMoveDateSingleScopeMovesOnlySelectedInstallment() throws Exception {
+        var result = mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Notebook",
+                                  "amount": 300.00,
+                                  "transactionDate": "2026-01-31",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "installmentCount": 3
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        var payload = OBJECT_MAPPER.readTree(result.getResponse().getContentAsString());
+        var secondInstallmentId = payload.get(1).get("id").asText();
+        var thirdInstallmentId = payload.get(2).get("id").asText();
+
+        mockMvc.perform(patch("/api/transactions/" + secondInstallmentId + "/move-date")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(moveDateRequest("SINGLE", "2026-02-28", "2026-03-28")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactionDate").value("2026-03-28"))
+                .andExpect(jsonPath("$.referenceMonth").value("2026-03-01"));
+
+        assertThat(transactionRepository
+                        .findById(UUID.fromString(secondInstallmentId))
+                        .orElseThrow()
+                        .getTransactionDate())
+                .isEqualTo(LocalDate.of(2026, 3, 28));
+        assertThat(transactionRepository
+                        .findById(UUID.fromString(thirdInstallmentId))
+                        .orElseThrow()
+                        .getTransactionDate())
+                .isEqualTo(LocalDate.of(2026, 3, 31));
+    }
+
+    @Test
+    void patchMoveDateFutureScopeMovesCurrentAndFutureInstallments() throws Exception {
+        var result = mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                {
+                                  "type": "EXPENSE",
+                                  "ownershipType": "SHARED",
+                                  "description": "Phone",
+                                  "amount": 300.00,
+                                  "transactionDate": "2026-06-20",
+                                  "accountId": "%s",
+                                  "categoryId": "%s",
+                                  "installmentCount": 3
+                                }
+                                """
+                                        .formatted(account.getId(), category.getId())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        var payload = OBJECT_MAPPER.readTree(result.getResponse().getContentAsString());
+        var secondInstallmentId = payload.get(1).get("id").asText();
+        var thirdInstallmentId = payload.get(2).get("id").asText();
+
+        mockMvc.perform(patch("/api/transactions/" + secondInstallmentId + "/move-date")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(moveDateRequest("FUTURE", "2026-07-20", "2026-08-20")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactionDate").value("2026-08-20"))
+                .andExpect(jsonPath("$.referenceMonth").value("2026-08-01"));
+
+        assertThat(transactionRepository
+                        .findById(UUID.fromString(secondInstallmentId))
+                        .orElseThrow()
+                        .getTransactionDate())
+                .isEqualTo(LocalDate.of(2026, 8, 20));
+        assertThat(transactionRepository
+                        .findById(UUID.fromString(thirdInstallmentId))
+                        .orElseThrow()
+                        .getTransactionDate())
+                .isEqualTo(LocalDate.of(2026, 9, 20));
+    }
+
+    @Test
+    void patchMoveDateRejectsFixedExpenseTransactions() throws Exception {
+        var futureReferenceMonth = currentReferenceMonth().plusMonths(2);
+        var template = fixedExpenseTemplateRepository.save(FixedExpenseTemplate.builder()
+                .name("Projected Rent")
+                .type(TransactionType.EXPENSE)
+                .amount(new BigDecimal("880.00"))
+                .category(category)
+                .account(account)
+                .dueDay((short) 12)
+                .createdInMonth(currentReferenceMonth().minusMonths(1))
+                .active(true)
+                .build());
+
+        mockMvc.perform(post("/api/transactions/materialize")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("referenceMonth", futureReferenceMonth.toString()))
+                .andExpect(status().isNoContent());
+
+        var fixedExpenseTransaction = transactionRepository
+                .findByFixedExpenseTemplateIdAndReferenceMonth(template.getId(), futureReferenceMonth)
+                .orElseThrow();
+
+        mockMvc.perform(patch("/api/transactions/" + fixedExpenseTransaction.getId() + "/move-date")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(moveDateRequest(
+                                "SINGLE",
+                                futureReferenceMonth.withDayOfMonth(12).toString(),
+                                futureReferenceMonth
+                                        .plusMonths(1)
+                                        .withDayOfMonth(12)
+                                        .toString())))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message")
+                        .value("Only manual or installment transactions can be moved to the next month."));
+    }
+
+    @Test
+    void patchMoveDateRejectsFutureScopeForNonInstallments() throws Exception {
+        mockMvc.perform(patch("/api/transactions/" + sharedTransaction.getId() + "/move-date")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(moveDateRequest("FUTURE", "2026-06-10", "2026-07-10")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("Future scope is only allowed for installment transactions."));
+    }
+
+    @Test
+    void patchMoveDateRejectsWhenExpectedCurrentDateDoesNotMatch() throws Exception {
+        mockMvc.perform(patch("/api/transactions/" + sharedTransaction.getId() + "/move-date")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(moveDateRequest("SINGLE", "2026-06-09", "2026-07-10")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("Transaction date confirmation does not match the persisted transaction date."));
+    }
+
+    @Test
+    void patchMoveDateRejectsWhenConfirmedNewDateDoesNotMatch() throws Exception {
+        mockMvc.perform(patch("/api/transactions/" + sharedTransaction.getId() + "/move-date")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(moveDateRequest("SINGLE", "2026-06-10", "2026-07-11")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("Confirmed new transaction date does not match the next allowed transaction date."));
+    }
+
+    @Test
+    void patchMoveDateReturns404ForNonExistentId() throws Exception {
+        mockMvc.perform(patch("/api/transactions/00000000-0000-0000-0000-000000000000/move-date")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(moveDateRequest("SINGLE", "2026-06-10", "2026-07-10")))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -822,6 +1084,12 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                                         {"referenceMonthPolicy":"FORCE_NEXT"}
                                         """))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(patch("/api/transactions/" + sharedTransaction.getId() + "/move-date")
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(moveDateRequest("SINGLE", "2026-06-10", "2026-07-10")))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -1057,6 +1325,14 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                                         """
                                 {"type": "EXPENSE", "ownershipType": "SHARED", "description": "T", "amount": 50.0, "transactionDate": "2026-06-10", "accountId": "00000000-0000-0000-0000-000000000000", "categoryId": "00000000-0000-0000-0000-000000000000"}
                                 """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void patchMoveDateRequiresAuthentication() throws Exception {
+        mockMvc.perform(patch("/api/transactions/00000000-0000-0000-0000-000000000000/move-date")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(moveDateRequest("SINGLE", "2026-06-10", "2026-07-10")))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -1353,5 +1629,17 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                 .fetchedAt(OffsetDateTime.parse("2026-06-15T12:00:00Z"))
                 .build();
         exchangeRateRepository.save(rate);
+    }
+
+    private String moveDateRequest(
+            String scope, String expectedCurrentTransactionDate, String confirmedNewTransactionDate) {
+        return """
+                {
+                  "scope": "%s",
+                  "expectedCurrentTransactionDate": "%s",
+                  "confirmedNewTransactionDate": "%s"
+                }
+                """
+                .formatted(scope, expectedCurrentTransactionDate, confirmedNewTransactionDate);
     }
 }

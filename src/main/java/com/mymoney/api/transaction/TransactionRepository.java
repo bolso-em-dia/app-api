@@ -106,6 +106,14 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             """)
     Optional<TransactionResponse> findResponseById(UUID id);
 
+    @EntityGraph(attributePaths = {"account", "category", "member", "fixedExpenseTemplate"})
+    @Query("""
+            select t
+            from Transaction t
+            where t.id = :id
+            """)
+    Optional<Transaction> findDetailedById(UUID id);
+
     @Query(
             """
             select t.description
@@ -187,6 +195,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             UUID installmentGroupId, Short installmentNumber);
 
     void deleteByInstallmentGroupId(UUID installmentGroupId);
+
+    @EntityGraph(attributePaths = {"account", "category", "member", "fixedExpenseTemplate"})
+    List<Transaction> findByInstallmentGroupIdAndInstallmentNumberGreaterThanEqualOrderByInstallmentNumberAsc(
+            UUID installmentGroupId, Short installmentNumber);
 
     @Modifying
     @Query(

@@ -14,6 +14,7 @@ import com.mymoney.api.shared.DateProvider;
 import com.mymoney.api.shared.EntityResolver;
 import com.mymoney.api.shared.InputNormalizer;
 import com.mymoney.api.transaction.api.request.CreateTransactionRequest;
+import com.mymoney.api.transaction.api.request.MoveTransactionDateRequest;
 import com.mymoney.api.transaction.api.request.UpdateTransactionRequest;
 import com.mymoney.api.transaction.api.response.TransactionResponse;
 import java.math.BigDecimal;
@@ -120,10 +121,35 @@ public class TransactionService {
 
     @Transactional(readOnly = true)
     public Transaction getById(UUID id) {
-        return transactionRepository
-                .findById(id)
-                .orElseThrow(
-                        () -> new CodedResponseStatusException(HttpStatus.NOT_FOUND, ErrorCode.TRANSACTION_NOT_FOUND));
+        return EntityResolver.resolveOrThrow(() -> transactionRepository.findById(id), ErrorCode.TRANSACTION_NOT_FOUND);
+    }
+
+    @Transactional
+    public TransactionResponse moveDate(UUID id, MoveTransactionDateRequest request) {
+        var transaction = getDetailedById(id);
+        validateMoveDateAllowed(transaction);
+        validateMoveScope(transaction, request.scope());
+        validateMoveDateConfirmation(transaction, request);
+
+        var transactionsToMove = resolveTransactionsToMove(transaction, request.scope());
+        for (var item : transactionsToMove) {
+            var movedTransactionDate = moveToNextMonth(item.getTransactionDate());
+            var movedReferenceMonth = resolveReferenceMonth(
+                    movedTransactionDate, item.getAccount(), item.getType(), item.getReferenceMonthPolicy());
+
+            validateIndividualAllowance(item.getOwnershipType(), item.getMember(), movedReferenceMonth);
+            item.setTransactionDate(movedTransactionDate);
+            item.setReferenceMonth(movedReferenceMonth);
+            transactionRepository.save(item);
+        }
+
+        log.info(
+                "Transaction date moved: id={}, scope={}, installmentGroupId={}, memberId={}",
+                transaction.getId(),
+                request.scope(),
+                transaction.getInstallmentGroupId(),
+                auditorResolver.resolveMemberId());
+        return getResponseById(id);
     }
 
     @Transactional
@@ -411,6 +437,63 @@ public class TransactionService {
             throw new CodedResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.REFERENCE_MONTH_POLICY_UPDATE_NOT_ALLOWED);
         }
+    }
+
+    private Transaction getDetailedById(UUID id) {
+        return EntityResolver.resolveOrThrow(
+                () -> transactionRepository.findDetailedById(id), ErrorCode.TRANSACTION_NOT_FOUND);
+    }
+
+    private void validateMoveDateAllowed(Transaction transaction) {
+        if (transaction.getSourceType() == TransactionSourceType.MANUAL
+                || transaction.getSourceType() == TransactionSourceType.INSTALLMENT) {
+            return;
+        }
+
+        throw new CodedResponseStatusException(
+                HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.MOVE_TO_NEXT_MONTH_NOT_ALLOWED);
+    }
+
+    private void validateMoveScope(Transaction transaction, MoveTransactionDateScope scope) {
+        if (scope != MoveTransactionDateScope.FUTURE) {
+            return;
+        }
+        if (transaction.getInstallmentGroupId() != null && transaction.getInstallmentNumber() != null) {
+            return;
+        }
+
+        throw new CodedResponseStatusException(
+                HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.MOVE_TRANSACTION_DATE_FUTURE_SCOPE_NOT_ALLOWED);
+    }
+
+    private void validateMoveDateConfirmation(Transaction transaction, MoveTransactionDateRequest request) {
+        if (!transaction.getTransactionDate().equals(request.expectedCurrentTransactionDate())) {
+            throw new CodedResponseStatusException(
+                    HttpStatus.CONFLICT, ErrorCode.TRANSACTION_DATE_CONFIRMATION_MISMATCH);
+        }
+
+        var expectedNewTransactionDate = moveToNextMonth(transaction.getTransactionDate());
+        if (expectedNewTransactionDate.equals(request.confirmedNewTransactionDate())) {
+            return;
+        }
+
+        throw new CodedResponseStatusException(
+                HttpStatus.CONFLICT, ErrorCode.NEW_TRANSACTION_DATE_CONFIRMATION_MISMATCH);
+    }
+
+    private List<Transaction> resolveTransactionsToMove(Transaction transaction, MoveTransactionDateScope scope) {
+        if (scope == MoveTransactionDateScope.SINGLE) {
+            return List.of(transaction);
+        }
+
+        return transactionRepository
+                .findByInstallmentGroupIdAndInstallmentNumberGreaterThanEqualOrderByInstallmentNumberAsc(
+                        transaction.getInstallmentGroupId(), transaction.getInstallmentNumber());
+    }
+
+    private LocalDate moveToNextMonth(LocalDate transactionDate) {
+        var nextMonth = YearMonth.from(transactionDate).plusMonths(1);
+        return nextMonth.atDay(Math.min(transactionDate.getDayOfMonth(), nextMonth.lengthOfMonth()));
     }
 
     private LocalDate referenceMonthFromDate(LocalDate transactionDate) {

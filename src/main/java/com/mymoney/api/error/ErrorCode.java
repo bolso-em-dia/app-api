@@ -30,6 +30,10 @@ public enum ErrorCode {
     EMAIL_ALREADY_IN_USE(40901, "Email is already in use."),
     DUPLICATE_ALLOWANCE_BUDGET(40902, "An allowance budget already exists for this member."),
     CONCURRENT_MODIFICATION(40903, "Resource was modified by another user."),
+    TRANSACTION_DATE_CONFIRMATION_MISMATCH(
+            40904, "Transaction date confirmation does not match the persisted transaction date."),
+    NEW_TRANSACTION_DATE_CONFIRMATION_MISMATCH(
+            40905, "Confirmed new transaction date does not match the next allowed transaction date."),
 
     ARCHIVE_BEFORE_ACCOUNT_CREATION(42201, "Archive month cannot be before the account creation month."),
     CREDIT_CARD_REQUIRES_DAYS(42202, "Credit cards require both closing day and due day."),
@@ -53,9 +57,10 @@ public enum ErrorCode {
     DEFAULT_ACCOUNT_INACTIVE(42219, "Default account must be active for the current month."),
     DAY_OUT_OF_RANGE(42220, "Day must be between 1 and 31."),
     REFERENCE_MONTH_POLICY_NOT_ALLOWED(42221, "Reference month policy is not allowed for this transaction."),
-    MOVE_TO_NEXT_MONTH_NOT_ALLOWED(42222, "Only manual credit-card expenses can be moved to the next month."),
+    MOVE_TO_NEXT_MONTH_NOT_ALLOWED(42222, "Only manual or installment transactions can be moved to the next month."),
     REFERENCE_MONTH_POLICY_UPDATE_NOT_ALLOWED(
             42223, "Only manual credit-card expenses support reference month policy updates."),
+    MOVE_TRANSACTION_DATE_FUTURE_SCOPE_NOT_ALLOWED(42224, "Future scope is only allowed for installment transactions."),
 
     INTERNAL_ERROR(50001, "Unexpected server error."),
 

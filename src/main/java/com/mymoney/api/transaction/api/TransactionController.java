@@ -6,6 +6,7 @@ import com.mymoney.api.transaction.OwnershipType;
 import com.mymoney.api.transaction.TransactionService;
 import com.mymoney.api.transaction.TransactionType;
 import com.mymoney.api.transaction.api.request.CreateTransactionRequest;
+import com.mymoney.api.transaction.api.request.MoveTransactionDateRequest;
 import com.mymoney.api.transaction.api.request.UpdateTransactionReferenceMonthPolicyRequest;
 import com.mymoney.api.transaction.api.request.UpdateTransactionRequest;
 import com.mymoney.api.transaction.api.response.TransactionResponse;
@@ -107,6 +108,12 @@ public class TransactionController {
     public ResponseEntity<TransactionResponse> updateReferenceMonthPolicy(
             @PathVariable UUID id, @Valid @RequestBody UpdateTransactionReferenceMonthPolicyRequest request) {
         return ResponseEntity.ok(transactionService.updateReferenceMonthPolicy(id, request.referenceMonthPolicy()));
+    }
+
+    @PatchMapping("/{id}/move-date")
+    public ResponseEntity<TransactionResponse> moveDate(
+            @PathVariable UUID id, @Valid @RequestBody MoveTransactionDateRequest request) {
+        return ResponseEntity.ok(transactionService.moveDate(id, request));
     }
 
     @DeleteMapping("/{id}")
