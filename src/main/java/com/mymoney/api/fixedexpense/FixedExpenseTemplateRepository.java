@@ -1,6 +1,7 @@
 package com.mymoney.api.fixedexpense;
 
 import com.mymoney.api.fixedexpense.api.response.FixedExpenseTemplateResponse;
+import com.mymoney.api.transaction.TransactionType;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -43,8 +44,17 @@ public interface FixedExpenseTemplateRepository extends JpaRepository<FixedExpen
                 or (:status = 'ACTIVE' and t.archivedFromMonth is null)
                 or (:status = 'ARCHIVED' and t.archivedFromMonth is not null)
               )
+              and (:type is null or t.type = :type)
+              and (:accountId is null or t.account.id = :accountId)
+              and (:categoryIds is null or t.category.id in :categoryIds)
             """)
-    Page<FixedExpenseTemplateResponse> findResponseByFilters(String search, String status, Pageable pageable);
+    Page<FixedExpenseTemplateResponse> findResponseByFilters(
+            String search,
+            String status,
+            TransactionType type,
+            UUID accountId,
+            List<UUID> categoryIds,
+            Pageable pageable);
 
     @Query(
             """

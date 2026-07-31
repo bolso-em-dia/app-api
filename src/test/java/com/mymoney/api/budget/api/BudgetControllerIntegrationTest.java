@@ -1,6 +1,7 @@
 package com.mymoney.api.budget.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -121,6 +122,149 @@ class BudgetControllerIntegrationTest extends AuthenticatedIntegrationTestSuppor
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].categoryName").value("Transport"))
                 .andExpect(jsonPath("$[0].amount").value(45.0));
+    }
+
+    @Test
+    void listBudgetsSupportsRemainingAmountSortWithPagination() throws Exception {
+        var lowCategory = fixtures().persistCategory(created -> {
+            created.setName("Remaining Sort Low Category");
+            created.setCreatedInMonth(currentReferenceMonth());
+        });
+        var middleCategory = fixtures().persistCategory(created -> {
+            created.setName("Remaining Sort Middle Category");
+            created.setCreatedInMonth(currentReferenceMonth());
+        });
+        var highCategory = fixtures().persistCategory(created -> {
+            created.setName("Remaining Sort High Category");
+            created.setCreatedInMonth(currentReferenceMonth());
+        });
+
+        fixtures().persistBudget(created -> {
+            created.setName("Remaining Sort Low");
+            created.setType(com.mymoney.api.budget.BudgetType.GLOBAL);
+            created.setMonthlyLimit(new BigDecimal("100.00"));
+            created.setCreatedInMonth(currentReferenceMonth());
+            created.setActive(true);
+            created.setCategories(new java.util.LinkedHashSet<>(java.util.List.of(lowCategory)));
+        });
+        fixtures().persistBudget(created -> {
+            created.setName("Remaining Sort Middle");
+            created.setType(com.mymoney.api.budget.BudgetType.GLOBAL);
+            created.setMonthlyLimit(new BigDecimal("100.00"));
+            created.setCreatedInMonth(currentReferenceMonth());
+            created.setActive(true);
+            created.setCategories(new java.util.LinkedHashSet<>(java.util.List.of(middleCategory)));
+        });
+        fixtures().persistBudget(created -> {
+            created.setName("Remaining Sort High");
+            created.setType(com.mymoney.api.budget.BudgetType.GLOBAL);
+            created.setMonthlyLimit(new BigDecimal("100.00"));
+            created.setCreatedInMonth(currentReferenceMonth());
+            created.setActive(true);
+            created.setCategories(new java.util.LinkedHashSet<>(java.util.List.of(highCategory)));
+        });
+
+        fixtures().persistTransaction(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("Remaining Sort Low Tx");
+            created.setAmount(new BigDecimal("60.00"));
+            created.setConvertedAmount(new BigDecimal("60.00"));
+            created.setTransactionDate(LocalDate.of(2026, 6, 20));
+            created.setReferenceMonth(currentReferenceMonth());
+            created.setAccount(account);
+            created.setCategory(lowCategory);
+        });
+        fixtures().persistTransaction(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("Remaining Sort Middle Tx");
+            created.setAmount(new BigDecimal("30.00"));
+            created.setConvertedAmount(new BigDecimal("30.00"));
+            created.setTransactionDate(LocalDate.of(2026, 6, 21));
+            created.setReferenceMonth(currentReferenceMonth());
+            created.setAccount(account);
+            created.setCategory(middleCategory);
+        });
+        fixtures().persistTransaction(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("Remaining Sort High Tx");
+            created.setAmount(new BigDecimal("10.00"));
+            created.setConvertedAmount(new BigDecimal("10.00"));
+            created.setTransactionDate(LocalDate.of(2026, 6, 22));
+            created.setReferenceMonth(currentReferenceMonth());
+            created.setAccount(account);
+            created.setCategory(highCategory);
+        });
+
+        mockMvc.perform(get("/api/budgets")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("referenceMonth", "2026-06-01")
+                        .param("search", "Remaining Sort")
+                        .param("sortBy", "REMAINING_AMOUNT")
+                        .param("sortDir", "ASC")
+                        .param("size", "1")
+                        .param("page", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].name").value("Remaining Sort Low"))
+                .andExpect(jsonPath("$.items[0].remainingAmount").value(40.0))
+                .andExpect(jsonPath("$.totalItems").value(3));
+
+        mockMvc.perform(get("/api/budgets")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("referenceMonth", "2026-06-01")
+                        .param("search", "Remaining Sort")
+                        .param("sortBy", "REMAINING_AMOUNT")
+                        .param("sortDir", "ASC")
+                        .param("size", "1")
+                        .param("page", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].name").value("Remaining Sort Middle"))
+                .andExpect(jsonPath("$.items[0].remainingAmount").value(70.0));
+
+        mockMvc.perform(get("/api/budgets")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("referenceMonth", "2026-06-01")
+                        .param("search", "Remaining Sort")
+                        .param("sortBy", "REMAINING_AMOUNT")
+                        .param("sortDir", "ASC")
+                        .param("size", "1")
+                        .param("page", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].name").value("Remaining Sort High"))
+                .andExpect(jsonPath("$.items[0].remainingAmount").value(90.0));
+    }
+
+    @Test
+    void listBudgetsRejectsInvalidSortBy() throws Exception {
+        mockMvc.perform(get("/api/budgets")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("referenceMonth", "2026-06-01")
+                        .param("sortBy", "INVALID"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value(40004))
+                .andExpect(jsonPath("$.error").value("400 BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(containsString("sortBy")))
+                .andExpect(jsonPath("$.path").value("/api/budgets"));
+    }
+
+    @Test
+    void listBudgetsRejectsInvalidSortDir() throws Exception {
+        mockMvc.perform(get("/api/budgets")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("referenceMonth", "2026-06-01")
+                        .param("sortDir", "INVALID"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value(40004))
+                .andExpect(jsonPath("$.error").value("400 BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(containsString("sortDir")))
+                .andExpect(jsonPath("$.path").value("/api/budgets"));
     }
 
     @Test

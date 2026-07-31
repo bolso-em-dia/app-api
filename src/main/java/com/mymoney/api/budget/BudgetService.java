@@ -9,6 +9,7 @@ import com.mymoney.api.error.CodedResponseStatusException;
 import com.mymoney.api.error.ErrorCode;
 import com.mymoney.api.member.FamilyMember;
 import com.mymoney.api.member.FamilyMemberRepository;
+import com.mymoney.api.shared.ApiSortDirection;
 import com.mymoney.api.shared.DateProvider;
 import com.mymoney.api.shared.EntityResolver;
 import com.mymoney.api.shared.InputNormalizer;
@@ -49,10 +50,22 @@ public class BudgetService {
 
     @Transactional(readOnly = true)
     public Page<BudgetView> listForMonth(
-            LocalDate referenceMonth, String search, BudgetListStatus status, BudgetType type, Pageable pageable) {
-        Page<UUID> idPage = budgetRepository.findIdsForMonth(
-                referenceMonth, InputNormalizer.normalizeSearch(search), status.name(), type, pageable);
-        List<BudgetView> views = loadByIds(idPage.getContent()).stream()
+            LocalDate referenceMonth,
+            String search,
+            BudgetListStatus status,
+            BudgetType type,
+            BudgetListSortBy sortBy,
+            ApiSortDirection sortDir,
+            Pageable pageable) {
+        var idPage = budgetRepository.findIdsForMonth(
+                referenceMonth,
+                InputNormalizer.normalizeSearch(search),
+                status.name(),
+                type,
+                sortBy,
+                sortDir,
+                pageable);
+        var views = loadByIds(idPage.getContent()).stream()
                 .map(budget -> toView(budget, referenceMonth))
                 .toList();
         return new PageImpl<>(views, pageable, idPage.getTotalElements());
@@ -61,7 +74,14 @@ public class BudgetService {
     @Transactional(readOnly = true)
     public List<BudgetView> listForMonth(LocalDate referenceMonth) {
         return loadByIds(budgetRepository
-                        .findIdsForMonth(referenceMonth, "", BudgetListStatus.ACTIVE.name(), null, Pageable.unpaged())
+                        .findIdsForMonth(
+                                referenceMonth,
+                                "",
+                                BudgetListStatus.ACTIVE.name(),
+                                null,
+                                BudgetListSortBy.NAME,
+                                ApiSortDirection.ASC,
+                                Pageable.unpaged())
                         .getContent())
                 .stream()
                 .map(budget -> toView(budget, referenceMonth))

@@ -1,6 +1,7 @@
 package com.mymoney.api.fixedexpense.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -144,6 +145,90 @@ class FixedExpenseTemplateControllerIntegrationTest extends AuthenticatedIntegra
                 .andExpect(jsonPath("$.name").value("Rent Updated"))
                 .andExpect(jsonPath("$.amount").value(1850.0))
                 .andExpect(jsonPath("$.dueDay").value(7));
+    }
+
+    @Test
+    void listTemplatesSupportsApplicableFiltersAndSort() throws Exception {
+        var otherCategory = fixtures().persistCategory(created -> {
+            created.setName("Utilities");
+            created.setCreatedInMonth(currentReferenceMonth());
+        });
+        var otherAccount = fixtures().persistAccount(created -> {
+            created.setName("Savings");
+            created.setType(AccountType.SAVINGS);
+            created.setCreatedInMonth(currentReferenceMonth());
+        });
+
+        fixtures().persistFixedExpenseTemplate(created -> {
+            created.setName("Recurring Filter First");
+            created.setType(TransactionType.EXPENSE);
+            created.setAmount(new BigDecimal("100.00"));
+            created.setCategory(category);
+            created.setAccount(account);
+            created.setDueDay((short) 5);
+            created.setCreatedInMonth(currentReferenceMonth());
+            created.setActive(true);
+        });
+        fixtures().persistFixedExpenseTemplate(created -> {
+            created.setName("Recurring Filter Second");
+            created.setType(TransactionType.EXPENSE);
+            created.setAmount(new BigDecimal("200.00"));
+            created.setCategory(category);
+            created.setAccount(account);
+            created.setDueDay((short) 20);
+            created.setCreatedInMonth(currentReferenceMonth());
+            created.setActive(true);
+        });
+        fixtures().persistFixedExpenseTemplate(created -> {
+            created.setName("Recurring Filter Ignored");
+            created.setType(TransactionType.INCOME);
+            created.setAmount(new BigDecimal("300.00"));
+            created.setCategory(otherCategory);
+            created.setAccount(otherAccount);
+            created.setDueDay((short) 25);
+            created.setCreatedInMonth(currentReferenceMonth());
+            created.setActive(true);
+        });
+
+        mockMvc.perform(get("/api/fixed-transactions")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("search", "Recurring Filter")
+                        .param("status", "ACTIVE")
+                        .param("type", "EXPENSE")
+                        .param("accountId", account.getId().toString())
+                        .param("categoryIds", category.getId().toString())
+                        .param("sortBy", "DUE_DAY")
+                        .param("sortDir", "DESC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].name").value("Recurring Filter Second"))
+                .andExpect(jsonPath("$.items[1].name").value("Recurring Filter First"));
+    }
+
+    @Test
+    void listTemplatesRejectsInvalidSortBy() throws Exception {
+        mockMvc.perform(get("/api/fixed-transactions")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("sortBy", "INVALID"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value(40004))
+                .andExpect(jsonPath("$.error").value("400 BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(containsString("sortBy")))
+                .andExpect(jsonPath("$.path").value("/api/fixed-transactions"));
+    }
+
+    @Test
+    void listTemplatesRejectsInvalidSortDir() throws Exception {
+        mockMvc.perform(get("/api/fixed-transactions")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("sortDir", "INVALID"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value(40004))
+                .andExpect(jsonPath("$.error").value("400 BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(containsString("sortDir")))
+                .andExpect(jsonPath("$.path").value("/api/fixed-transactions"));
     }
 
     @Test

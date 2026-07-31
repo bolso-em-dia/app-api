@@ -1,6 +1,7 @@
 package com.mymoney.api.budget.api;
 
 import com.mymoney.api.PageResponse;
+import com.mymoney.api.budget.BudgetListSortBy;
 import com.mymoney.api.budget.BudgetListStatus;
 import com.mymoney.api.budget.BudgetService;
 import com.mymoney.api.budget.BudgetType;
@@ -9,6 +10,7 @@ import com.mymoney.api.budget.api.request.UpdateBudgetRequest;
 import com.mymoney.api.budget.api.response.BudgetCategoryBreakdownResponse;
 import com.mymoney.api.budget.api.response.BudgetResponse;
 import com.mymoney.api.budget.mapper.BudgetMapper;
+import com.mymoney.api.shared.ApiSortDirection;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
@@ -45,9 +47,11 @@ public class BudgetController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "ACTIVE") BudgetListStatus status,
             @RequestParam(required = false) BudgetType type,
-            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+            @RequestParam(required = false) BudgetListSortBy sortBy,
+            @RequestParam(required = false) ApiSortDirection sortDir,
+            @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(PageResponse.from(budgetService
-                .listForMonth(referenceMonth, search, status, type, pageable)
+                .listForMonth(referenceMonth, search, status, type, sortBy, sortDir, pageable)
                 .map(view -> budgetMapper.toResponse(view, List.of()))));
     }
 

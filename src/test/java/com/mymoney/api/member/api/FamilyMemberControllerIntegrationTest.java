@@ -58,6 +58,24 @@ class FamilyMemberControllerIntegrationTest extends AuthenticatedIntegrationTest
     }
 
     @Test
+    void listFamilyMembersSupportsExplicitEmailSort() throws Exception {
+        fixtures().persistFamilyMember("zzz@bolso-em-dia.local", "member123456", member -> {
+            member.setName("Zed");
+            member.setRole(FamilyRole.USER);
+            member.setActive(true);
+            member.setMustChangePassword(false);
+        });
+
+        mockMvc.perform(get("/api/family-members")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("sortBy", "EMAIL")
+                        .param("sortDir", "DESC")
+                        .param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].email").value("zzz@bolso-em-dia.local"));
+    }
+
+    @Test
     void adminCanCreateFamilyMember() throws Exception {
         mockMvc.perform(post("/api/family-members")
                         .header("Authorization", bearerToken(adminToken))

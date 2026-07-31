@@ -1,6 +1,7 @@
 package com.mymoney.api.account.api;
 
 import com.mymoney.api.PageResponse;
+import com.mymoney.api.account.AccountListSortBy;
 import com.mymoney.api.account.AccountListStatus;
 import com.mymoney.api.account.AccountService;
 import com.mymoney.api.account.AccountType;
@@ -9,6 +10,8 @@ import com.mymoney.api.account.api.request.UpdateAccountRequest;
 import com.mymoney.api.account.api.response.AccountOptionResponse;
 import com.mymoney.api.account.api.response.AccountResponse;
 import com.mymoney.api.account.mapper.AccountMapper;
+import com.mymoney.api.shared.ApiSortDirection;
+import com.mymoney.api.shared.PageableSortResolver;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
@@ -44,9 +47,12 @@ public class AccountController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "ACTIVE") AccountListStatus status,
             @RequestParam(required = false) AccountType type,
-            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+            @RequestParam(required = false) AccountListSortBy sortBy,
+            @RequestParam(required = false) ApiSortDirection sortDir,
+            @PageableDefault(size = 20) Pageable pageable) {
+        var sortedPageable = PageableSortResolver.resolve(pageable, sortBy, AccountListSortBy.NAME, sortDir);
         return ResponseEntity.ok(PageResponse.from(
-                accountService.listAll(search, status, type, pageable).map(accountMapper::toResponse)));
+                accountService.listAll(search, status, type, sortedPageable).map(accountMapper::toResponse)));
     }
 
     @GetMapping("/{id}")

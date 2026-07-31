@@ -1,8 +1,11 @@
 package com.mymoney.api.transaction.api;
 
 import com.mymoney.api.PageResponse;
+import com.mymoney.api.shared.ApiSortDirection;
+import com.mymoney.api.shared.PageableSortResolver;
 import com.mymoney.api.transaction.DeleteScope;
 import com.mymoney.api.transaction.OwnershipType;
+import com.mymoney.api.transaction.TransactionListSortBy;
 import com.mymoney.api.transaction.TransactionService;
 import com.mymoney.api.transaction.TransactionType;
 import com.mymoney.api.transaction.api.request.CreateTransactionRequest;
@@ -17,7 +20,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.data.web.SortDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -51,10 +53,10 @@ public class TransactionController {
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) UUID memberId,
             @RequestParam(required = false) String search,
-            @PageableDefault(size = 20)
-                    @SortDefault.SortDefaults({@SortDefault(sort = "transactionDate"), @SortDefault(sort = "createdAt")
-                    })
-                    Pageable pageable) {
+            @RequestParam(required = false) TransactionListSortBy sortBy,
+            @RequestParam(required = false) ApiSortDirection sortDir,
+            @PageableDefault(size = 20) Pageable pageable) {
+        var sortedPageable = PageableSortResolver.resolve(pageable, sortBy, TransactionListSortBy.DATE, sortDir);
         return ResponseEntity.ok(PageResponse.from(transactionService.listResponseByFilters(
                 referenceMonth,
                 type,
@@ -63,7 +65,7 @@ public class TransactionController {
                 normalizeCategoryIds(categoryIds, categoryId),
                 memberId,
                 search,
-                pageable)));
+                sortedPageable)));
     }
 
     @PostMapping("/materialize")

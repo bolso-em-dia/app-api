@@ -1,6 +1,7 @@
 package com.mymoney.api.transaction.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -153,6 +154,108 @@ class TransactionControllerIntegrationTest extends AuthenticatedIntegrationTestS
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("Updated Market"))
                 .andExpect(jsonPath("$.amount").value(200.0));
+    }
+
+    @Test
+    void listTransactionsUsesNewestTransactionDateAsDefaultSort() throws Exception {
+        fixtures().persistTransaction(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("Sort Check Older");
+            created.setAmount(new BigDecimal("10.00"));
+            created.setConvertedAmount(new BigDecimal("10.00"));
+            created.setTransactionDate(LocalDate.of(2026, 6, 5));
+            created.setReferenceMonth(currentReferenceMonth());
+            created.setAccount(account);
+            created.setCategory(category);
+        });
+        fixtures().persistTransaction(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("Sort Check Newer");
+            created.setAmount(new BigDecimal("20.00"));
+            created.setConvertedAmount(new BigDecimal("20.00"));
+            created.setTransactionDate(LocalDate.of(2026, 6, 25));
+            created.setReferenceMonth(currentReferenceMonth());
+            created.setAccount(account);
+            created.setCategory(category);
+        });
+
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("referenceMonth", "2026-06-01")
+                        .param("search", "Sort Check"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].description").value("Sort Check Newer"))
+                .andExpect(jsonPath("$.items[1].description").value("Sort Check Older"));
+    }
+
+    @Test
+    void listTransactionsSupportsExplicitAmountSort() throws Exception {
+        fixtures().persistTransaction(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("Sort Amount High");
+            created.setAmount(new BigDecimal("99.00"));
+            created.setConvertedAmount(new BigDecimal("99.00"));
+            created.setTransactionDate(LocalDate.of(2026, 6, 12));
+            created.setReferenceMonth(currentReferenceMonth());
+            created.setAccount(account);
+            created.setCategory(category);
+        });
+        fixtures().persistTransaction(created -> {
+            created.setType(TransactionType.EXPENSE);
+            created.setOwnershipType(OwnershipType.SHARED);
+            created.setSourceType(TransactionSourceType.MANUAL);
+            created.setDescription("Sort Amount Low");
+            created.setAmount(new BigDecimal("11.00"));
+            created.setConvertedAmount(new BigDecimal("11.00"));
+            created.setTransactionDate(LocalDate.of(2026, 6, 13));
+            created.setReferenceMonth(currentReferenceMonth());
+            created.setAccount(account);
+            created.setCategory(category);
+        });
+
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("referenceMonth", "2026-06-01")
+                        .param("search", "Sort Amount")
+                        .param("sortBy", "AMOUNT")
+                        .param("sortDir", "ASC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].description").value("Sort Amount Low"))
+                .andExpect(jsonPath("$.items[1].description").value("Sort Amount High"));
+    }
+
+    @Test
+    void listTransactionsRejectsInvalidSortBy() throws Exception {
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("referenceMonth", "2026-06-01")
+                        .param("sortBy", "INVALID"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value(40004))
+                .andExpect(jsonPath("$.error").value("400 BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(containsString("sortBy")))
+                .andExpect(jsonPath("$.path").value("/api/transactions"));
+    }
+
+    @Test
+    void listTransactionsRejectsInvalidSortDir() throws Exception {
+        mockMvc.perform(get("/api/transactions")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("referenceMonth", "2026-06-01")
+                        .param("sortDir", "INVALID"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value(40004))
+                .andExpect(jsonPath("$.error").value("400 BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(containsString("sortDir")))
+                .andExpect(jsonPath("$.path").value("/api/transactions"));
     }
 
     @Test

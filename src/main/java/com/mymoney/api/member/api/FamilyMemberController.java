@@ -1,12 +1,15 @@
 package com.mymoney.api.member.api;
 
 import com.mymoney.api.PageResponse;
+import com.mymoney.api.member.FamilyMemberListSortBy;
 import com.mymoney.api.member.FamilyMemberListStatus;
 import com.mymoney.api.member.FamilyMemberService;
 import com.mymoney.api.member.api.request.CreateFamilyMemberRequest;
 import com.mymoney.api.member.api.request.UpdateFamilyMemberRequest;
 import com.mymoney.api.member.api.response.FamilyMemberResponse;
 import com.mymoney.api.member.mapper.FamilyMemberMapper;
+import com.mymoney.api.shared.ApiSortDirection;
+import com.mymoney.api.shared.PageableSortResolver;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -38,9 +41,12 @@ public class FamilyMemberController {
     public ResponseEntity<PageResponse<FamilyMemberResponse>> list(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "ACTIVE") FamilyMemberListStatus status,
-            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+            @RequestParam(required = false) FamilyMemberListSortBy sortBy,
+            @RequestParam(required = false) ApiSortDirection sortDir,
+            @PageableDefault(size = 20) Pageable pageable) {
+        var sortedPageable = PageableSortResolver.resolve(pageable, sortBy, FamilyMemberListSortBy.NAME, sortDir);
         return ResponseEntity.ok(PageResponse.from(
-                familyMemberService.listAll(search, status, pageable).map(familyMemberMapper::toResponse)));
+                familyMemberService.listAll(search, status, sortedPageable).map(familyMemberMapper::toResponse)));
     }
 
     @GetMapping("/{id}")
@@ -50,7 +56,7 @@ public class FamilyMemberController {
 
     @PostMapping
     public ResponseEntity<FamilyMemberResponse> create(@Valid @RequestBody CreateFamilyMemberRequest request) {
-        FamilyMemberResponse response = familyMemberMapper.toResponse(familyMemberService.create(request));
+        var response = familyMemberMapper.toResponse(familyMemberService.create(request));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

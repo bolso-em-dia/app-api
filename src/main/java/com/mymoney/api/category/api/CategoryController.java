@@ -1,6 +1,7 @@
 package com.mymoney.api.category.api;
 
 import com.mymoney.api.PageResponse;
+import com.mymoney.api.category.CategoryListSortBy;
 import com.mymoney.api.category.CategoryListStatus;
 import com.mymoney.api.category.CategoryService;
 import com.mymoney.api.category.api.request.ArchiveCategoryRequest;
@@ -9,6 +10,8 @@ import com.mymoney.api.category.api.request.UpdateCategoryRequest;
 import com.mymoney.api.category.api.response.CategoryOptionResponse;
 import com.mymoney.api.category.api.response.CategoryResponse;
 import com.mymoney.api.category.mapper.CategoryMapper;
+import com.mymoney.api.shared.ApiSortDirection;
+import com.mymoney.api.shared.PageableSortResolver;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
@@ -43,8 +46,11 @@ public class CategoryController {
     public ResponseEntity<PageResponse<CategoryResponse>> list(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "ACTIVE") CategoryListStatus status,
-            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(categoryService.listAllResponses(search, status, pageable)));
+            @RequestParam(required = false) CategoryListSortBy sortBy,
+            @RequestParam(required = false) ApiSortDirection sortDir,
+            @PageableDefault(size = 20) Pageable pageable) {
+        var sortedPageable = PageableSortResolver.resolve(pageable, sortBy, CategoryListSortBy.NAME, sortDir);
+        return ResponseEntity.ok(PageResponse.from(categoryService.listAllResponses(search, status, sortedPageable)));
     }
 
     @GetMapping("/{id}")

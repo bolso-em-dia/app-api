@@ -101,6 +101,17 @@ class AccountControllerIntegrationTest extends AuthenticatedIntegrationTestSuppo
     }
 
     @Test
+    void listAccountsSupportsExplicitTypeSort() throws Exception {
+        mockMvc.perform(get("/api/accounts")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("sortBy", "TYPE")
+                        .param("sortDir", "DESC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].name").value("Visa Platinum"))
+                .andExpect(jsonPath("$.items[1].name").value("Main Checking"));
+    }
+
+    @Test
     void accountValidationAndOptionsWork() throws Exception {
         mockMvc.perform(post("/api/accounts")
                         .header("Authorization", bearerToken(adminToken))

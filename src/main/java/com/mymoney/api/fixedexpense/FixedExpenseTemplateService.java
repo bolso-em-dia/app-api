@@ -19,6 +19,7 @@ import com.mymoney.api.transaction.EffectiveMonthlyTransactionService;
 import com.mymoney.api.transaction.TransactionRepository;
 import com.mymoney.api.transaction.TransactionType;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,8 +45,14 @@ public class FixedExpenseTemplateService {
 
     @Transactional(readOnly = true)
     public Page<FixedExpenseTemplateResponse> listAllResponses(
-            String search, FixedExpenseTemplateListStatus status, Pageable pageable) {
-        return fixedExpenseTemplateRepository.findResponseByFilters(normalizeSearch(search), status.name(), pageable);
+            String search,
+            FixedExpenseTemplateListStatus status,
+            TransactionType type,
+            UUID accountId,
+            List<UUID> categoryIds,
+            Pageable pageable) {
+        return fixedExpenseTemplateRepository.findResponseByFilters(
+                normalizeSearch(search), status.name(), type, accountId, categoryIds, pageable);
     }
 
     @Transactional(readOnly = true)

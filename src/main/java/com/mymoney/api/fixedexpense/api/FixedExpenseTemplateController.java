@@ -1,12 +1,17 @@
 package com.mymoney.api.fixedexpense.api;
 
 import com.mymoney.api.PageResponse;
+import com.mymoney.api.fixedexpense.FixedExpenseTemplateListSortBy;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateListStatus;
 import com.mymoney.api.fixedexpense.FixedExpenseTemplateService;
 import com.mymoney.api.fixedexpense.api.request.CreateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.request.UpdateFixedExpenseTemplateRequest;
 import com.mymoney.api.fixedexpense.api.response.FixedExpenseTemplateResponse;
+import com.mymoney.api.shared.ApiSortDirection;
+import com.mymoney.api.shared.PageableSortResolver;
+import com.mymoney.api.transaction.TransactionType;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -36,9 +41,20 @@ public class FixedExpenseTemplateController {
     public ResponseEntity<PageResponse<FixedExpenseTemplateResponse>> list(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "ACTIVE") FixedExpenseTemplateListStatus status,
-            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
-        return ResponseEntity.ok(
-                PageResponse.from(fixedExpenseTemplateService.listAllResponses(search, status, pageable)));
+            @RequestParam(required = false) TransactionType type,
+            @RequestParam(required = false) UUID accountId,
+            @RequestParam(required = false) List<UUID> categoryIds,
+            @RequestParam(required = false) FixedExpenseTemplateListSortBy sortBy,
+            @RequestParam(required = false) ApiSortDirection sortDir,
+            @PageableDefault(size = 20) Pageable pageable) {
+        var sortedPageable =
+                PageableSortResolver.resolve(pageable, sortBy, FixedExpenseTemplateListSortBy.NAME, sortDir);
+        return ResponseEntity.ok(PageResponse.from(fixedExpenseTemplateService.listAllResponses(
+                search, status, type, accountId, normalizeCategoryIds(categoryIds), sortedPageable)));
+    }
+
+    private List<UUID> normalizeCategoryIds(List<UUID> categoryIds) {
+        return categoryIds == null || categoryIds.isEmpty() ? null : categoryIds;
     }
 
     @GetMapping("/{id}")

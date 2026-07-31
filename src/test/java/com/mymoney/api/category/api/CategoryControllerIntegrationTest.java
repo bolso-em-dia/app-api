@@ -1,6 +1,7 @@
 package com.mymoney.api.category.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -123,6 +124,31 @@ class CategoryControllerIntegrationTest extends AuthenticatedIntegrationTestSupp
                 .andExpect(jsonPath("$.name").value("Supermarket"))
                 .andExpect(jsonPath("$.icon").value("basket"))
                 .andExpect(jsonPath("$.color").value("#228844"));
+    }
+
+    @Test
+    void listCategoriesSupportsExplicitNameSort() throws Exception {
+        mockMvc.perform(get("/api/categories")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("search", "Integration Category")
+                        .param("sortBy", "NAME")
+                        .param("sortDir", "DESC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].name").value("Beta Integration Category"))
+                .andExpect(jsonPath("$.items[1].name").value("Alpha Integration Category"));
+    }
+
+    @Test
+    void listCategoriesRejectsInvalidSortDir() throws Exception {
+        mockMvc.perform(get("/api/categories")
+                        .header("Authorization", bearerToken(adminToken))
+                        .param("sortDir", "INVALID"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value(40004))
+                .andExpect(jsonPath("$.error").value("400 BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(containsString("sortDir")))
+                .andExpect(jsonPath("$.path").value("/api/categories"));
     }
 
     @Test
